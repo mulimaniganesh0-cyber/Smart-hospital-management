@@ -1,0 +1,58 @@
+SMART HOSPITAL RESOURCE MANAGEMENT SYSTEM
+LIBRARY REQUIREMENTS
+
+==================================================
+1. FLUTTER CLIENT DEPENDENCIES (frontend/pubspec.yaml)
+==================================================
+* flutter: Flutter SDK
+* cupertino_icons: iOS-style icons
+* google_fonts: Poppins and Outfit typography
+* font_awesome_flutter: Additional icon pack
+* provider: Flutter State management library
+* shared_preferences: Local key-value storage (for login tokens/sessions)
+* intl: Date and time formatting utilities
+* http: REST API client
+* socket_io_client: Real-time Socket.IO client interface
+* geolocator: Geolocation coordinate fetching
+* permission_handler: System permission request handler
+* geocoding: Resolving location addresses and coordinates
+* pdf: Custom PDF document generation
+* printing: Native document printing and sharing utilities
+* path_provider: Resolving local directories and folder paths
+* share_plus: Share context panels
+* syncfusion_flutter_pdfviewer: Inline PDF document viewer
+
+[Flutter Dev Dependencies]
+* flutter_test: Unit and Widget test framework
+* flutter_lints: Recommended static analysis rules
+
+==================================================
+2. BACKEND DEPENDENCIES (backend/package.json)
+==================================================
+* express: HTTP server and REST API framework
+* pg: PostgreSQL database client pool
+* socket.io: Bidirectional real-time Socket.IO server
+* jsonwebtoken: JWT auth token signing & validation
+* bcryptjs: Password hashing encryption
+* dotenv: Environmental variables resolver (.env)
+* cors: Cross-Origin Resource Sharing control handler
+* helmet: Security HTTP response header configurations
+* compression: Response payload compression
+* express-rate-limit: Rate limiting middleware for DDoS prevention
+* express-validator: Request validation checks
+* nodemailer: SMTP email notifications delivery dispatcher
+* uuid: Unique Identifier UUID key generator
+
+[Backend Dev Dependencies]
+* nodemon: Hot reload server script restarts
+
+==================================================
+3. INSTALLATION
+==================================================
+* Node.js Backend:
+  cd backend
+  npm install
+
+* Flutter Client:
+  cd frontend
+  flutter pub get
