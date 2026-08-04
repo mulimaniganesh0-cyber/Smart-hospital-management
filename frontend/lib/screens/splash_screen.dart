@@ -23,6 +23,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
     _controller.forward();
     Future.delayed(const Duration(seconds: 3), () {
+      if (!context.mounted) return;
+      if (!context.mounted) return;
+      if (!mounted) return;
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
     });
   }
@@ -55,9 +58,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   Container(
                     padding: const EdgeInsets.all(25),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
-                      boxShadow: [BoxShadow(color: Colors.white.withOpacity(0.3), blurRadius: 30, offset: const Offset(0, 10))],
+                      boxShadow: [BoxShadow(color: Colors.white.withValues(alpha: 0.3), blurRadius: 30, offset: const Offset(0, 10))],
                     ),
                     child: const Icon(Icons.local_hospital, size: 80, color: Colors.white),
                   ),
@@ -69,13 +72,13 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
-                      shadows: [Shadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 2))],
+                      shadows: [Shadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 2))],
                     ),
                   ),
                   const SizedBox(height: 20),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(30)),
+                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(30)),
                     child: const Text('Emergency Response System', style: TextStyle(color: Colors.white70, fontSize: 14)),
                   ),
                   const SizedBox(height: 60),

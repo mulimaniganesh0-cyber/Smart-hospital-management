@@ -88,28 +88,91 @@ io.on('connection', (socket) => {
   });
   
   socket.on('emergency-alert', (data) => {
-    if (!socket.data.patient || !Number.isInteger(Number(data?.hospitalId))) {
-      return socket.emit('socket-error', { message: 'Invalid emergency alert' });
+    if (!socket.data.patient) {
+      return socket.emit('socket-error', { message: 'Patient authentication required' });
     }
-    io.to(`hospital_${data.hospitalId}`).emit('new-emergency', data);
-    console.log(`🚨 Emergency alert sent to hospital_${data.hospitalId}`);
+    const targetHospital = data?.hospitalId || data?.hospital_id;
+    if (targetHospital) {
+      io.to(`hospital_${targetHospital}`).emit('new-emergency', data);
+      console.log(`🚨 Emergency alert sent to hospital_${targetHospital}`);
+    } else {
+      // Broadcast to all hospitals if no specific hospital target
+      io.emit('new-emergency', data);
+      console.log(`🚨 Emergency alert broadcasted globally`);
+    }
   });
   
-  socket.on('resource-update', (data) => {
-    const hospitalId = socket.data.hospital?.id;
-    if (!hospitalId) {
-      return socket.emit('socket-error', { message: 'Hospital access required' });
+  socket.on('emergency-location-update', (data) => {
+    if (data?.emergencyId) {
+      if (data?.hospitalId) {
+        io.to(`hospital_${data.hospitalId}`).emit('emergency-location-changed', data);
+      }
+      if (data?.patientId) {
+        io.to(`patient_${data.patientId}`).emit('emergency-location-changed', data);
+      }
+      io.emit(`emergency_${data.emergencyId}_location`, data);
+      console.log(`📍 Emergency location update for emergency #${data.emergencyId}`);
     }
-    io.to(`hospital_${hospitalId}`).emit('resources-changed', data);
-    console.log(`📊 Resource update sent to hospital_${data.hospitalId}`);
+  });
+
+  socket.on('ambulance-location-update', (data) => {
+    if (data?.ambulanceId) {
+      io.emit(`ambulance_${data.ambulanceId}_location`, data);
+      if (data?.emergencyId) {
+        io.emit(`emergency_${data.emergencyId}_ambulance`, data);
+      }
+      console.log(`🚑 Ambulance #${data.ambulanceId} location updated`);
+    }
+  });
+
+  socket.on('queue-update', (data) => {
+    if (data?.hospitalId) {
+      io.to(`hospital_${data.hospitalId}`).emit('queue-changed', data);
+    }
+    if (data?.patientId) {
+      io.to(`patient_${data.patientId}`).emit('queue-changed', data);
+    }
+  });
+
+  socket.on('appointment-update', (data) => {
+    if (data?.hospitalId) {
+      io.to(`hospital_${data.hospitalId}`).emit('appointment-changed', data);
+    }
+    if (data?.patientId) {
+      io.to(`patient_${data.patientId}`).emit('appointment-changed', data);
+    }
+  });
+
+  socket.on('dashboard-update', (data) => {
+    const hospitalId = socket.data.hospital?.id || data?.hospitalId;
+    if (hospitalId) {
+      io.to(`hospital_${hospitalId}`).emit('dashboard-stats-changed', data);
+    }
+  });
+
+  socket.on('resource-update', (data) => {
+    const hospitalId = socket.data.hospital?.id || data?.hospitalId;
+    if (hospitalId) {
+      io.to(`hospital_${hospitalId}`).emit('resources-changed', data);
+      io.emit('global-resources-changed', { hospitalId, ...data });
+      console.log(`📊 Resource update sent to hospital_${hospitalId}`);
+    }
   });
   
   socket.on('blood-request', (data) => {
-    if (!socket.data.patient || !Number.isInteger(Number(data?.hospitalId))) {
-      return socket.emit('socket-error', { message: 'Invalid blood request' });
+    const hospitalId = data?.hospitalId || data?.hospital_id;
+    if (hospitalId) {
+      io.to(`hospital_${hospitalId}`).emit('new-blood-request', data);
+      console.log(`🩸 Blood request sent to hospital_${hospitalId}`);
     }
-    io.to(`hospital_${data.hospitalId}`).emit('new-blood-request', data);
-    console.log(`🩸 Blood request sent to hospital_${data.hospitalId}`);
+  });
+
+  socket.on('blood-inventory-update', (data) => {
+    const hospitalId = socket.data.hospital?.id || data?.hospitalId;
+    if (hospitalId) {
+      io.to(`hospital_${hospitalId}`).emit('blood-stock-changed', data);
+      io.emit('global-blood-stock-changed', { hospitalId, ...data });
+    }
   });
   
   socket.on('disconnect', () => {
@@ -151,6 +214,15 @@ const ensureDatabaseSchema = async () => {
         )
       `);
     }
+
+    // Upgrade existing databases for the enhanced blood-request endpoints.
+    await pool.query(`
+      ALTER TABLE blood_requests
+        ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        ADD COLUMN IF NOT EXISTS urgency_level VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS rejection_reason TEXT,
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    `);
     
     // Check hospital_resources columns
     const columnCheck = await pool.query(`

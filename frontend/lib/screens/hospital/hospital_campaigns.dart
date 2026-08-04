@@ -1,7 +1,5 @@
 // lib/screens/hospital/hospital_campaigns.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../providers/hospital_provider.dart';
 import '../../services/api_service.dart';
 
 class HospitalCampaigns extends StatefulWidget {
@@ -105,7 +103,7 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
                           return Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: FilterChip(
-                              label: Text(filter.toUpperCase()),
+                              label: Text('${filter.toUpperCase()} ($count)'),
                               selected: _selectedFilter == filter,
                               onSelected: (selected) {
                                 setState(() => _selectedFilter = filter);
@@ -217,7 +215,7 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -413,7 +411,7 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
   final confirm = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text('Update Campaign Status'),
+      title: const Text('Update Campaign Status'),
       content: Text('Are you sure you want to mark this campaign as $status?'),
       actions: [
         TextButton(
@@ -791,14 +789,16 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
                 });
 
                 if (response['success']) {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('✅ Campaign created successfully!'),
+                      content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Campaign created successfully!'),
                       backgroundColor: Colors.green,
                     ),
                   );
                   _loadCampaigns();
                 } else {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(response['message'] ?? 'Failed to create campaign'),

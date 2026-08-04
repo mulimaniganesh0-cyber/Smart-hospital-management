@@ -303,102 +303,280 @@ exports.addBloodWithExpiry = async (req, res) => {
       error: error.message 
     });
   }
-};exports.addBloodWithExpiry = async (req, res) => {
+};
+
+// ==================== APPROVE / REJECT BLOOD REQUEST (HOSPITAL) ====================
+
+exports.approveBloodRequest = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { 
-      blood_group, 
-      units, 
-      expiry_date,
-      donation_date,
-      donor_name,
-      donor_phone,
-      batch_number
-    } = req.body;
-
-    console.log('Adding blood with expiry:', { blood_group, units, expiry_date, donor_name });
+    const { requestId } = req.params;
 
     const hospitalResult = await pool.query(
-      'SELECT id FROM hospitals WHERE user_id = $1',
-      [userId]
+      'SELECT id FROM hospitals WHERE user_id = $1', [userId]
     );
-
     if (hospitalResult.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Hospital not found' 
+      return res.status(404).json({ success: false, message: 'Hospital not found' });
+    }
+    const hospitalId = hospitalResult.rows[0].id;
+
+    // Find the request
+    const reqResult = await pool.query(
+      'SELECT * FROM blood_requests WHERE id = $1 AND hospital_id = $2 AND status = $3',
+      [requestId, hospitalId, 'pending']
+    );
+    if (reqResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Pending request not found' });
+    }
+
+    const bloodReq = reqResult.rows[0];
+
+    // Check availability
+    const stockResult = await pool.query(
+      'SELECT units_available FROM blood_bank WHERE hospital_id = $1 AND blood_group = $2',
+      [hospitalId, bloodReq.blood_group]
+    );
+    const available = stockResult.rows.length > 0 ? stockResult.rows[0].units_available : 0;
+    if (available < bloodReq.units_required) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient ${bloodReq.blood_group} stock. Available: ${available}, Requested: ${bloodReq.units_required}`,
       });
     }
 
-    const hospitalId = hospitalResult.rows[0].id;
-    const batchNum = batch_number || `BATCH${Date.now().toString().slice(-6)}${blood_group}`;
-
-    // Check if blood group already exists
-    const existingResult = await pool.query(
-      'SELECT id, units_available FROM blood_bank WHERE hospital_id = $1 AND blood_group = $2',
-      [hospitalId, blood_group]
+    // Deduct stock
+    await pool.query(
+      'UPDATE blood_bank SET units_available = units_available - $1, last_updated = CURRENT_TIMESTAMP WHERE hospital_id = $2 AND blood_group = $3',
+      [bloodReq.units_required, hospitalId, bloodReq.blood_group]
     );
 
-    let result;
-    if (existingResult.rows.length > 0) {
-      // Update existing record
-      const existingId = existingResult.rows[0].id;
-      const currentUnits = existingResult.rows[0].units_available || 0;
-      const newUnits = currentUnits + units;
-      
-      result = await pool.query(
-        `UPDATE blood_bank 
-         SET units_available = $1,
-             expiry_date = COALESCE($2, expiry_date),
-             batch_number = COALESCE($3, batch_number),
-             donation_date = COALESCE($4, donation_date),
-             donor_name = COALESCE($5, donor_name),
-             last_updated = CURRENT_TIMESTAMP
-         WHERE id = $6
-         RETURNING *`,
-        [newUnits, expiry_date, batchNum, donation_date || new Date(), donor_name || 'Unknown', existingId]
-      );
-      console.log(`Updated existing ${blood_group} stock: ${currentUnits} -> ${newUnits} units`);
-    } else {
-      // Insert new record
-      result = await pool.query(
-        `INSERT INTO blood_bank (
-          hospital_id, blood_group, units_available, 
-          expiry_date, batch_number, donation_date, donor_name,
-          last_updated, minimum_threshold
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, 10)
-        RETURNING *`,
-        [hospitalId, blood_group, units, expiry_date, batchNum, donation_date || new Date(), donor_name || 'Unknown']
-      );
-      console.log(`Added new ${blood_group} stock: ${units} units`);
+    // Update status
+    const result = await pool.query(
+      "UPDATE blood_requests SET status = 'approved', updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *",
+      [requestId]
+    );
+
+    res.json({ success: true, message: 'Blood request approved and stock deducted', data: result.rows[0] });
+  } catch (error) {
+    console.error('Approve blood request error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+exports.rejectBloodRequest = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { requestId } = req.params;
+    const { reason } = req.body;
+
+    const hospitalResult = await pool.query(
+      'SELECT id FROM hospitals WHERE user_id = $1', [userId]
+    );
+    if (hospitalResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Hospital not found' });
+    }
+    const hospitalId = hospitalResult.rows[0].id;
+
+    const result = await pool.query(
+      "UPDATE blood_requests SET status = 'rejected', rejection_reason = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND hospital_id = $3 AND status = 'pending' RETURNING *",
+      [reason || 'No reason provided', requestId, hospitalId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Pending request not found' });
     }
 
+    res.json({ success: true, message: 'Blood request rejected', data: result.rows[0] });
+  } catch (error) {
+    console.error('Reject blood request error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// ==================== EMERGENCY BLOOD REQUEST ====================
+
+exports.emergencyBloodRequest = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { blood_group, units_required, patient_name, urgency_level } = req.body;
+
+    const patientResult = await pool.query('SELECT id FROM patients WHERE user_id = $1', [userId]);
+    const patientId = patientResult.rows.length > 0 ? patientResult.rows[0].id : null;
+
+    // Find nearest hospital with stock
+    const hospitalWithStock = await pool.query(
+      `SELECT bb.hospital_id, bb.units_available, h.name as hospital_name
+       FROM blood_bank bb
+       JOIN hospitals h ON bb.hospital_id = h.id
+       WHERE bb.blood_group = $1 AND bb.units_available >= $2
+       ORDER BY bb.units_available DESC
+       LIMIT 1`,
+      [blood_group, units_required]
+    );
+
+    if (hospitalWithStock.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: `No hospitals have ${units_required} units of ${blood_group} available for emergency.`,
+      });
+    }
+
+    const targetHospital = hospitalWithStock.rows[0];
+
+    const result = await pool.query(
+      `INSERT INTO blood_requests (
+        patient_id, user_id, hospital_id, blood_group, units_required,
+        patient_name, status, urgency_level, request_date
+      ) VALUES ($1, $2, $3, $4, $5, $6, 'approved', $7, CURRENT_TIMESTAMP)
+      RETURNING *`,
+      [patientId, userId, targetHospital.hospital_id, blood_group, units_required,
+       patient_name || 'Emergency Patient', urgency_level || 'critical']
+    );
+
+    // Auto-deduct stock for emergency
     await pool.query(
-      `INSERT INTO blood_donation_history (
-        hospital_id, donor_name, donor_phone, blood_group, 
-        units_donated, donation_date, expiry_date, batch_number
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [hospitalId, donor_name || 'Anonymous', donor_phone || '', blood_group, units, donation_date || new Date(), expiry_date, batchNum]
+      'UPDATE blood_bank SET units_available = units_available - $1, last_updated = CURRENT_TIMESTAMP WHERE hospital_id = $2 AND blood_group = $3',
+      [units_required, targetHospital.hospital_id, blood_group]
     );
 
     res.status(201).json({
       success: true,
-      message: existingResult.rows.length > 0 
-        ? `Blood stock updated successfully. Added ${units} units to existing ${blood_group} stock.`
-        : 'Blood stock added successfully with expiry tracking',
+      message: `Emergency blood request auto-approved. ${units_required} units of ${blood_group} allocated from ${targetHospital.hospital_name}.`,
       data: result.rows[0],
     });
   } catch (error) {
-    console.error('Add blood with expiry error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error', 
-      error: error.message 
-    });
+    console.error('Emergency blood request error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
 
-// src/controllers/bloodBankController.js - Replace the getBloodStockWithExpiry method
+// ==================== INTER-HOSPITAL BLOOD TRANSFER ====================
+
+exports.transferBlood = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { target_hospital_id, blood_group, units } = req.body;
+
+    const sourceResult = await pool.query('SELECT id, name FROM hospitals WHERE user_id = $1', [userId]);
+    if (sourceResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Source hospital not found' });
+    }
+    const sourceHospitalId = sourceResult.rows[0].id;
+    const sourceHospitalName = sourceResult.rows[0].name;
+
+    if (sourceHospitalId === target_hospital_id) {
+      return res.status(400).json({ success: false, message: 'Cannot transfer to self' });
+    }
+
+    // Check source stock
+    const sourceStock = await pool.query(
+      'SELECT units_available FROM blood_bank WHERE hospital_id = $1 AND blood_group = $2',
+      [sourceHospitalId, blood_group]
+    );
+    const available = sourceStock.rows.length > 0 ? sourceStock.rows[0].units_available : 0;
+    if (available < units) {
+      return res.status(400).json({
+        success: false,
+        message: `Insufficient ${blood_group} stock to transfer. Available: ${available}`,
+      });
+    }
+
+    // Deduct from source
+    await pool.query(
+      'UPDATE blood_bank SET units_available = units_available - $1, last_updated = CURRENT_TIMESTAMP WHERE hospital_id = $2 AND blood_group = $3',
+      [units, sourceHospitalId, blood_group]
+    );
+
+    // Add to target (upsert)
+    await pool.query(
+      `INSERT INTO blood_bank (hospital_id, blood_group, units_available, last_updated, minimum_threshold)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP, 10)
+       ON CONFLICT (hospital_id, blood_group)
+       DO UPDATE SET units_available = blood_bank.units_available + $3, last_updated = CURRENT_TIMESTAMP`,
+      [target_hospital_id, blood_group, units]
+    );
+
+    res.json({
+      success: true,
+      message: `${units} units of ${blood_group} transferred from ${sourceHospitalName} to hospital #${target_hospital_id}`,
+      data: { source: sourceHospitalId, target: target_hospital_id, blood_group, units },
+    });
+  } catch (error) {
+    console.error('Transfer blood error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// ==================== BLOOD BANK ANALYTICS ====================
+
+exports.getBloodBankAnalytics = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const hospitalResult = await pool.query('SELECT id FROM hospitals WHERE user_id = $1', [userId]);
+    if (hospitalResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Hospital not found' });
+    }
+    const hospitalId = hospitalResult.rows[0].id;
+
+    // Stock by group
+    const stockResult = await pool.query(
+      `SELECT blood_group, COALESCE(SUM(units_available), 0) as total_units, minimum_threshold
+       FROM blood_bank WHERE hospital_id = $1
+       GROUP BY blood_group, minimum_threshold
+       ORDER BY blood_group`,
+      [hospitalId]
+    );
+
+    // Requests summary
+    const requestsResult = await pool.query(
+      `SELECT
+         COUNT(*) as total_requests,
+         COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
+         COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved,
+         COUNT(CASE WHEN status = 'rejected' THEN 1 END) as rejected,
+         COALESCE(SUM(units_required), 0) as total_units_requested
+       FROM blood_requests WHERE hospital_id = $1`,
+      [hospitalId]
+    );
+
+    // Low stock alerts
+    const lowStockResult = await pool.query(
+      `SELECT blood_group, units_available, minimum_threshold
+       FROM blood_bank 
+       WHERE hospital_id = $1 AND units_available < COALESCE(minimum_threshold, 10)
+       ORDER BY units_available ASC`,
+      [hospitalId]
+    );
+
+    // Expiring soon (next 7 days)
+    const expiringResult = await pool.query(
+      `SELECT blood_group, SUM(units_available) as units, MIN(expiry_date) as nearest_expiry
+       FROM blood_bank
+       WHERE hospital_id = $1 AND expiry_date IS NOT NULL
+         AND expiry_date <= CURRENT_DATE + INTERVAL '7 days'
+         AND expiry_date >= CURRENT_DATE AND units_available > 0
+       GROUP BY blood_group`,
+      [hospitalId]
+    );
+
+    res.json({
+      success: true,
+      data: {
+        stock_by_group: stockResult.rows,
+        requests_summary: requestsResult.rows[0],
+        low_stock_alerts: lowStockResult.rows,
+        expiring_soon: expiringResult.rows,
+        all_blood_groups: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'],
+      },
+    });
+  } catch (error) {
+    console.error('Get blood bank analytics error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// ==================== BLOOD EXPIRY MANAGEMENT ====================
 
 exports.getBloodExpiryNotifications = async (req, res) => {
   try {

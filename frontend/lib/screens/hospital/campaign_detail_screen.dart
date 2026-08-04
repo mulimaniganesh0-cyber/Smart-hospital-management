@@ -32,7 +32,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
   }
 
   Future<void> _loadData() async {
-    if (!mounted) return;
+    if (!context.mounted) return;
     
     setState(() {
       _isLoading = true;
@@ -85,9 +85,9 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
           backgroundColor: Colors.red,
           bottom: const TabBar(
             tabs: [
-              Tab(text: '📋 Overview', icon: Icon(Icons.info)),
-              Tab(text: '👤 Registrations', icon: Icon(Icons.people)),
-              Tab(text: '🩸 Donations', icon: Icon(Icons.bloodtype)),
+              Tab(text: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ Overview', icon: Icon(Icons.info)),
+              Tab(text: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‚Â¤ Registrations', icon: Icon(Icons.people)),
+              Tab(text: 'ÃƒÂ°Ã…Â¸Ã‚Â©Ã‚Â¸ Donations', icon: Icon(Icons.bloodtype)),
             ],
           ),
           actions: [
@@ -315,7 +315,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
+                        color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -330,15 +330,15 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('🩸 Blood Group: ${reg['blood_group'] ?? 'N/A'}'),
-                Text('📱 ${reg['donor_phone'] ?? 'N/A'}'),
+                Text('ÃƒÂ°Ã…Â¸Ã‚Â©Ã‚Â¸ Blood Group: ${reg['blood_group'] ?? 'N/A'}'),
+                Text('ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â± ${reg['donor_phone'] ?? 'N/A'}'),
                 if (reg['age'] != null)
-                  Text('🎂 Age: ${reg['age']} years'),
+                  Text('ÃƒÂ°Ã…Â¸Ã…Â½Ã¢â‚¬Å¡ Age: ${reg['age']} years'),
                 if (reg['weight'] != null)
-                  Text('⚖️ Weight: ${reg['weight']} kg'),
-                Text('📅 Registered: ${reg['registration_date']?.toString().split('T')[0] ?? ''}'),
+                  Text('ÃƒÂ¢Ã…Â¡Ã¢â‚¬â€œÃƒÂ¯Ã‚Â¸Ã‚Â Weight: ${reg['weight']} kg'),
+                Text('ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¦ Registered: ${reg['registration_date']?.toString().split('T')[0] ?? ''}'),
                 if (reg['units_donated'] != null && reg['units_donated'] > 0)
-                  Text('🩸 Units Donated: ${reg['units_donated']}'),
+                  Text('ÃƒÂ°Ã…Â¸Ã‚Â©Ã‚Â¸ Units Donated: ${reg['units_donated']}'),
                 if (status == 'registered')
                   const SizedBox(height: 8),
                 if (status == 'registered')
@@ -351,7 +351,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                             backgroundColor: Colors.green,
                             foregroundColor: Colors.white,
                           ),
-                          child: const Text('✅ Record Donation'),
+                          child: const Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Record Donation'),
                         ),
                       ),
                     ],
@@ -401,7 +401,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                             color: Colors.red.shade50,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Icon(
+                          child: const Icon(
                             Icons.bloodtype,
                             color: Colors.red,
                             size: 24,
@@ -432,12 +432,12 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
+                        color: Colors.green.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         'Batch: ${donation['batch_number'] ?? 'N/A'}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 10,
                           color: Colors.green,
                         ),
@@ -466,7 +466,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                 if (donation['expiry_date'] != null)
                   Text(
                     'Expires: ${donation['expiry_date']?.toString().split('T')[0] ?? ''}',
-                    style: TextStyle(fontSize: 12, color: Colors.orange),
+                    style: const TextStyle(fontSize: 12, color: Colors.orange),
                   ),
                 if (donation['collected_by'] != null)
                   Text(
@@ -503,7 +503,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: selectedBloodGroup,
+                  initialValue: selectedBloodGroup,
                   decoration: const InputDecoration(
                     labelText: 'Blood Group *',
                     border: OutlineInputBorder(),
@@ -681,7 +681,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                       child: TextField(
                         controller: temperatureController,
                         decoration: const InputDecoration(
-                          labelText: 'Temperature (°F)',
+                          labelText: 'Temperature (Ãƒâ€šÃ‚Â°F)',
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.thermostat),
                         ),
@@ -765,18 +765,21 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                   await _loadData();
                   
                   // Also refresh the hospital provider to update blood bank
+                  if (!context.mounted) return;
                   final hospitalProvider = Provider.of<HospitalProvider>(context, listen: false);
                   await hospitalProvider.loadHospitalData();
                   
                   if (mounted) {
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('✅ Donation recorded! ${units} unit(s) of ${selectedBloodGroup} added to blood bank.'),
+                        content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Donation recorded! $units unit(s) of $selectedBloodGroup added to blood bank.'),
                         backgroundColor: Colors.green,
                       ),
                     );
                   }
                 } else if (mounted) {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(response['message'] ?? 'Failed to record donation'),
@@ -788,7 +791,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
               ),
-              child: const Text('✅ Record Donation'),
+              child: const Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Record Donation'),
             ),
           ],
         ),

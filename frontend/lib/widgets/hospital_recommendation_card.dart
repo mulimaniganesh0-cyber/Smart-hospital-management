@@ -47,7 +47,7 @@ class HospitalRecommendationCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: isEmergency ? Colors.red.shade50 : const Color(0xFF0A4D68).withOpacity(0.1),
+                      color: isEmergency ? Colors.red.shade50 : const Color(0xFF0A4D68).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
@@ -77,7 +77,7 @@ class HospitalRecommendationCard extends StatelessWidget {
                           ],
                         ),
                         Text(
-                          '📍 $address',
+                          'ðŸ“ $address',
                           style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -126,7 +126,7 @@ class HospitalRecommendationCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Text(
-                        '🚨 Emergency',
+                        'ðŸš¨ Emergency',
                         style: TextStyle(fontSize: 10, color: Colors.red),
                       ),
                     ),
@@ -141,7 +141,7 @@ class HospitalRecommendationCard extends StatelessWidget {
                     backgroundColor: isEmergency ? Colors.red : const Color(0xFF0A4D68),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
-                  child: Text(isEmergency ? '🚑 Request Emergency Help' : '📋 View Details'),
+                  child: Text(isEmergency ? 'ðŸš‘ Request Emergency Help' : 'ðŸ“‹ View Details'),
                 ),
               ),
             ],
@@ -159,7 +159,7 @@ class HospitalRecommendationCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(

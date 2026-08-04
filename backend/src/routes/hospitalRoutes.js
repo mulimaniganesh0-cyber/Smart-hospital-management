@@ -14,6 +14,7 @@ router.get('/:hospitalId/doctors', hospitalController.getHospitalDoctors);
 
 // Protected routes (authentication required)
 router.get('/profile', protect, authorize('hospital'), hospitalController.getHospitalProfile);
+router.get('/dashboard-stats', protect, authorize('hospital'), hospitalController.getDashboardStats);
 router.put('/resources', protect, authorize('hospital'), hospitalController.updateResources);
 
 // Staff management routes (hospital only)

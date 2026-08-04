@@ -107,7 +107,6 @@ class _PatientDashboardState extends State<PatientDashboard> {
     'available_icus': 0,
     'blood_units': 0,
   };
-  bool _isLoading = true;
   bool _isRequesting = false;
 
   @override
@@ -122,13 +121,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
   }
 
   Future<void> _loadDashboardStats() async {
-    if (!mounted) return;
-
-    setState(() => _isLoading = true);
+    if (!context.mounted) return;
 
     try {
       final response = await ApiService.getNearbyHospitals(28.6139, 77.2090);
-      if (!mounted) return;
+      if (!context.mounted) return;
 
       if (response['success'] && response['data'] != null) {
         final hospitals = response['data'];
@@ -151,11 +148,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
         }
       }
     } catch (e) {
-      print('Error loading stats: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      debugPrint('Error loading stats: $e');
     }
   }
 
@@ -197,6 +190,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
         return;
       }
 
+      if (!context.mounted) return;
       await showDialog(
         context: context,
         barrierDismissible: false,
@@ -384,7 +378,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                                     const Padding(
                                       padding: EdgeInsets.only(top: 8),
                                       child: Text(
-                                        '⚠️ No blood units available in this hospital',
+                                        'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â No blood units available in this hospital',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.red,
@@ -408,7 +402,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                                 ),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.check_circle,
+                                    const Icon(Icons.check_circle,
                                         color: Colors.green, size: 16),
                                     const SizedBox(width: 8),
                                     Text(
@@ -523,6 +517,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
     } catch (e) {
       setState(() => _isRequesting = false);
       if (mounted) {
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Network error. Please try again.'),
@@ -545,7 +540,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
         onLoaded(availability);
       }
     } catch (e) {
-      print('Error loading blood availability: $e');
+      debugPrint('Error loading blood availability: $e');
     }
   }
 
@@ -584,6 +579,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
       setState(() => _isRequesting = false);
 
       if (requestResponse['success'] && mounted) {
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$resourceType request sent successfully'),
@@ -591,6 +587,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
           ),
         );
       } else if (mounted) {
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(requestResponse['message'] ?? 'Request failed'),
@@ -601,6 +598,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
     } catch (e) {
       setState(() => _isRequesting = false);
       if (mounted) {
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Network error. Please try again.'),
@@ -916,7 +914,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
+            color: Colors.white.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: Colors.white, size: 24),
@@ -989,9 +987,9 @@ class QuickActionCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           children: [
@@ -1030,9 +1028,9 @@ class ResourceRequestCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1114,7 +1112,7 @@ class RecentHospitalCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
+                      color: statusColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(

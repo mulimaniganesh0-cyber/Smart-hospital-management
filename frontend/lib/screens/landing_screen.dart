@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import 'login_screen.dart';
 import 'signup_screen.dart';
 import 'patient/patient_home_screen.dart' as patient;
 import 'hospital/hospital_home_screen.dart' as hospital;
@@ -18,7 +17,8 @@ class LandingScreen extends StatefulWidget {
   State<LandingScreen> createState() => _LandingScreenState();
 }
 
-class _LandingScreenState extends State<LandingScreen> with TickerProviderStateMixin {
+class _LandingScreenState extends State<LandingScreen>
+    with TickerProviderStateMixin {
   final PageController _pageController = PageController();
   double _currentPage = 0.0;
   DateTime _lastScrollTime = DateTime.now();
@@ -41,7 +41,8 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
   // CareGuide simulated chat state
   final List<Map<String, dynamic>> _simulatedMessages = [
     {
-      'text': 'Hello! I am CareGuide. Ask me anything about nearby resource availability or emergency booking.',
+      'text':
+          'Hello! I am CareGuide. Ask me anything about nearby resource availability or emergency booking.',
       'isUser': false
     }
   ];
@@ -73,7 +74,7 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
-    
+
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.08).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
@@ -161,7 +162,8 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
             child: PageView(
               controller: _pageController,
               scrollDirection: Axis.vertical,
-              physics: const NeverScrollableScrollPhysics(), // Managed via mouse listener / navigation
+              physics:
+                  const NeverScrollableScrollPhysics(), // Managed via mouse listener / navigation
               children: [
                 _buildHeroSection(isDesktop),
                 _buildResourceRegistrySection(isDesktop),
@@ -205,8 +207,8 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFF0B132B).withOpacity(0.9),
-            const Color(0xFF0B132B).withOpacity(0.0),
+            const Color(0xFF0B132B).withValues(alpha: 0.9),
+            const Color(0xFF0B132B).withValues(alpha: 0.0),
           ],
         ),
       ),
@@ -247,13 +249,16 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                   child: TextButton(
                     onPressed: () => _scrollToPage(index),
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      foregroundColor: isSelected ? const Color(0xFF48CAE4) : Colors.white70,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      foregroundColor:
+                          isSelected ? const Color(0xFF48CAE4) : Colors.white70,
                     ),
                     child: Text(
                       _sections[index]['title'],
                       style: GoogleFonts.poppins(
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
                   ),
@@ -268,7 +273,7 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
               backgroundColor: const Color(0xFF0077B6),
               foregroundColor: Colors.white,
               elevation: 4,
-              shadowColor: const Color(0xFF0096C7).withOpacity(0.4),
+              shadowColor: const Color(0xFF0096C7).withValues(alpha: 0.4),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(30),
@@ -303,7 +308,7 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: const Color(0xFF48CAE4).withOpacity(0.6),
+                            color: const Color(0xFF48CAE4).withValues(alpha: 0.6),
                             blurRadius: 10,
                             spreadRadius: 2,
                           )
@@ -321,109 +326,129 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
   // ==================== SLIDE 0: HERO SECTION ====================
 
   Widget _buildHeroSection(bool isDesktop) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const SizedBox(height: 60),
-              // Main Tagline
-              ShaderMask(
-                shaderCallback: (bounds) => const LinearGradient(
-                  colors: [Color(0xFF90E0EF), Color(0xFF00B4D8), Color(0xFF0077B6)],
-                ).createShader(bounds),
-                child: Text(
-                  'Revolutionizing Hospital Resource Coordination',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.outfit(
-                    fontSize: isDesktop ? 54 : 36,
-                    fontWeight: FontWeight.extrabold,
-                    color: Colors.white,
-                    height: 1.2,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Description
-              Text(
-                'A modern, integrated portal for real-time bed registries, emergency ambulance dispatching, blood bank monitoring, and CareGuide AI guidance.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.poppins(
-                  fontSize: isDesktop ? 18 : 15,
-                  color: Colors.white.withOpacity(0.8),
-                  height: 1.6,
-                ),
-              ),
-              const SizedBox(height: 48),
-
-              // Desktop Glass Dashboard Mockup
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.04),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 30,
-                      offset: const Offset(0, 15),
-                    )
-                  ],
-                ),
-                child: Wrap(
-                  spacing: 24,
-                  runSpacing: 24,
-                  alignment: WrapAlignment.center,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1200),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _buildHeroMetric('142+', 'Hospitals Connected', Icons.local_hospital, const Color(0xFF48CAE4)),
-                    _buildHeroMetric('2.1 Min', 'Avg Response Time', Icons.flash_on, const Color(0xFFFFB703)),
-                    _buildHeroMetric('98.7%', 'Successful Dispatches', Icons.check_circle_outline, const Color(0xFF2A9D8F)),
+                    const SizedBox(height: 60),
+                    // Main Tagline
+                    ShaderMask(
+                      shaderCallback: (bounds) => const LinearGradient(
+                        colors: [
+                          Color(0xFF90E0EF),
+                          Color(0xFF00B4D8),
+                          Color(0xFF0077B6)
+                        ],
+                      ).createShader(bounds),
+                      child: Text(
+                        'Revolutionizing Hospital Resource Coordination',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.outfit(
+                          fontSize: isDesktop ? 54 : 36,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Description
+                    Text(
+                      'A modern, integrated portal for real-time bed registries, emergency ambulance dispatching, blood bank monitoring, and CareGuide AI guidance.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        fontSize: isDesktop ? 18 : 15,
+                        color: Colors.white.withValues(alpha: 0.8),
+                        height: 1.6,
+                      ),
+                    ),
+                    const SizedBox(height: 48),
+
+                    // Desktop Glass Dashboard Mockup
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(20),
+                        border:
+                            Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.3),
+                            blurRadius: 30,
+                            offset: const Offset(0, 15),
+                          )
+                        ],
+                      ),
+                      child: Wrap(
+                        spacing: 24,
+                        runSpacing: 24,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          _buildHeroMetric('142+', 'Hospitals Connected',
+                              Icons.local_hospital, const Color(0xFF48CAE4)),
+                          _buildHeroMetric('2.1 Min', 'Avg Response Time',
+                              Icons.flash_on, const Color(0xFFFFB703)),
+                          _buildHeroMetric(
+                              '98.7%',
+                              'Successful Dispatches',
+                              Icons.check_circle_outline,
+                              const Color(0xFF2A9D8F)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 60),
+
+                    // Bouncing Chevron indicator
+                    Column(
+                      children: [
+                        Text(
+                          'Scroll down to explore features',
+                          style: GoogleFonts.poppins(
+                              fontSize: 12, color: Colors.white30),
+                        ),
+                        const SizedBox(height: 8),
+                        const Icon(
+                          Icons.keyboard_arrow_down,
+                          color: Colors.white30,
+                          size: 28,
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 60),
-
-              // Bouncing Chevron indicator
-              Column(
-                children: [
-                  Text(
-                    'Scroll down to explore features',
-                    style: GoogleFonts.poppins(fontSize: 12, color: Colors.white30),
-                  ),
-                  const SizedBox(height: 8),
-                  const Icon(
-                    Icons.keyboard_arrow_down,
-                    color: Colors.white30,
-                    size: 28,
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildHeroMetric(String val, String label, IconData icon, Color color) {
+  Widget _buildHeroMetric(
+      String val, String label, IconData icon, Color color) {
     return Container(
       width: 250,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.02),
+        color: Colors.white.withValues(alpha: 0.02),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 24),
@@ -444,7 +469,8 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                 ),
                 Text(
                   label,
-                  style: GoogleFonts.poppins(fontSize: 12, color: Colors.white54),
+                  style:
+                      GoogleFonts.poppins(fontSize: 12, color: Colors.white54),
                 ),
               ],
             ),
@@ -475,9 +501,10 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF48CAE4).withOpacity(0.1),
+                        color: const Color(0xFF48CAE4).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(30),
                       ),
                       child: Text(
@@ -508,9 +535,12 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                       ),
                     ),
                     const SizedBox(height: 24),
-                    _buildFeatureBullet(Icons.check_circle_outline_rounded, 'Auto-updates via WebSockets connection.'),
-                    _buildFeatureBullet(Icons.check_circle_outline_rounded, 'Prevents hospital congestion during surge seasons.'),
-                    _buildFeatureBullet(Icons.check_circle_outline_rounded, 'Critical levels trigger system warnings.'),
+                    _buildFeatureBullet(Icons.check_circle_outline_rounded,
+                        'Auto-updates via WebSockets connection.'),
+                    _buildFeatureBullet(Icons.check_circle_outline_rounded,
+                        'Prevents hospital congestion during surge seasons.'),
+                    _buildFeatureBullet(Icons.check_circle_outline_rounded,
+                        'Critical levels trigger system warnings.'),
                   ],
                 ),
               ),
@@ -522,9 +552,9 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                 child: Container(
                   padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.03),
+                    color: Colors.white.withValues(alpha: 0.03),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -541,12 +571,14 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                       const SizedBox(height: 8),
                       Text(
                         'Adjust sliders to simulate emergency patient intake and watch inventory levels update dynamically.',
-                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.white30),
+                        style: GoogleFonts.poppins(
+                            fontSize: 12, color: Colors.white30),
                       ),
                       const SizedBox(height: 24),
 
                       // General Beds Tracker
-                      _buildSliderIndicator('General Beds Occupancy', _simulatedBeds, const Color(0xFF48CAE4)),
+                      _buildSliderIndicator('General Beds Occupancy',
+                          _simulatedBeds, const Color(0xFF48CAE4)),
                       Slider(
                         value: _simulatedBeds,
                         min: 0,
@@ -562,7 +594,8 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                       const SizedBox(height: 16),
 
                       // ICU Occupancy
-                      _buildSliderIndicator('ICU Beds Occupancy', _simulatedICU, const Color(0xFFFFB703)),
+                      _buildSliderIndicator('ICU Beds Occupancy', _simulatedICU,
+                          const Color(0xFFFFB703)),
                       Slider(
                         value: _simulatedICU,
                         min: 0,
@@ -578,7 +611,8 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                       const SizedBox(height: 16),
 
                       // Ventilator Available
-                      _buildSliderIndicator('Ventilators In Use', _simulatedVents, const Color(0xFF2A9D8F)),
+                      _buildSliderIndicator('Ventilators In Use',
+                          _simulatedVents, const Color(0xFF2A9D8F)),
                       Slider(
                         value: _simulatedVents,
                         min: 0,
@@ -612,13 +646,16 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title, style: GoogleFonts.poppins(fontSize: 14, color: Colors.white70)),
+        Text(title,
+            style: GoogleFonts.poppins(fontSize: 14, color: Colors.white70)),
         Row(
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: val > 85 ? Colors.red.withOpacity(0.2) : color.withOpacity(0.2),
+                color: val > 85
+                    ? Colors.red.withValues(alpha: 0.2)
+                    : color.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
@@ -631,7 +668,9 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
               ),
             ),
             const SizedBox(width: 8),
-            Text('${val.round()}%', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white)),
+            Text('${val.round()}%',
+                style: GoogleFonts.outfit(
+                    fontWeight: FontWeight.bold, color: Colors.white)),
           ],
         )
       ],
@@ -679,9 +718,10 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFB703).withOpacity(0.1),
+                        color: const Color(0xFFFFB703).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(30),
                       ),
                       child: Text(
@@ -712,9 +752,12 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                       ),
                     ),
                     const SizedBox(height: 24),
-                    _buildFeatureBullet(Icons.flash_on, 'Instantly broadcasts coordinates through WebSockets.'),
-                    _buildFeatureBullet(Icons.map, 'Calculates travel time using live geographic telemetry.'),
-                    _buildFeatureBullet(Icons.phone_in_talk, 'Direct coordination line to ambulance drivers.'),
+                    _buildFeatureBullet(Icons.flash_on,
+                        'Instantly broadcasts coordinates through WebSockets.'),
+                    _buildFeatureBullet(Icons.map,
+                        'Calculates travel time using live geographic telemetry.'),
+                    _buildFeatureBullet(Icons.phone_in_talk,
+                        'Direct coordination line to ambulance drivers.'),
                   ],
                 ),
               ),
@@ -726,9 +769,9 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                 child: Container(
                   height: 400,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.02),
+                    color: Colors.white.withValues(alpha: 0.02),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(24),
@@ -747,14 +790,18 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                           bottom: 80,
                           child: Column(
                             children: [
-                              const Icon(Icons.person_pin_circle_rounded, color: Color(0xFFFFB703), size: 36),
+                              const Icon(Icons.person_pin_circle_rounded,
+                                  color: Color(0xFFFFB703), size: 36),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.8),
+                                  color: Colors.black.withValues(alpha: 0.8),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
-                                child: Text('Patient Location', style: GoogleFonts.poppins(fontSize: 10, color: Colors.white)),
+                                child: Text('Patient Location',
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 10, color: Colors.white)),
                               ),
                             ],
                           ),
@@ -765,14 +812,18 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                           top: 80,
                           child: Column(
                             children: [
-                              const Icon(Icons.local_hospital, color: Color(0xFF48CAE4), size: 40),
+                              const Icon(Icons.local_hospital,
+                                  color: Color(0xFF48CAE4), size: 40),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.8),
+                                  color: Colors.black.withValues(alpha: 0.8),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
-                                child: Text('City General Hospital', style: GoogleFonts.poppins(fontSize: 10, color: Colors.white)),
+                                child: Text('City General Hospital',
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 10, color: Colors.white)),
                               ),
                             ],
                           ),
@@ -786,22 +837,32 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                           child: Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.85),
+                              color: Colors.black.withValues(alpha: 0.85),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: Colors.white10),
                             ),
                             child: Row(
                               children: [
-                                const Icon(Icons.local_shipping_rounded, color: Color(0xFFFFB703), size: 24),
+                                const Icon(Icons.local_shipping_rounded,
+                                    color: Color(0xFFFFB703), size: 24),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Text('Ambulance #A-24 Dispatched', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white)),
+                                      Text('Ambulance #A-24 Dispatched',
+                                          style: GoogleFonts.poppins(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                              color: Colors.white)),
                                       const SizedBox(height: 2),
-                                      Text('En Route. ETA: 4.8 minutes (Traffic Normal)', style: GoogleFonts.poppins(fontSize: 10, color: Colors.white70)),
+                                      Text(
+                                          'En Route. ETA: 4.8 minutes (Traffic Normal)',
+                                          style: GoogleFonts.poppins(
+                                              fontSize: 10,
+                                              color: Colors.white70)),
                                     ],
                                   ),
                                 ),
@@ -842,9 +903,10 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2A9D8F).withOpacity(0.1),
+                        color: const Color(0xFF2A9D8F).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(30),
                       ),
                       child: Text(
@@ -875,9 +937,12 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                       ),
                     ),
                     const SizedBox(height: 24),
-                    _buildFeatureBullet(Icons.location_on, 'Uses client geographic search contexts.'),
-                    _buildFeatureBullet(Icons.chat_bubble_outline_rounded, 'Answers questions on resource reservation rules.'),
-                    _buildFeatureBullet(Icons.stars_sharp, 'Recommends top-rated hospitals based on patient reports.'),
+                    _buildFeatureBullet(Icons.location_on,
+                        'Uses client geographic search contexts.'),
+                    _buildFeatureBullet(Icons.chat_bubble_outline_rounded,
+                        'Answers questions on resource reservation rules.'),
+                    _buildFeatureBullet(Icons.stars_sharp,
+                        'Recommends top-rated hospitals based on patient reports.'),
                   ],
                 ),
               ),
@@ -890,9 +955,9 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                   height: 400,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.03),
+                    color: Colors.white.withValues(alpha: 0.03),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                   ),
                   child: Column(
                     children: [
@@ -902,21 +967,32 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF2A9D8F).withOpacity(0.1),
+                              color: const Color(0xFF2A9D8F).withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.support_agent, color: Color(0xFF2A9D8F)),
+                            child: const Icon(Icons.support_agent,
+                                color: Color(0xFF2A9D8F)),
                           ),
                           const SizedBox(width: 12),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('CareGuide AI', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
+                              Text('CareGuide AI',
+                                  style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white)),
                               Row(
                                 children: [
-                                  Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
+                                  Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: const BoxDecoration(
+                                          color: Colors.green,
+                                          shape: BoxShape.circle)),
                                   const SizedBox(width: 6),
-                                  Text('Online', style: GoogleFonts.poppins(fontSize: 10, color: Colors.white60)),
+                                  Text('Online',
+                                      style: GoogleFonts.poppins(
+                                          fontSize: 10, color: Colors.white60)),
                                 ],
                               ),
                             ],
@@ -933,24 +1009,32 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                             final msg = _simulatedMessages[index];
                             final isUser = msg['isUser'] == true;
                             return Align(
-                              alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                              alignment: isUser
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
                               child: Container(
                                 margin: const EdgeInsets.only(bottom: 12),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 10),
                                 decoration: BoxDecoration(
                                   color: isUser
                                       ? const Color(0xFF0077B6)
-                                      : Colors.white.withOpacity(0.06),
+                                      : Colors.white.withValues(alpha: 0.06),
                                   borderRadius: BorderRadius.only(
                                     topLeft: const Radius.circular(12),
                                     topRight: const Radius.circular(12),
-                                    bottomLeft: isUser ? const Radius.circular(12) : Radius.zero,
-                                    bottomRight: isUser ? Radius.zero : const Radius.circular(12),
+                                    bottomLeft: isUser
+                                        ? const Radius.circular(12)
+                                        : Radius.zero,
+                                    bottomRight: isUser
+                                        ? Radius.zero
+                                        : const Radius.circular(12),
                                   ),
                                 ),
                                 child: Text(
                                   msg['text'],
-                                  style: GoogleFonts.poppins(fontSize: 13, color: Colors.white),
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 13, color: Colors.white),
                                 ),
                               ),
                             );
@@ -963,7 +1047,11 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                           alignment: Alignment.centerLeft,
                           child: Padding(
                             padding: const EdgeInsets.only(bottom: 8.0),
-                            child: Text('CareGuide is typing...', style: GoogleFonts.poppins(fontSize: 11, color: Colors.white30, fontStyle: FontStyle.italic)),
+                            child: Text('CareGuide is typing...',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 11,
+                                    color: Colors.white30,
+                                    fontStyle: FontStyle.italic)),
                           ),
                         ),
 
@@ -988,9 +1076,13 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
 
   Widget _buildPromptChip(String label) {
     return ActionChip(
-      backgroundColor: Colors.white.withOpacity(0.04),
-      label: Text(label, style: GoogleFonts.poppins(fontSize: 11, color: const Color(0xFF48CAE4))),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: Colors.white10)),
+      backgroundColor: Colors.white.withValues(alpha: 0.04),
+      label: Text(label,
+          style: GoogleFonts.poppins(
+              fontSize: 11, color: const Color(0xFF48CAE4))),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Colors.white10)),
       onPressed: () {
         if (_isTyping) return;
         setState(() {
@@ -1004,9 +1096,11 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
             _isTyping = false;
             String response = 'Loading real-time data... ';
             if (label.contains('ICU')) {
-              response = 'City General Hospital currently has 3 vacant ICU beds, which is 2.4 km away. I recommend routing there.';
+              response =
+                  'City General Hospital currently has 3 vacant ICU beds, which is 2.4 km away. I recommend routing there.';
             } else {
-              response = 'You can book an emergency ambulance directly from the dispatch portal on your patient dashboard. Just input your coordinates.';
+              response =
+                  'You can book an emergency ambulance directly from the dispatch portal on your patient dashboard. Just input your coordinates.';
             }
             _simulatedMessages.add({'text': response, 'isUser': false});
           });
@@ -1037,9 +1131,10 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.redAccent.withOpacity(0.1),
+                        color: Colors.redAccent.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(30),
                       ),
                       child: Text(
@@ -1070,9 +1165,12 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                       ),
                     ),
                     const SizedBox(height: 24),
-                    _buildFeatureBullet(Icons.warning_amber_rounded, 'Proactive expiry alerts per batch.'),
-                    _buildFeatureBullet(Icons.event_note, 'Coordinated community campaigns.'),
-                    _buildFeatureBullet(Icons.analytics, 'Detailed collection report logs.'),
+                    _buildFeatureBullet(Icons.warning_amber_rounded,
+                        'Proactive expiry alerts per batch.'),
+                    _buildFeatureBullet(
+                        Icons.event_note, 'Coordinated community campaigns.'),
+                    _buildFeatureBullet(
+                        Icons.analytics, 'Detailed collection report logs.'),
                   ],
                 ),
               ),
@@ -1084,9 +1182,9 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                 child: Container(
                   padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.03),
+                    color: Colors.white.withValues(alpha: 0.03),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1103,7 +1201,8 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                       const SizedBox(height: 8),
                       Text(
                         'Simulate remaining batch shelf life. The system automatically creates a campaign once it dips below 7 days.',
-                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.white30),
+                        style: GoogleFonts.poppins(
+                            fontSize: 12, color: Colors.white30),
                       ),
                       const SizedBox(height: 24),
 
@@ -1111,8 +1210,13 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Days until Batch Expiry', style: GoogleFonts.poppins(fontSize: 14, color: Colors.white70)),
-                          Text('${_bloodExpirySlider.round()} Days', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: Colors.white)),
+                          Text('Days until Batch Expiry',
+                              style: GoogleFonts.poppins(
+                                  fontSize: 14, color: Colors.white70)),
+                          Text('${_bloodExpirySlider.round()} Days',
+                              style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white)),
                         ],
                       ),
                       Slider(
@@ -1135,11 +1239,13 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: _bloodExpirySlider < 7
-                              ? Colors.red.withOpacity(0.15)
-                              : Colors.green.withOpacity(0.1),
+                              ? Colors.red.withValues(alpha: 0.15)
+                              : Colors.green.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: _bloodExpirySlider < 7 ? Colors.redAccent : Colors.green,
+                            color: _bloodExpirySlider < 7
+                                ? Colors.redAccent
+                                : Colors.green,
                           ),
                         ),
                         child: Row(
@@ -1148,7 +1254,9 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                               _bloodExpirySlider < 7
                                   ? Icons.warning_amber_rounded
                                   : Icons.check_circle_outline,
-                              color: _bloodExpirySlider < 7 ? Colors.redAccent : Colors.green,
+                              color: _bloodExpirySlider < 7
+                                  ? Colors.redAccent
+                                  : Colors.green,
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -1157,11 +1265,13 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                                 children: [
                                   Text(
                                     _bloodExpirySlider < 7
-                                        ? '⚠️ Critical Expiry Risk!'
+                                        ? 'âš ï¸ Critical Expiry Risk!'
                                         : 'Blood Stock Stable',
                                     style: GoogleFonts.poppins(
                                       fontWeight: FontWeight.bold,
-                                      color: _bloodExpirySlider < 7 ? Colors.redAccent : Colors.green,
+                                      color: _bloodExpirySlider < 7
+                                          ? Colors.redAccent
+                                          : Colors.green,
                                       fontSize: 13,
                                     ),
                                   ),
@@ -1170,7 +1280,8 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                                     _bloodExpirySlider < 7
                                         ? 'Batch A+ expires soon. Community Blood Campaign launched automatically.'
                                         : 'All current blood bank resources are safely within acceptable usage terms.',
-                                    style: GoogleFonts.poppins(fontSize: 11, color: Colors.white70),
+                                    style: GoogleFonts.poppins(
+                                        fontSize: 11, color: Colors.white70),
                                   ),
                                 ],
                               ),
@@ -1210,9 +1321,10 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0077B6).withOpacity(0.1),
+                        color: const Color(0xFF0077B6).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(30),
                       ),
                       child: Text(
@@ -1249,9 +1361,12 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                       spacing: 12,
                       runSpacing: 12,
                       children: [
-                        _buildRoleSelectorCard('patient', 'Patient Portal', Icons.person),
-                        _buildRoleSelectorCard('hospital', 'Hospital Portal', Icons.local_hospital),
-                        _buildRoleSelectorCard('admin', 'Admin Portal', Icons.admin_panel_settings),
+                        _buildRoleSelectorCard(
+                            'patient', 'Patient Portal', Icons.person),
+                        _buildRoleSelectorCard('hospital', 'Hospital Portal',
+                            Icons.local_hospital),
+                        _buildRoleSelectorCard('admin', 'Admin Portal',
+                            Icons.admin_panel_settings),
                       ],
                     )
                   ],
@@ -1265,12 +1380,12 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                 child: Container(
                   padding: const EdgeInsets.all(32),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.04),
+                    color: Colors.white.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withValues(alpha: 0.2),
                         blurRadius: 30,
                         offset: const Offset(0, 15),
                       )
@@ -1290,7 +1405,8 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                       ),
                       Text(
                         'Access your ${_selectedPortal.toUpperCase()} dashboard workspace',
-                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.white30),
+                        style: GoogleFonts.poppins(
+                            fontSize: 12, color: Colors.white30),
                       ),
                       const SizedBox(height: 24),
 
@@ -1301,9 +1417,11 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                         decoration: InputDecoration(
                           labelText: 'Email Address',
                           labelStyle: const TextStyle(color: Colors.white70),
-                          prefixIcon: const Icon(Icons.email_outlined, color: Colors.white54),
-                          fillColor: Colors.white.withOpacity(0.05),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          prefixIcon: const Icon(Icons.email_outlined,
+                              color: Colors.white54),
+                          fillColor: Colors.white.withValues(alpha: 0.05),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -1316,10 +1434,13 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                         decoration: InputDecoration(
                           labelText: 'Password',
                           labelStyle: const TextStyle(color: Colors.white70),
-                          prefixIcon: const Icon(Icons.lock_outline, color: Colors.white54),
+                          prefixIcon: const Icon(Icons.lock_outline,
+                              color: Colors.white54),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
+                              _isPasswordVisible
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
                               color: Colors.white54,
                             ),
                             onPressed: () {
@@ -1328,8 +1449,9 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                               });
                             },
                           ),
-                          fillColor: Colors.white.withOpacity(0.05),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          fillColor: Colors.white.withValues(alpha: 0.05),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -1342,11 +1464,15 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF0077B6),
                               padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
                             ),
                             child: auth.isLoading
-                                ? const CircularProgressIndicator(color: Colors.white)
-                                : const Text('Access Portal Dashboard', style: TextStyle(fontWeight: FontWeight.bold)),
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white)
+                                : const Text('Access Portal Dashboard',
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold)),
                           );
                         },
                       ),
@@ -1356,14 +1482,18 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Text("Don't have an account? ", style: TextStyle(color: Colors.white60, fontSize: 13)),
+                            const Text("Don't have an account? ",
+                                style: TextStyle(
+                                    color: Colors.white60, fontSize: 13)),
                             TextButton(
                               onPressed: () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => SignupScreen(
-                                      userType: _selectedPortal == 'patient' ? 'Patient' : 'Hospital',
+                                      userType: _selectedPortal == 'patient'
+                                          ? 'Patient'
+                                          : 'Hospital',
                                     ),
                                   ),
                                 );
@@ -1396,16 +1526,22 @@ class _LandingScreenState extends State<LandingScreen> with TickerProviderStateM
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF48CAE4).withOpacity(0.15) : Colors.white.withOpacity(0.02),
+          color: isSelected
+              ? const Color(0xFF48CAE4).withValues(alpha: 0.15)
+              : Colors.white.withValues(alpha: 0.02),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? const Color(0xFF48CAE4) : Colors.white.withOpacity(0.08),
+            color: isSelected
+                ? const Color(0xFF48CAE4)
+                : Colors.white.withValues(alpha: 0.08),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: isSelected ? const Color(0xFF48CAE4) : Colors.white30, size: 18),
+            Icon(icon,
+                color: isSelected ? const Color(0xFF48CAE4) : Colors.white30,
+                size: 18),
             const SizedBox(width: 8),
             Text(
               label,
@@ -1482,7 +1618,7 @@ class MapGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.03)
+      ..color = Colors.white.withValues(alpha: 0.03)
       ..strokeWidth = 1.0;
 
     // Draw grid lines
@@ -1496,7 +1632,7 @@ class MapGridPainter extends CustomPainter {
 
     // Draw some stylized road layouts
     final roadPaint = Paint()
-      ..color = Colors.white.withOpacity(0.08)
+      ..color = Colors.white.withValues(alpha: 0.08)
       ..strokeWidth = 8.0
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
@@ -1511,7 +1647,7 @@ class MapGridPainter extends CustomPainter {
 
     // Draw dotted path for route telemetry
     final routePaint = Paint()
-      ..color = const Color(0xFFFFB703).withOpacity(0.6)
+      ..color = const Color(0xFFFFB703).withValues(alpha: 0.6)
       ..strokeWidth = 3.0
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;

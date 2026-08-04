@@ -18,10 +18,10 @@ class ChatBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!message.isUser)
-            CircleAvatar(
+            const CircleAvatar(
               radius: 16,
-              backgroundColor: const Color(0xFF0A4D68),
-              child: const Icon(Icons.medical_information, size: 18, color: Colors.white),
+              backgroundColor: Color(0xFF0A4D68),
+              child: Icon(Icons.medical_information, size: 18, color: Colors.white),
             ),
           if (!message.isUser) const SizedBox(width: 8),
           Flexible(
@@ -66,7 +66,7 @@ class ChatBubble extends StatelessWidget {
                     DateFormat('hh:mm a').format(message.timestamp),
                     style: TextStyle(
                       color: message.isUser
-                          ? Colors.white.withOpacity(0.7)
+                          ? Colors.white.withValues(alpha: 0.7)
                           : Colors.grey.shade600,
                       fontSize: 10,
                     ),
@@ -77,10 +77,10 @@ class ChatBubble extends StatelessWidget {
           ),
           if (message.isUser) const SizedBox(width: 8),
           if (message.isUser)
-            CircleAvatar(
+            const CircleAvatar(
               radius: 16,
-              backgroundColor: const Color(0xFF088395),
-              child: const Icon(Icons.person, size: 18, color: Colors.white),
+              backgroundColor: Color(0xFF088395),
+              child: Icon(Icons.person, size: 18, color: Colors.white),
             ),
         ],
       ),
@@ -137,7 +137,7 @@ class _TypingDotState extends State<_TypingDot> with SingleTickerProviderStateMi
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color: Colors.grey.shade600.withOpacity(_animation.value),
+              color: Colors.grey.shade600.withValues(alpha: _animation.value),
               shape: BoxShape.circle,
             ),
           ),

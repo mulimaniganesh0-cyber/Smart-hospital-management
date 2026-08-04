@@ -21,7 +21,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
   String _selectedUserType = 'patient';
-  bool _isLoading = false;
 
   final List<Map<String, dynamic>> _userTypes = [
     {'label': 'Patient', 'value': 'patient'},
@@ -39,10 +38,10 @@ class _LoginScreenState extends State<LoginScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 40),
-              Icon(
+              const Icon(
                 Icons.local_hospital,
                 size: 60,
-                color: const Color(0xFF0A4D68),
+                color: Color(0xFF0A4D68),
               ),
               const SizedBox(height: 20),
               Text(
@@ -170,7 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text("Don't have an account? "),
+                    const Text("Don't have an account? "),
                     TextButton(
                       onPressed: () {
                         Navigator.push(

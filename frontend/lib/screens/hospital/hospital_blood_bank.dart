@@ -1,7 +1,5 @@
 // lib/screens/hospital/hospital_blood_bank.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../providers/hospital_provider.dart';
 import '../../services/api_service.dart';
 
 class HospitalBloodBank extends StatefulWidget {
@@ -67,14 +65,14 @@ Future<void> _loadBloodBank() async {
         }
       }
       
-      print('✅ Loaded ${_bloodStock.length} blood stocks');
+      debugPrint('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ Loaded ${_bloodStock.length} blood stocks');
     } else {
       _errorMessage = response['message'] ?? 'Failed to load blood bank';
-      print('❌ Failed to load blood bank: $_errorMessage');
+      debugPrint('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ Failed to load blood bank: $_errorMessage');
     }
   } catch (e) {
     _errorMessage = 'Network error: $e';
-    print('❌ Network error: $e');
+    debugPrint('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ Network error: $e');
   } finally {
     setState(() => _isLoading = false);
   }
@@ -94,7 +92,7 @@ Future<void> _loadBloodBank() async {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: selectedGroup,
+                  initialValue: selectedGroup,
                   decoration: const InputDecoration(
                     labelText: 'Blood Group',
                     border: OutlineInputBorder(),
@@ -168,13 +166,16 @@ Future<void> _loadBloodBank() async {
           expiryDate: result['expiry_date'],
         );
         if (response['success'] == true) {
+          if (!context.mounted) return;
+          if (!context.mounted) return;
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Blood stock added successfully'), backgroundColor: Colors.green),
           );
           await _loadBloodBank();
         }
       } catch (e) {
-        print('Error adding blood stock: $e');
+        debugPrint('Error adding blood stock: $e');
       } finally {
         setState(() => _isLoading = false);
       }
@@ -347,9 +348,9 @@ Future<void> _loadBloodBank() async {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           children: [
@@ -452,13 +453,16 @@ Future<void> _loadBloodBank() async {
           expiryDate: result['expiry_date'],
         );
         if (response['success'] == true) {
+          if (!context.mounted) return;
+          if (!context.mounted) return;
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Blood stock updated successfully'), backgroundColor: Colors.green),
           );
           await _loadBloodBank();
         }
       } catch (e) {
-        print('Error updating blood stock: $e');
+        debugPrint('Error updating blood stock: $e');
       } finally {
         setState(() => _isLoading = false);
       }
@@ -490,13 +494,16 @@ Future<void> _loadBloodBank() async {
       try {
         final response = await ApiService.deleteBloodStock(stock['blood_group']);
         if (response['success'] == true) {
+          if (!context.mounted) return;
+          if (!context.mounted) return;
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('${stock['blood_group']} blood stock deleted'), backgroundColor: Colors.green),
           );
           await _loadBloodBank();
         }
       } catch (e) {
-        print('Error deleting blood stock: $e');
+        debugPrint('Error deleting blood stock: $e');
       } finally {
         setState(() => _isLoading = false);
       }

@@ -1,12 +1,13 @@
 // lib/services/api_service.dart
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   // Override at build time, for example:
   // --dart-define=API_BASE_URL=http://10.0.2.2:5000/api
-  static const String BASE_URL = String.fromEnvironment(
+  static const String baseUrlValue = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: 'http://localhost:5000/api',
   );
@@ -16,8 +17,7 @@ class ApiService {
     defaultValue: 'http://localhost:5000',
   );
 
-  // Define baseUrl getter that returns BASE_URL
-  static String get baseUrl => BASE_URL;
+  static String get baseUrl => baseUrlValue;
 
   static Future<Map<String, String>> _getHeaders() async {
     final prefs = await SharedPreferences.getInstance();
@@ -120,7 +120,7 @@ class ApiService {
   static Future<Map<String, dynamic>> updateHospitalResources(
       Map<String, dynamic> resources) async {
     try {
-      print('Updating resources: $resources');
+      debugPrint('Updating resources: $resources');
 
       final payload = {};
       final fieldMap = {
@@ -139,7 +139,7 @@ class ApiService {
         payload[mappedKey] = value;
       }
 
-      print('Sending payload: $payload');
+      debugPrint('Sending payload: $payload');
 
       final response = await http.put(
         Uri.parse('$baseUrl/hospitals/resources'),
@@ -147,8 +147,8 @@ class ApiService {
         body: json.encode(payload),
       );
 
-      print('Update resources response: ${response.statusCode}');
-      print('Update resources body: ${response.body}');
+      debugPrint('Update resources response: ${response.statusCode}');
+      debugPrint('Update resources body: ${response.body}');
 
       final data = json.decode(response.body);
       return {
@@ -157,7 +157,7 @@ class ApiService {
         'data': data['data'],
       };
     } catch (e) {
-      print('Update resources error: $e');
+      debugPrint('Update resources error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -260,6 +260,66 @@ class ApiService {
         Uri.parse('$baseUrl/emergency/create'),
         headers: await _getHeaders(),
         body: json.encode(emergencyData),
+      );
+      return json.decode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> triggerEmergencySos(
+      Map<String, dynamic> sosData) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/emergency/sos'),
+        headers: await _getHeaders(),
+        body: json.encode(sosData),
+      );
+      return json.decode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateEmergencyLiveLocation({
+    required int emergencyId,
+    required double latitude,
+    required double longitude,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/emergency/location-update'),
+        headers: await _getHeaders(),
+        body: json.encode({
+          'emergencyId': emergencyId,
+          'location_lat': latitude,
+          'location_lng': longitude,
+        }),
+      );
+      return json.decode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getPatientSosHistory() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/emergency/patient-history'),
+        headers: await _getHeaders(),
+      );
+      return json.decode(response.body);
+    } catch (e) {
+      return {'success': false, 'data': []};
+    }
+  }
+
+  static Future<Map<String, dynamic>> endEmergency(int emergencyId, {String status = 'completed'}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/emergency/$emergencyId/end'),
+        headers: await _getHeaders(),
+        body: json.encode({'status': status}),
       );
       return json.decode(response.body);
     } catch (e) {
@@ -378,8 +438,8 @@ class ApiService {
         headers: await _getHeaders(),
       );
 
-      print('Get all users response status: ${response.statusCode}');
-      print('Get all users response body: ${response.body}');
+      debugPrint('Get all users response status: ${response.statusCode}');
+      debugPrint('Get all users response body: ${response.body}');
 
       final data = json.decode(response.body);
 
@@ -393,7 +453,7 @@ class ApiService {
         'message': data['message'] ?? 'No data found'
       };
     } catch (e) {
-      print('Get all users error: $e');
+      debugPrint('Get all users error: $e');
       return {'success': false, 'data': [], 'message': 'Network error: $e'};
     }
   }
@@ -409,8 +469,8 @@ class ApiService {
         body: json.encode(bookingData),
       );
 
-      print('Book ambulance response: ${response.statusCode}');
-      print('Book ambulance body: ${response.body}');
+      debugPrint('Book ambulance response: ${response.statusCode}');
+      debugPrint('Book ambulance body: ${response.body}');
 
       final data = json.decode(response.body);
 
@@ -421,7 +481,7 @@ class ApiService {
 
       return data;
     } catch (e) {
-      print('Book ambulance error: $e');
+      debugPrint('Book ambulance error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -463,10 +523,10 @@ class ApiService {
         Uri.parse('$baseUrl/resources/my-requests'),
         headers: await _getHeaders(),
       );
-      print('Get patient requests response: ${response.statusCode}');
+      debugPrint('Get patient requests response: ${response.statusCode}');
       return json.decode(response.body);
     } catch (e) {
-      print('Get patient requests error: $e');
+      debugPrint('Get patient requests error: $e');
       return {'success': false, 'data': []};
     }
   }
@@ -491,11 +551,11 @@ class ApiService {
         headers: await _getHeaders(),
         body: json.encode(data),
       );
-      print('Create blood request response: ${response.statusCode}');
-      print('Create blood request body: ${response.body}');
+      debugPrint('Create blood request response: ${response.statusCode}');
+      debugPrint('Create blood request body: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Create blood request error: $e');
+      debugPrint('Create blood request error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -503,15 +563,15 @@ class ApiService {
   static Future<Map<String, dynamic>> getHospitalProfile() async {
     try {
       final headers = await _getHeaders();
-      print('Requesting hospital profile with headers: ${headers.keys}');
+      debugPrint('Requesting hospital profile with headers: ${headers.keys}');
 
       final response = await http.get(
         Uri.parse('$baseUrl/hospitals/profile'),
         headers: headers,
       );
 
-      print('Hospital profile response status: ${response.statusCode}');
-      print('Hospital profile response body: ${response.body}');
+      debugPrint('Hospital profile response status: ${response.statusCode}');
+      debugPrint('Hospital profile response body: ${response.body}');
 
       if (response.statusCode == 401) {
         final prefs = await SharedPreferences.getInstance();
@@ -525,7 +585,37 @@ class ApiService {
 
       return json.decode(response.body);
     } catch (e) {
-      print('Get hospital profile error: $e');
+      debugPrint('Get hospital profile error: $e');
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getHospitalDashboardStats() async {
+    try {
+      final headers = await _getHeaders();
+      final response = await http.get(
+        Uri.parse('$baseUrl/hospitals/dashboard-stats'),
+        headers: headers,
+      );
+      return json.decode(response.body);
+    } catch (e) {
+      debugPrint('Get hospital dashboard stats error: $e');
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  // ==================== CAREGUIDE CHATBOT ====================
+
+  static Future<Map<String, dynamic>> queryChatbot(
+      Map<String, dynamic> query) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/chatbot/query'),
+        headers: await _getHeaders(),
+        body: json.encode(query),
+      );
+      return json.decode(response.body);
+    } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -549,8 +639,9 @@ class ApiService {
     try {
       String url = '$baseUrl/hospitals/all';
       if (city != null) url += '?city=$city';
-      if (verified != null)
+      if (verified != null) {
         url += '${city != null ? '&' : '?'}verified=$verified';
+      }
 
       final response = await http.get(Uri.parse(url));
       return json.decode(response.body);
@@ -628,7 +719,7 @@ class ApiService {
         }
       }
 
-      print('Sending resource request: $requestData');
+      debugPrint('Sending resource request: $requestData');
 
       final response = await http.post(
         Uri.parse('$baseUrl/resources/request'),
@@ -636,12 +727,12 @@ class ApiService {
         body: json.encode(requestData),
       );
 
-      print('Resource request response status: ${response.statusCode}');
-      print('Resource request response body: ${response.body}');
+      debugPrint('Resource request response status: ${response.statusCode}');
+      debugPrint('Resource request response body: ${response.body}');
 
       return json.decode(response.body);
     } catch (e) {
-      print('Error requesting resource: $e');
+      debugPrint('Error requesting resource: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -652,11 +743,11 @@ class ApiService {
         Uri.parse('$baseUrl/resources/hospital-requests'),
         headers: await _getHeaders(),
       );
-      print('Get hospital requests response status: ${response.statusCode}');
-      print('Get hospital requests response body: ${response.body}');
+      debugPrint('Get hospital requests response status: ${response.statusCode}');
+      debugPrint('Get hospital requests response body: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Error getting hospital requests: $e');
+      debugPrint('Error getting hospital requests: $e');
       return {'success': false, 'data': []};
     }
   }
@@ -667,11 +758,11 @@ class ApiService {
         Uri.parse('$baseUrl/resources/my-requests'),
         headers: await _getHeaders(),
       );
-      print('Get my requests response status: ${response.statusCode}');
-      print('Get my requests response body: ${response.body}');
+      debugPrint('Get my requests response status: ${response.statusCode}');
+      debugPrint('Get my requests response body: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Error getting my requests: $e');
+      debugPrint('Error getting my requests: $e');
       return {'success': false, 'data': []};
     }
   }
@@ -691,10 +782,10 @@ class ApiService {
           'available': available,
         }),
       );
-      print('Add resource response: ${response.body}');
+      debugPrint('Add resource response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Add resource error: $e');
+      debugPrint('Add resource error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -722,10 +813,10 @@ class ApiService {
         }),
       );
 
-      print('Free resource response: ${response.body}');
+      debugPrint('Free resource response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Free resource error: $e');
+      debugPrint('Free resource error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -737,10 +828,10 @@ class ApiService {
         Uri.parse('$baseUrl/hospitals/$hospitalId/doctors'),
         headers: await _getHeaders(),
       );
-      print('Get doctors response: ${response.body}');
+      debugPrint('Get doctors response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Get doctors error: $e');
+      debugPrint('Get doctors error: $e');
       return {'success': false, 'data': []};
     }
   }
@@ -748,7 +839,7 @@ class ApiService {
   static Future<Map<String, dynamic>> addHospitalStaff(
       Map<String, dynamic> staffData) async {
     try {
-      print('Adding staff: $staffData');
+      debugPrint('Adding staff: $staffData');
 
       final response = await http.post(
         Uri.parse('$baseUrl/hospitals/staff'),
@@ -756,8 +847,8 @@ class ApiService {
         body: json.encode(staffData),
       );
 
-      print('Add staff response status: ${response.statusCode}');
-      print('Add staff response body: ${response.body}');
+      debugPrint('Add staff response status: ${response.statusCode}');
+      debugPrint('Add staff response body: ${response.body}');
 
       if (response.statusCode == 201) {
         return json.decode(response.body);
@@ -769,7 +860,7 @@ class ApiService {
         'message': data['message'] ?? 'Failed to add staff',
       };
     } catch (e) {
-      print('Add staff error: $e');
+      debugPrint('Add staff error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -799,10 +890,10 @@ class ApiService {
         Uri.parse('$baseUrl/admin/hospitals/$hospitalId/resources'),
         headers: await _getHeaders(),
       );
-      print('Get admin hospital resources response: ${response.body}');
+      debugPrint('Get admin hospital resources response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Get admin hospital resources error: $e');
+      debugPrint('Get admin hospital resources error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -817,10 +908,10 @@ class ApiService {
         headers: await _getHeaders(),
         body: json.encode(resources),
       );
-      print('Update admin hospital resources response: ${response.body}');
+      debugPrint('Update admin hospital resources response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Update admin hospital resources error: $e');
+      debugPrint('Update admin hospital resources error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -832,10 +923,10 @@ class ApiService {
         Uri.parse('$baseUrl/admin/hospitals/$hospitalId/blood-bank'),
         headers: await _getHeaders(),
       );
-      print('Get admin hospital blood bank response: ${response.body}');
+      debugPrint('Get admin hospital blood bank response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Get admin hospital blood bank error: $e');
+      debugPrint('Get admin hospital blood bank error: $e');
       return {'success': false, 'data': []};
     }
   }
@@ -854,10 +945,10 @@ class ApiService {
           'units_available': units,
         }),
       );
-      print('Update admin blood bank response: ${response.body}');
+      debugPrint('Update admin blood bank response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Update admin blood bank error: $e');
+      debugPrint('Update admin blood bank error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -993,8 +1084,8 @@ class ApiService {
   static Future<Map<String, dynamic>> createAppointment(
       Map<String, dynamic> appointmentData) async {
     try {
-      print('🟢 Creating appointment with data: $appointmentData');
-      print('🟢 Hospital ID being sent: ${appointmentData['hospital_id']}');
+      debugPrint('ðŸŸ¢ Creating appointment with data: $appointmentData');
+      debugPrint('ðŸŸ¢ Hospital ID being sent: ${appointmentData['hospital_id']}');
 
       final response = await http.post(
         Uri.parse('$baseUrl/appointments/create'),
@@ -1002,12 +1093,12 @@ class ApiService {
         body: json.encode(appointmentData),
       );
 
-      print('🟢 Appointment response status: ${response.statusCode}');
-      print('🟢 Appointment response body: ${response.body}');
+      debugPrint('ðŸŸ¢ Appointment response status: ${response.statusCode}');
+      debugPrint('ðŸŸ¢ Appointment response body: ${response.body}');
 
       return json.decode(response.body);
     } catch (e) {
-      print('🔴 Appointment error: $e');
+      debugPrint('ðŸ”´ Appointment error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1027,10 +1118,10 @@ class ApiService {
         headers: await _getHeaders(),
         body: json.encode(data),
       );
-      print('Create campaign response: ${response.body}');
+      debugPrint('Create campaign response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Create campaign error: $e');
+      debugPrint('Create campaign error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1043,10 +1134,10 @@ class ApiService {
         headers: await _getHeaders(),
         body: json.encode({'status': status}),
       );
-      print('Update campaign status response: ${response.body}');
+      debugPrint('Update campaign status response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Update campaign status error: $e');
+      debugPrint('Update campaign status error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1057,10 +1148,10 @@ class ApiService {
         Uri.parse('$baseUrl/campaigns/$campaignId/approve'),
         headers: await _getHeaders(),
       );
-      print('Approve campaign response: ${response.body}');
+      debugPrint('Approve campaign response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Approve campaign error: $e');
+      debugPrint('Approve campaign error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1071,10 +1162,10 @@ class ApiService {
         Uri.parse('$baseUrl/campaigns/$campaignId/reject'),
         headers: await _getHeaders(),
       );
-      print('Reject campaign response: ${response.body}');
+      debugPrint('Reject campaign response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Reject campaign error: $e');
+      debugPrint('Reject campaign error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1168,10 +1259,10 @@ class ApiService {
         headers: await _getHeaders(),
         body: json.encode(data),
       );
-      print('Record donation response: ${response.body}');
+      debugPrint('Record donation response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Record donation error: $e');
+      debugPrint('Record donation error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1258,7 +1349,7 @@ class ApiService {
 
       return json.decode(response.body);
     } catch (e) {
-      print('Get hospital campaigns error: $e');
+      debugPrint('Get hospital campaigns error: $e');
       return {'success': true, 'data': []};
     }
   }
@@ -1279,7 +1370,7 @@ class ApiService {
 
       return json.decode(response.body);
     } catch (e) {
-      print('Get hospital ambulances error: $e');
+      debugPrint('Get hospital ambulances error: $e');
       return {'success': true, 'data': []};
     }
   }
@@ -1297,7 +1388,7 @@ class ApiService {
 
       return json.decode(response.body);
     } catch (e) {
-      print('Get hospital ambulance bookings error: $e');
+      debugPrint('Get hospital ambulance bookings error: $e');
       return {'success': true, 'data': []};
     }
   }
@@ -1379,10 +1470,10 @@ class ApiService {
         Uri.parse('$baseUrl/hospitals/staff'),
         headers: await _getHeaders(),
       );
-      print('Get staff response status: ${response.statusCode}');
+      debugPrint('Get staff response status: ${response.statusCode}');
       return json.decode(response.body);
     } catch (e) {
-      print('Get staff error: $e');
+      debugPrint('Get staff error: $e');
       return {'success': false, 'data': []};
     }
   }
@@ -1435,7 +1526,7 @@ class ApiService {
       );
 
       final data = json.decode(response.body);
-      print('Hospital resources response: $data');
+      debugPrint('Hospital resources response: $data');
 
       if (data['success'] == true && data['data'] != null) {
         return {
@@ -1445,7 +1536,7 @@ class ApiService {
       }
       return data;
     } catch (e) {
-      print('Error getting hospital resources: $e');
+      debugPrint('Error getting hospital resources: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1460,10 +1551,10 @@ class ApiService {
       );
 
       final data = json.decode(response.body);
-      print('Update resource request status response: $data');
+      debugPrint('Update resource request status response: $data');
       return data;
     } catch (e) {
-      print('Error updating resource request status: $e');
+      debugPrint('Error updating resource request status: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1483,38 +1574,47 @@ class ApiService {
         Uri.parse(url),
         headers: await _getHeaders(),
       );
-      print('Get all hospitals with resources response: ${response.body}');
+      debugPrint('Get all hospitals with resources response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
-      print('Get all hospitals with resources error: $e');
+      debugPrint('Get all hospitals with resources error: $e');
       return {'success': false, 'data': []};
     }
   }
 // lib/services/api_service.dart
 
   static Future<Map<String, dynamic>> getNearbyHospitals(
-      double lat, double lng) async {
+    double lat,
+    double lng, {
+    double radius = 20,
+    String sortBy = 'distance',
+  }) async {
     try {
       final headers = await _getHeaders();
 
-      // Try both endpoints - first try /api/resources/nearby
-      String url = '$baseUrl/resources/nearby?lat=$lat&lng=$lng';
+      final query = Uri(queryParameters: {
+        'lat': '$lat',
+        'lng': '$lng',
+        'radius': '$radius',
+        'sortBy': sortBy,
+      }).query;
+      String url = '$baseUrl/hospitals/nearby?$query';
 
-      print('Fetching nearby hospitals from: $url');
+      debugPrint('Fetching nearby hospitals from: $url');
 
       final response = await http.get(
         Uri.parse(url),
         headers: headers,
       );
 
-      print('Response status: ${response.statusCode}');
+      debugPrint('Response status: ${response.statusCode}');
 
       final Map<String, dynamic> data = json.decode(response.body);
-      print('Nearby hospitals response: ${data['success']}');
+      debugPrint('Nearby hospitals response: ${data['success']}');
 
       if (data['success'] == true && data['data'] != null) {
         final List<dynamic> hospitals = data['data'];
-        print('Found ${hospitals.length} hospitals');
+        debugPrint('Found ${hospitals.length} hospitals');
 
         // Process each hospital to ensure proper resource mapping
         final processedHospitals = hospitals.map((hospital) {
@@ -1552,11 +1652,11 @@ class ApiService {
         };
       }
 
-      // If the first endpoint fails, try the alternative
+      // Backward-compatible fallback for older backends.
       if (response.statusCode == 404) {
-        print('Trying alternative endpoint...');
+        debugPrint('Trying alternative endpoint...');
         final altResponse = await http.get(
-          Uri.parse('$baseUrl/hospitals/nearby?lat=$lat&lng=$lng'),
+          Uri.parse('$baseUrl/resources/nearby?lat=$lat&lng=$lng'),
           headers: headers,
         );
         final altData = json.decode(altResponse.body);
@@ -1565,7 +1665,7 @@ class ApiService {
 
       return data;
     } catch (e) {
-      print('Error fetching nearby hospitals: $e');
+      debugPrint('Error fetching nearby hospitals: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1584,10 +1684,10 @@ class ApiService {
       );
 
       final data = json.decode(response.body);
-      print('Verify hospital response: $data');
+      debugPrint('Verify hospital response: $data');
       return data;
     } catch (e) {
-      print('Verify hospital error: $e');
+      debugPrint('Verify hospital error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1601,10 +1701,10 @@ class ApiService {
       );
 
       final data = json.decode(response.body);
-      print('Delete hospital response: $data');
+      debugPrint('Delete hospital response: $data');
       return data;
     } catch (e) {
-      print('Delete hospital error: $e');
+      debugPrint('Delete hospital error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1620,10 +1720,10 @@ class ApiService {
       );
 
       final data = json.decode(response.body);
-      print('Delete ambulance response: $data');
+      debugPrint('Delete ambulance response: $data');
       return data;
     } catch (e) {
-      print('Delete ambulance error: $e');
+      debugPrint('Delete ambulance error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1643,10 +1743,10 @@ class ApiService {
       );
 
       final data = json.decode(response.body);
-      print('Use blood response: ${data['success']}');
+      debugPrint('Use blood response: ${data['success']}');
       return data;
     } catch (e) {
-      print('Use blood error: $e');
+      debugPrint('Use blood error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1663,10 +1763,10 @@ class ApiService {
       );
 
       final data = json.decode(response.body);
-      print('Blood bank response: ${data['success']}');
+      debugPrint('Blood bank response: ${data['success']}');
       return data;
     } catch (e) {
-      print('Get blood bank error: $e');
+      debugPrint('Get blood bank error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1680,7 +1780,7 @@ class ApiService {
       );
 
       final data = json.decode(response.body);
-      print('Blood stock with expiry response: ${data['success']}');
+      debugPrint('Blood stock with expiry response: ${data['success']}');
 
       if (data['success'] == true && data['data'] != null) {
         // Process the data to ensure proper format
@@ -1689,7 +1789,7 @@ class ApiService {
                   ...item,
                   'units': item['units'] ?? item['units_available'] ?? 0,
                   'batch_number': item['batch_number'] ??
-                      'BATCH-' + (item['id']?.toString() ?? ''),
+                      'BATCH-${item['id']?.toString() ?? ''}',
                 })
             .toList();
 
@@ -1701,7 +1801,7 @@ class ApiService {
       }
       return data;
     } catch (e) {
-      print('Get blood stock with expiry error: $e');
+      debugPrint('Get blood stock with expiry error: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1726,7 +1826,7 @@ class ApiService {
       final data = json.decode(response.body);
       return data;
     } catch (e) {
-      print('Error adding blood stock: $e');
+      debugPrint('Error adding blood stock: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1745,7 +1845,7 @@ class ApiService {
       final data = json.decode(response.body);
       return data;
     } catch (e) {
-      print('Error getting blood availability: $e');
+      debugPrint('Error getting blood availability: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1762,7 +1862,7 @@ class ApiService {
       final data = json.decode(response.body);
       return data;
     } catch (e) {
-      print('Error getting hospital blood requests: $e');
+      debugPrint('Error getting hospital blood requests: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1795,7 +1895,7 @@ class ApiService {
       }
       return data;
     } catch (e) {
-      print('Error getting hospital blood bank: $e');
+      debugPrint('Error getting hospital blood bank: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1821,7 +1921,7 @@ class ApiService {
       final data = json.decode(response.body);
       return data;
     } catch (e) {
-      print('Error updating blood stock: $e');
+      debugPrint('Error updating blood stock: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1839,7 +1939,7 @@ class ApiService {
       final data = json.decode(response.body);
       return data;
     } catch (e) {
-      print('Error deleting blood stock: $e');
+      debugPrint('Error deleting blood stock: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1856,7 +1956,7 @@ class ApiService {
       final data = json.decode(response.body);
       return data;
     } catch (e) {
-      print('Error fulfilling blood request: $e');
+      debugPrint('Error fulfilling blood request: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
@@ -1873,7 +1973,7 @@ class ApiService {
       final data = json.decode(response.body);
       return data;
     } catch (e) {
-      print('Error rejecting blood request: $e');
+      debugPrint('Error rejecting blood request: $e');
       return {'success': false, 'message': 'Network error: $e'};
     }
   }

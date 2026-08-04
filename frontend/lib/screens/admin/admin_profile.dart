@@ -186,7 +186,7 @@ class AdminProfile extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.1),
+                              color: Colors.red.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Icon(Icons.logout, color: Colors.red),
@@ -262,7 +262,7 @@ class AdminProfile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0A4D68).withOpacity(0.1),
+                  color: const Color(0xFF0A4D68).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, size: 20, color: const Color(0xFF0A4D68)),
@@ -292,7 +292,7 @@ class AdminProfile extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
+              color: iconColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, size: 18, color: iconColor),
@@ -336,7 +336,7 @@ class AdminProfile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, size: 20, color: color),
@@ -371,11 +371,11 @@ class AdminProfile extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Row(
+        title: const Row(
           children: [
-            const Icon(Icons.download_done, color: Colors.blue),
-            const SizedBox(width: 12),
-            const Text('Downloaded Reports'),
+            Icon(Icons.download_done, color: Colors.blue),
+            SizedBox(width: 12),
+            Text('Downloaded Reports'),
           ],
         ),
         content: SizedBox(

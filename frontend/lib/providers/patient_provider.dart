@@ -41,7 +41,7 @@ Future<void> loadPatientData() async {
     }
   } catch (e) {
     _errorMessage = 'Network error: $e';
-    print('Error loading patient data: $e');
+    debugPrint('Error loading patient data: $e');
   }
 
   _isLoading = false;
@@ -71,7 +71,7 @@ Future<void> loadPatientData() async {
       }
       return false;
     } catch (e) {
-      print('Update profile error: $e');
+      debugPrint('Update profile error: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -85,7 +85,7 @@ Future<void> loadPatientData() async {
 
     try {
       final response = await ApiService.createAppointment(booking);
-      print('Create appointment response: $response');
+      debugPrint('Create appointment response: $response');
       
       if (response['success'] == true) {
         await loadPatientData();
@@ -93,7 +93,7 @@ Future<void> loadPatientData() async {
       }
       return false;
     } catch (e) {
-      print('Add booking error: $e');
+      debugPrint('Add booking error: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -114,7 +114,7 @@ Future<void> loadPatientData() async {
       }
       return false;
     } catch (e) {
-      print('Cancel booking error: $e');
+      debugPrint('Cancel booking error: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -146,7 +146,7 @@ Future<List<Map<String, dynamic>>> getResourceRequests() async {
     }
     return [];
   } catch (e) {
-    print('Error getting resource requests: $e');
+    debugPrint('Error getting resource requests: $e');
     return [];
   }
 }

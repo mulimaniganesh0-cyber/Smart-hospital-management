@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/hospital_provider.dart';
-import '../../services/api_service.dart';
 
 class HospitalStaff extends StatefulWidget {
   const HospitalStaff({super.key});
@@ -84,7 +83,7 @@ class _HospitalStaffState extends State<HospitalStaff> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.white, isAvailable ? Colors.green.withOpacity(0.05) : Colors.red.withOpacity(0.05)],
+            colors: [Colors.white, isAvailable ? Colors.green.withValues(alpha: 0.05) : Colors.red.withValues(alpha: 0.05)],
           ),
         ),
         child: Padding(
@@ -130,7 +129,7 @@ class _HospitalStaffState extends State<HospitalStaff> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isAvailable ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                          color: isAvailable ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: isAvailable ? Colors.green.shade200 : Colors.red.shade200,
@@ -224,7 +223,7 @@ class _HospitalStaffState extends State<HospitalStaff> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -277,7 +276,7 @@ class _HospitalStaffState extends State<HospitalStaff> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0A4D68).withOpacity(0.1),
+                  color: const Color(0xFF0A4D68).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.person_add, color: Color(0xFF0A4D68)),
@@ -294,7 +293,7 @@ class _HospitalStaffState extends State<HospitalStaff> {
                 const SizedBox(height: 12),
                 
                 DropdownButtonFormField<String>(
-                  value: selectedDesignation,
+                  initialValue: selectedDesignation,
                   decoration: InputDecoration(
                     labelText: 'Designation',
                     prefixIcon: const Icon(Icons.work, color: Color(0xFF0A4D68)),
@@ -311,7 +310,7 @@ class _HospitalStaffState extends State<HospitalStaff> {
                 const SizedBox(height: 12),
 
                 DropdownButtonFormField<String>(
-                  value: selectedDepartment,
+                  initialValue: selectedDepartment,
                   decoration: InputDecoration(
                     labelText: 'Department',
                     prefixIcon: const Icon(Icons.business, color: Color(0xFF0A4D68)),
@@ -353,7 +352,7 @@ class _HospitalStaffState extends State<HospitalStaff> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isAvailable ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                          color: isAvailable ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -392,6 +391,7 @@ class _HospitalStaffState extends State<HospitalStaff> {
 
       // Use provider instead of calling API directly
       final success = await provider.addStaffMember(staffData);
+      if (!context.mounted) return;
       Navigator.pop(context);
       
       if (success && context.mounted) {
@@ -470,7 +470,7 @@ class _HospitalStaffState extends State<HospitalStaff> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
+                  color: Colors.blue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.edit, color: Colors.blue),
@@ -484,7 +484,7 @@ class _HospitalStaffState extends State<HospitalStaff> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: selectedDesignation,
+                  initialValue: selectedDesignation,
                   decoration: InputDecoration(
                     labelText: 'Designation',
                     prefixIcon: const Icon(Icons.work, color: Colors.blue),
@@ -500,7 +500,7 @@ class _HospitalStaffState extends State<HospitalStaff> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: selectedDepartment,
+                  initialValue: selectedDepartment,
                   decoration: InputDecoration(
                     labelText: 'Department',
                     prefixIcon: const Icon(Icons.business, color: Colors.blue),
@@ -538,7 +538,7 @@ class _HospitalStaffState extends State<HospitalStaff> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isAvailable ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                          color: isAvailable ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -560,14 +560,6 @@ class _HospitalStaffState extends State<HospitalStaff> {
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
-                final updatedData = {
-                  'designation': selectedDesignation,
-                  'department': selectedDepartment,
-                  'qualification': qualificationController.text,
-                  'experience_years': int.tryParse(experienceController.text) ?? 0,
-                  'phone': phoneController.text,
-                  'is_available': isAvailable,
-                };
                 Navigator.pop(context);
                 provider.loadHospitalData();
                 if (mounted) {
@@ -602,7 +594,7 @@ class _HospitalStaffState extends State<HospitalStaff> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Icons.delete, color: Colors.red),

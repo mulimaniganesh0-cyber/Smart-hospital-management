@@ -18,6 +18,7 @@ const resourceRoutes = require('./routes/resourceRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const donationCampaignRoutes = require('./routes/donationCampaignRoutes');
 const roleRoutes = require('./routes/roleRoutes');
+const chatbotRoutes = require('./routes/chatbotRoutes');
 
 const app = express();
 
@@ -116,6 +117,7 @@ app.use('/api/resources', resourceRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/campaigns', donationCampaignRoutes);
 app.use('/api/roles', roleRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
 
 // Health check endpoint
@@ -144,7 +146,8 @@ app.get('/', (req, res) => {
       bloodBank: '/api/blood-bank',
       ambulance: '/api/ambulance',
       admin: '/api/admin',
-      resources: '/api/resources'
+      resources: '/api/resources',
+      chatbot: '/api/chatbot'
     }
   });
 });

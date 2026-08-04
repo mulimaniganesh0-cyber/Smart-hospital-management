@@ -17,8 +17,8 @@ class PatientCareHub extends StatefulWidget {
 class _PatientCareHubState extends State<PatientCareHub> {
   bool _largeText = false;
   final List<_Reminder> _reminders = [
-    _Reminder('Metformin', 'After breakfast', '08:00 AM'),
-    _Reminder('Vitamin D3', 'Every Sunday', '09:00 AM'),
+    const _Reminder('Metformin', 'After breakfast', '08:00 AM'),
+    const _Reminder('Vitamin D3', 'Every Sunday', '09:00 AM'),
   ];
 
   @override
@@ -111,7 +111,7 @@ class _PatientCareHubState extends State<PatientCareHub> {
 
   Widget _actionTile(IconData icon, Color color, String title, String subtitle, VoidCallback onTap) => ListTile(
         onTap: onTap,
-        leading: Container(padding: const EdgeInsets.all(9), decoration: BoxDecoration(color: color.withOpacity(.11), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: color)),
+        leading: Container(padding: const EdgeInsets.all(9), decoration: BoxDecoration(color: color.withValues(alpha: .11), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: color)),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(subtitle),
         trailing: const Icon(Icons.chevron_right),
@@ -127,7 +127,7 @@ class _PatientCareHubState extends State<PatientCareHub> {
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text('Medicine reminders', style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            ..._reminders.map((r) => ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.medication, color: Colors.deepPurple), title: Text(r.name), subtitle: Text('${r.schedule} • ${r.time}'), trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () { setState(() => _reminders.remove(r)); setSheetState(() {}); }))),
+            ..._reminders.map((r) => ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.medication, color: Colors.deepPurple), title: Text(r.name), subtitle: Text('${r.schedule} â€¢ ${r.time}'), trailing: IconButton(icon: const Icon(Icons.delete_outline), onPressed: () { setState(() => _reminders.remove(r)); setSheetState(() {}); }))),
             OutlinedButton.icon(onPressed: () { Navigator.pop(sheetContext); _addReminder(); }, icon: const Icon(Icons.add), label: const Text('Add reminder')),
           ]),
         )),
@@ -144,7 +144,7 @@ class _PatientCareHubState extends State<PatientCareHub> {
 
   void _showFeedback() {
     final feedback = TextEditingController();
-    showDialog(context: context, builder: (dialogContext) => AlertDialog(title: const Text('Share feedback'), content: TextField(controller: feedback, maxLines: 4, decoration: const InputDecoration(hintText: 'Tell us what went well or report an issue')), actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')), FilledButton(onPressed: () { Navigator.pop(dialogContext); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Thank you—your feedback has been recorded.'))); }, child: const Text('Submit'))]));
+    showDialog(context: context, builder: (dialogContext) => AlertDialog(title: const Text('Share feedback'), content: TextField(controller: feedback, maxLines: 4, decoration: const InputDecoration(hintText: 'Tell us what went well or report an issue')), actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')), FilledButton(onPressed: () { Navigator.pop(dialogContext); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Thank youâ€”your feedback has been recorded.'))); }, child: const Text('Submit'))]));
   }
 
   void _showAccessibility() => showDialog(context: context, builder: (dialogContext) => AlertDialog(title: const Text('Language & accessibility'), content: Column(mainAxisSize: MainAxisSize.min, children: [const ListTile(leading: Icon(Icons.language), title: Text('English'), subtitle: Text('More languages can be added in settings')), SwitchListTile(value: _largeText, onChanged: (value) { setState(() => _largeText = value); Navigator.pop(dialogContext); }, title: const Text('Large text'))]), actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Done'))]));

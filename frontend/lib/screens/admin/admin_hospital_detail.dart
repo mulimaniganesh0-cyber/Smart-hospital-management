@@ -475,7 +475,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
+                      color: color.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Icon(
@@ -494,7 +494,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -653,7 +653,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<String>(
-              value: selectedGroup,
+              initialValue: selectedGroup,
               decoration: const InputDecoration(
                 labelText: 'Blood Group',
                 border: OutlineInputBorder(),
@@ -735,11 +735,11 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Row(
+        title: const Row(
           children: [
             Icon(Icons.warning, color: Colors.red),
-            const SizedBox(width: 8),
-            const Text('Delete Hospital'),
+            SizedBox(width: 8),
+            Text('Delete Hospital'),
           ],
         ),
         content: Column(
@@ -759,7 +759,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '⚠️ This action cannot be undone!',
+                    'ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â This action cannot be undone!',
                     style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: 8),
@@ -782,14 +782,17 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
               Navigator.pop(context);
               final response = await ApiService.deleteHospital(widget.hospitalId);
               if (response['success'] && mounted) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('${widget.hospitalName} deleted successfully'),
                     backgroundColor: Colors.green,
                   ),
                 );
+                if (!context.mounted) return;
                 Navigator.pop(context);
               } else if (mounted) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(response['message'] ?? 'Failed to delete hospital'),

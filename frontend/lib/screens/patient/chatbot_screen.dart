@@ -37,7 +37,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     super.initState();
     _messages.add(
       ChatMessage(
-        text: 'Hello! I’m CareGuide, your hospital resource assistant. '
+        text: 'Hello! Iâ€™m CareGuide, your hospital resource assistant. '
             'I can help you find nearby care, understand services, and '
             'navigate urgent requests.',
         isUser: false,
@@ -55,7 +55,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   Future<void> _loadLocation() async {
     final position = await LocationService.getCurrentLocation();
-    if (!mounted) return;
+    if (!context.mounted) return;
     setState(() => _position = position);
   }
 
@@ -77,13 +77,13 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         longitude: _position?.longitude ?? 0,
         language: LocationService.getLanguageCode(_language),
       );
-      if (!mounted) return;
+      if (!context.mounted) return;
       setState(() {
         _messages.add(response);
         _isLoading = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       setState(() {
         _messages.add(
           ChatMessage(
@@ -110,6 +110,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   }
 
   void _startNewConversation() {
+    _assistant.resetConversation();
     setState(() {
       _messages
         ..clear()
@@ -188,8 +189,9 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
                 itemCount: _messages.length + (_isLoading ? 1 : 0),
                 itemBuilder: (context, index) {
-                  if (index == _messages.length)
+                  if (index == _messages.length) {
                     return const _TypingIndicator();
+                  }
                   return _MessageBubble(
                     message: _messages[index],
                     onRecommendationTap:
@@ -364,7 +366,7 @@ class _TypingIndicator extends StatelessWidget {
                 radius: 17,
                 child: Icon(Icons.health_and_safety_outlined, size: 18)),
             SizedBox(width: 8),
-            Text('CareGuide is thinking…'),
+            Text('CareGuide is thinkingâ€¦'),
           ],
         ),
       );
@@ -478,7 +480,7 @@ class _HospitalSheet extends StatelessWidget {
             ]),
             const SizedBox(height: 16),
             Text(
-                '${hospital.distance.toStringAsFixed(1)} km away · ${hospital.phone}',
+                '${hospital.distance.toStringAsFixed(1)} km away Â· ${hospital.phone}',
                 style: const TextStyle(color: Colors.blueGrey)),
           ],
         ),

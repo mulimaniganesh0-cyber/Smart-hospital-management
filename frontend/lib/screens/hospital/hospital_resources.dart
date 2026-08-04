@@ -88,8 +88,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
           title: const Text('Manage Resources'),
           bottom: const TabBar(
             tabs: [
-              Tab(text: '📊 Resources', icon: Icon(Icons.medical_services)),
-              Tab(text: '📋 Requests', icon: Icon(Icons.assignment)),
+              Tab(text: 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â  Resources', icon: Icon(Icons.medical_services)),
+              Tab(text: 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¹ Requests', icon: Icon(Icons.assignment)),
             ],
           ),
           actions: [
@@ -250,7 +250,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0A4D68).withOpacity(0.1),
+                    color: const Color(0xFF0A4D68).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -428,7 +428,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
         if (success && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('✅ ${_getResourceDisplayName(result['resourceType'])} added successfully'),
+              content: Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ ${_getResourceDisplayName(result['resourceType'])} added successfully'),
               backgroundColor: Colors.green,
             ),
           );
@@ -436,7 +436,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
         } else if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('❌ Failed to add resource. Please try again.'),
+              content: Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ Failed to add resource. Please try again.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -529,7 +529,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(icon, color: color, size: 24),
@@ -544,7 +544,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -591,7 +591,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
                       occupied,
                     ),
                     icon: const Icon(Icons.new_releases),
-                    label: Text('🟢 Discharge Patient (Free One $title)'),
+                    label: Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ Discharge Patient (Free One $title)'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade700,
                       foregroundColor: Colors.white,
@@ -688,14 +688,14 @@ class _HospitalResourcesState extends State<HospitalResources> {
             children: [
               Icon(Icons.new_releases, color: Colors.green.shade700),
               const SizedBox(width: 8),
-              Text('Discharge Patient'),
+              const Text('Discharge Patient'),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Current Status:'),
+              const Text('Current Status:'),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -756,7 +756,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green.shade700,
               ),
-              child: const Text('✅ Discharge & Free Resource'),
+              child: const Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Discharge & Free Resource'),
             ),
           ],
         ),
@@ -769,7 +769,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
         if (response['success'] && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✅ Patient discharged. Resource is now available.'),
+              content: Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Patient discharged. Resource is now available.'),
               backgroundColor: Colors.green,
             ),
           );
@@ -777,7 +777,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
         } else if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(response['message'] ?? '❌ Failed to free resource. Please try again.'),
+              content: Text(response['message'] ?? 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ Failed to free resource. Please try again.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -880,7 +880,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.purple.withOpacity(0.1),
+                        color: Colors.purple.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Icon(Icons.water_drop, color: Colors.purple, size: 24),
@@ -1016,7 +1016,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Text(
-                      'Total: ${bloodStock.fold<int>(0, (sum, stock) => sum + (_toInt(stock['units_available']) ?? 0))} units',
+                      'Total: ${bloodStock.fold<int>(0, (sum, stock) => sum + _toInt(stock['units_available']))} units',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -1050,7 +1050,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: selectedGroup,
+                  initialValue: selectedGroup,
                   decoration: const InputDecoration(
                     labelText: 'Blood Group',
                     border: OutlineInputBorder(),
@@ -1283,9 +1283,9 @@ class _HospitalResourcesState extends State<HospitalResources> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -1354,7 +1354,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon, color: color, size: 24),
@@ -1385,7 +1385,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isPending ? Colors.orange.withOpacity(0.1) : Colors.green.withOpacity(0.1),
+                    color: isPending ? Colors.orange.withValues(alpha: 0.1) : Colors.green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -1400,8 +1400,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
               ],
             ),
             const SizedBox(height: 8),
-            Text('📝 $description'),
-            Text('📞 ${request['patient_phone'] ?? 'N/A'}'),
+            Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â $description'),
+            Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¾ ${request['patient_phone'] ?? 'N/A'}'),
             if (isPending) ...[
               const SizedBox(height: 12),
               Row(
@@ -1446,8 +1446,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
                     const SizedBox(width: 8),
                     Text(
                       status == 'fulfilled' 
-                          ? '✅ Request fulfilled. Resource allocated to patient.'
-                          : '❌ Request rejected.',
+                          ? 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Request fulfilled. Resource allocated to patient.'
+                          : 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ Request rejected.',
                       style: TextStyle(
                         fontSize: 12,
                         color: status == 'fulfilled' ? Colors.green : Colors.red,
@@ -1506,9 +1506,12 @@ class _HospitalResourcesState extends State<HospitalResources> {
       if (confirm == true && context.mounted) {
         final success = await provider.fulfillResourceRequest(request['id']);
         if (success && context.mounted) {
+          if (!context.mounted) return;
+          if (!context.mounted) return;
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✅ Request fulfilled. Resource allocated.'),
+              content: Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Request fulfilled. Resource allocated.'),
               backgroundColor: Colors.green,
             ),
           );
@@ -1517,6 +1520,9 @@ class _HospitalResourcesState extends State<HospitalResources> {
       }
     } catch (e) {
       if (context.mounted) {
+        if (!context.mounted) return;
+        if (!context.mounted) return;
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
@@ -1556,9 +1562,12 @@ class _HospitalResourcesState extends State<HospitalResources> {
       if (confirm == true && context.mounted) {
         final success = await provider.rejectResourceRequest(request['id']);
         if (success && context.mounted) {
+          if (!context.mounted) return;
+          if (!context.mounted) return;
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('❌ Request rejected'),
+              content: Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ Request rejected'),
               backgroundColor: Colors.red,
             ),
           );
@@ -1567,6 +1576,9 @@ class _HospitalResourcesState extends State<HospitalResources> {
       }
     } catch (e) {
       if (context.mounted) {
+        if (!context.mounted) return;
+        if (!context.mounted) return;
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),

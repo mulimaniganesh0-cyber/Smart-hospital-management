@@ -34,13 +34,13 @@ class _TestConnectionScreenState extends State<TestConnectionScreen> with Single
     try {
       final result = await ApiService.getNearbyHospitals(28.6139, 77.2090);
       setState(() {
-        _status = '✅ Backend connection successful!\n\nFound ${result['count'] ?? 0} nearby hospitals.\n\nYou can now use the app with backend integration.';
+        _status = 'âœ… Backend connection successful!\n\nFound ${result['count'] ?? 0} nearby hospitals.\n\nYou can now use the app with backend integration.';
         _isLoading = false;
       });
       _animationController.stop();
     } catch (e) {
       setState(() {
-        _status = '❌ Connection failed: $e\n\nMake sure:\n1. Backend server is running on port 5000\n2. Database is connected\n3. No firewall blocking the connection';
+        _status = 'âŒ Connection failed: $e\n\nMake sure:\n1. Backend server is running on port 5000\n2. Database is connected\n3. No firewall blocking the connection';
         _isLoading = false;
       });
       _animationController.stop();
@@ -60,7 +60,7 @@ class _TestConnectionScreenState extends State<TestConnectionScreen> with Single
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.white, const Color(0xFF0A4D68).withOpacity(0.1)],
+            colors: [Colors.white, const Color(0xFF0A4D68).withValues(alpha: 0.1)],
           ),
         ),
         child: Center(
@@ -77,7 +77,7 @@ class _TestConnectionScreenState extends State<TestConnectionScreen> with Single
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: const LinearGradient(colors: [Color(0xFF0A4D68), Color(0xFF088395)]),
-                        boxShadow: [BoxShadow(color: const Color(0xFF0A4D68).withOpacity(0.3), blurRadius: 20)],
+                        boxShadow: [BoxShadow(color: const Color(0xFF0A4D68).withValues(alpha: 0.3), blurRadius: 20)],
                       ),
                       child: const Icon(Icons.network_check, size: 60, color: Colors.white),
                     ),
@@ -90,17 +90,17 @@ class _TestConnectionScreenState extends State<TestConnectionScreen> with Single
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      gradient: _status.contains('✅') ? LinearGradient(colors: [Colors.green.shade50, Colors.green.shade100]) : LinearGradient(colors: [Colors.red.shade50, Colors.red.shade100]),
+                      gradient: _status.contains('âœ…') ? LinearGradient(colors: [Colors.green.shade50, Colors.green.shade100]) : LinearGradient(colors: [Colors.red.shade50, Colors.red.shade100]),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: _status.contains('✅') ? Colors.green.shade200 : Colors.red.shade200),
+                      border: Border.all(color: _status.contains('âœ…') ? Colors.green.shade200 : Colors.red.shade200),
                     ),
                     child: Column(
                       children: [
-                        Icon(_status.contains('✅') ? Icons.check_circle : Icons.error, size: 80, color: _status.contains('✅') ? Colors.green : Colors.red),
+                        Icon(_status.contains('âœ…') ? Icons.check_circle : Icons.error, size: 80, color: _status.contains('âœ…') ? Colors.green : Colors.red),
                         const SizedBox(height: 16),
                         Text(
                           _status,
-                          style: TextStyle(fontSize: 14, color: _status.contains('✅') ? Colors.green.shade800 : Colors.red.shade800),
+                          style: TextStyle(fontSize: 14, color: _status.contains('âœ…') ? Colors.green.shade800 : Colors.red.shade800),
                           textAlign: TextAlign.center,
                         ),
                       ],
