@@ -142,7 +142,7 @@ class _PatientMyRequestsState extends State<PatientMyRequests> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(statusIcon, color: statusColor, size: 20),
@@ -160,7 +160,7 @@ class _PatientMyRequestsState extends State<PatientMyRequests> {
                         ),
                       ),
                       Text(
-                        '$hospitalName • Qty: $quantity',
+                        '$hospitalName â€¢ Qty: $quantity',
                         style: const TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
@@ -169,7 +169,7 @@ class _PatientMyRequestsState extends State<PatientMyRequests> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -186,19 +186,19 @@ class _PatientMyRequestsState extends State<PatientMyRequests> {
             if (request['description'] != null && request['description'].isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
-                '📝 ${request['description']}',
+                'ðŸ“ ${request['description']}',
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
             const SizedBox(height: 4),
             Text(
-              '🕐 ${_formatDate(request['created_at'])}',
+              'ðŸ• ${_formatDate(request['created_at'])}',
               style: const TextStyle(fontSize: 11, color: Colors.grey),
             ),
             if (status.toLowerCase() == 'fulfilled' && request['fulfilled_at'] != null) ...[
               const SizedBox(height: 4),
               Text(
-                '✅ Fulfilled on ${_formatDate(request['fulfilled_at'])}',
+                'âœ… Fulfilled on ${_formatDate(request['fulfilled_at'])}',
                 style: const TextStyle(fontSize: 11, color: Colors.green),
               ),
             ],
@@ -227,7 +227,7 @@ class _PatientMyRequestsState extends State<PatientMyRequests> {
         return 'Just now';
       }
     } catch (e) {
-      return dateTime ?? 'Just now';
+      return 'Just now';
     }
   }
 }

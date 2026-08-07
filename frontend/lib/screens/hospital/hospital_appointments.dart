@@ -50,7 +50,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
   }
 
   Future<void> _loadAppointments() async {
-    if (!mounted) return;
+    if (!context.mounted) return;
 
     setState(() {
       _isLoading = true;
@@ -62,25 +62,25 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
       final provider = Provider.of<HospitalProvider>(context, listen: false);
       if (provider.appointments.isNotEmpty) {
         _appointments = List<Map<String, dynamic>>.from(provider.appointments);
-        print('Loaded ${_appointments.length} appointments from provider');
+        debugPrint('Loaded ${_appointments.length} appointments from provider');
         setState(() => _isLoading = false);
         return;
       }
 
       // Fallback to API call
       final response = await ApiService.getHospitalAppointments();
-      print('Hospital appointments response: $response');
+      debugPrint('Hospital appointments response: $response');
 
       if (response['success'] == true) {
         _appointments = List<Map<String, dynamic>>.from(response['data'] ?? []);
-        print('Loaded ${_appointments.length} appointments from API');
+        debugPrint('Loaded ${_appointments.length} appointments from API');
       } else {
         _errorMessage = response['message'] ?? 'Failed to load appointments';
-        print('Error: $_errorMessage');
+        debugPrint('Error: $_errorMessage');
       }
     } catch (e) {
       _errorMessage = 'Network error: $e';
-      print('Error loading appointments: $e');
+      debugPrint('Error loading appointments: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -108,6 +108,9 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
     try {
       final response =
           await ApiService.updateAppointmentStatus(appointmentId, status);
+      if (!context.mounted) return;
+      if (!context.mounted) return;
+      if (!mounted) return;
       Navigator.pop(context); // Close loading dialog
 
       if (response['success'] == true && mounted) {
@@ -130,6 +133,9 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
         await _loadAppointments();
 
         // Also refresh the provider
+        if (!context.mounted) return;
+        if (!context.mounted) return;
+        if (!mounted) return;
         final provider = Provider.of<HospitalProvider>(context, listen: false);
         await provider.loadHospitalData();
       } else if (mounted) {
@@ -142,6 +148,9 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
         );
       }
     } catch (e) {
+      if (!context.mounted) return;
+      if (!context.mounted) return;
+      if (!mounted) return;
       Navigator.pop(context); // Close loading dialog
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -281,7 +290,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                 setState(() => _selectedFilter = filter);
               },
               backgroundColor: Colors.grey.shade50,
-              selectedColor: color.withOpacity(0.2),
+              selectedColor: color.withValues(alpha: 0.2),
               labelStyle: TextStyle(
                 color: isSelected ? color : Colors.grey[600],
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
@@ -356,7 +365,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.white, statusColor.withOpacity(0.05)],
+            colors: [Colors.white, statusColor.withValues(alpha: 0.05)],
           ),
         ),
         child: Padding(
@@ -374,10 +383,10 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
+                            gradient: const LinearGradient(
                               colors: [
-                                const Color(0xFF0A4D68),
-                                const Color(0xFF088395)
+                                Color(0xFF0A4D68),
+                                Color(0xFF088395)
                               ],
                             ),
                             borderRadius: BorderRadius.circular(16),
@@ -420,9 +429,9 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
+                      color: statusColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: statusColor.withOpacity(0.3)),
+                      border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -617,7 +626,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
         Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(icon, size: 16, color: color),
@@ -634,7 +643,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
               const SizedBox(height: 2),
               Text(
                 value,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
                 overflow: TextOverflow.ellipsis,
               ),
             ],

@@ -23,7 +23,6 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
   final TextEditingController _latitudeController = TextEditingController();
   final TextEditingController _longitudeController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
-  String _selectedAddress = '';
 
   @override
   void initState() {
@@ -36,7 +35,6 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
     }
     if (widget.initialAddress != null) {
       _addressController.text = widget.initialAddress!;
-      _selectedAddress = widget.initialAddress!;
     }
   }
 
@@ -73,9 +71,6 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
                 hintText: 'Enter full address',
               ),
               maxLines: 2,
-              onChanged: (value) {
-                _selectedAddress = value;
-              },
             ),
             const SizedBox(height: 16),
             
@@ -88,7 +83,7 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
                 border: OutlineInputBorder(),
                 hintText: 'e.g., 28.6139',
               ),
-              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
             const SizedBox(height: 16),
             
@@ -101,7 +96,7 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
                 border: OutlineInputBorder(),
                 hintText: 'e.g., 77.2090',
               ),
-              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
             const SizedBox(height: 24),
             

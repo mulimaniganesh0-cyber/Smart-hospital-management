@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import '../services/api_service.dart';
+import '../services/socket_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   UserModel? _currentUser;
@@ -25,9 +26,10 @@ class AuthProvider extends ChangeNotifier {
     if (userJson != null) {
       try {
         _currentUser = UserModel.fromJson(json.decode(userJson));
+        await SocketService.instance.connect();
         notifyListeners();
       } catch (e) {
-        print('Error loading user: $e');
+        debugPrint('Error loading user: $e');
       }
     }
   }
@@ -54,7 +56,7 @@ class AuthProvider extends ChangeNotifier {
         'additional_data': additionalData,
       });
 
-      print('Signup response: $response');
+      debugPrint('Signup response: $response');
 
       if (response['success'] == true) {
         _isLoading = false;
@@ -67,7 +69,7 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      print('Signup exception: $e');
+      debugPrint('Signup exception: $e');
       _errorMessage = 'Network error: $e';
       _isLoading = false;
       notifyListeners();
@@ -81,15 +83,15 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      print('AuthProvider login called with: $email, $userType');
+      debugPrint('AuthProvider login called with: $email, $userType');
 
       final response = await ApiService.login(email, password, userType);
 
-      print('API Response: $response');
+      debugPrint('API Response: $response');
 
       if (response['success'] == true) {
         final userData = response['user'];
-        print('User data received: $userData');
+        debugPrint('User data received: $userData');
 
         // Ensure userData has all required fields
         final user = UserModel(
@@ -105,19 +107,20 @@ class AuthProvider extends ChangeNotifier {
         // Save to shared preferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('user', json.encode(user.toJson()));
+        await SocketService.instance.connect();
 
         _isLoading = false;
         notifyListeners();
         return true;
       } else {
         _errorMessage = response['message'] ?? 'Invalid credentials';
-        print('Login failed: $_errorMessage');
+        debugPrint('Login failed: $_errorMessage');
         _isLoading = false;
         notifyListeners();
         return false;
       }
     } catch (e) {
-      print('Login exception: $e');
+      debugPrint('Login exception: $e');
       _errorMessage = 'Network error: $e';
       _isLoading = false;
       notifyListeners();
@@ -144,6 +147,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    SocketService.instance.disconnect();
     await ApiService.logout();
     _currentUser = null;
     notifyListeners();

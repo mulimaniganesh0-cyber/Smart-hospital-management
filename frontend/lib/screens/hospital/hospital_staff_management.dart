@@ -1,7 +1,5 @@
 // lib/screens/hospital/hospital_staff_management.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../providers/hospital_provider.dart';
 import '../../services/api_service.dart';
 
 class HospitalStaffManagement extends StatefulWidget {
@@ -13,7 +11,6 @@ class HospitalStaffManagement extends StatefulWidget {
 
 class _HospitalStaffManagementState extends State<HospitalStaffManagement> {
   List<Map<String, dynamic>> _staff = [];
-  List<Map<String, dynamic>> _roles = [];
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -37,12 +34,6 @@ class _HospitalStaffManagementState extends State<HospitalStaffManagement> {
         });
       }
 
-      final rolesResponse = await ApiService.getRoles();
-      if (rolesResponse['success']) {
-        setState(() {
-          _roles = List<Map<String, dynamic>>.from(rolesResponse['data']);
-        });
-      }
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to load data: $e';
@@ -64,8 +55,8 @@ class _HospitalStaffManagementState extends State<HospitalStaffManagement> {
           backgroundColor: const Color(0xFF0A4D68),
           bottom: const TabBar(
             tabs: [
-              Tab(text: '👥 Staff', icon: Icon(Icons.people)),
-              Tab(text: '📋 Activity', icon: Icon(Icons.history)),
+              Tab(text: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‚Â¥ Staff', icon: Icon(Icons.people)),
+              Tab(text: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ Activity', icon: Icon(Icons.history)),
             ],
           ),
           actions: [
@@ -169,7 +160,7 @@ class _HospitalStaffManagementState extends State<HospitalStaffManagement> {
               children: [
                 CircleAvatar(
                   radius: 25,
-                  backgroundColor: roleColor.withOpacity(0.1),
+                  backgroundColor: roleColor.withValues(alpha: 0.1),
                   child: Icon(
                     role == 'doctor' ? Icons.medical_services :
                     role == 'nurse' ? Icons.health_and_safety :
@@ -211,7 +202,7 @@ class _HospitalStaffManagementState extends State<HospitalStaffManagement> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: isActive ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                        color: isActive ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -370,7 +361,7 @@ class _HospitalStaffManagementState extends State<HospitalStaffManagement> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: selectedRole,
+                  initialValue: selectedRole,
                   decoration: const InputDecoration(
                     labelText: 'Role *',
                     border: OutlineInputBorder(),
@@ -400,7 +391,7 @@ class _HospitalStaffManagementState extends State<HospitalStaffManagement> {
                 const SizedBox(height: 12),
                 if (selectedRole == 'doctor') ...[
                   DropdownButtonFormField<String>(
-                    value: selectedDepartment,
+                    initialValue: selectedDepartment,
                     decoration: const InputDecoration(
                       labelText: 'Department',
                       border: OutlineInputBorder(),
@@ -473,14 +464,16 @@ class _HospitalStaffManagementState extends State<HospitalStaffManagement> {
                 final response = await ApiService.createStaffUser(staffData);
 
                 if (response['success'] && mounted) {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('✅ Staff added successfully'),
+                      content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Staff added successfully'),
                       backgroundColor: Colors.green,
                     ),
                   );
                   _loadData();
                 } else if (mounted) {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(response['message'] ?? 'Failed to add staff'),
@@ -511,7 +504,7 @@ class _HospitalStaffManagementState extends State<HospitalStaffManagement> {
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<String>(
-              value: selectedRole,
+              initialValue: selectedRole,
               decoration: const InputDecoration(
                 labelText: 'Role',
                 border: OutlineInputBorder(),
@@ -559,9 +552,10 @@ class _HospitalStaffManagementState extends State<HospitalStaffManagement> {
               final response = await ApiService.updateStaffRole(staff['id'], selectedRole);
 
               if (response['success'] && mounted) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('✅ Role updated successfully'),
+                    content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Role updated successfully'),
                     backgroundColor: Colors.green,
                   ),
                 );
@@ -592,14 +586,16 @@ class _HospitalStaffManagementState extends State<HospitalStaffManagement> {
               final response = await ApiService.deleteStaffUser(staffId);
 
               if (response['success'] && mounted) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('✅ Staff removed successfully'),
+                    content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Staff removed successfully'),
                     backgroundColor: Colors.green,
                   ),
                 );
                 _loadData();
               } else if (mounted) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(response['message'] ?? 'Failed to remove staff'),

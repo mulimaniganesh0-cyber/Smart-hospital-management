@@ -74,14 +74,14 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
         _isLoading = false;
       });
       
-      print('✅ Loaded ${allRequests.length} total requests');
+      debugPrint('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ Loaded ${allRequests.length} total requests');
       
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to load requests: $e';
         _isLoading = false;
       });
-      print('Error loading requests: $e');
+      debugPrint('Error loading requests: $e');
     }
   }
 
@@ -113,9 +113,6 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
 
   @override
   Widget build(BuildContext context) {
-    final hospitalProvider = Provider.of<HospitalProvider>(context);
-    final resources = hospitalProvider.hospitalData?['resources'] ?? {};
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('All Requests'),
@@ -181,12 +178,12 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 4),
                                   child: FilterChip(
-                                    label: Text(type == 'all' ? 'All' : type == 'blood' ? '🩸 Blood' : '🛏️ Resource'),
+                                    label: Text(type == 'all' ? 'All' : type == 'blood' ? 'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ Blood' : 'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂºÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Resource'),
                                     selected: _selectedType == type,
                                     onSelected: (selected) {
                                       setState(() => _selectedType = type);
                                     },
-                                    selectedColor: const Color(0xFF0A4D68).withOpacity(0.2),
+                                    selectedColor: const Color(0xFF0A4D68).withValues(alpha: 0.2),
                                   ),
                                 );
                               }).toList(),
@@ -210,7 +207,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                                     onSelected: (selected) {
                                       setState(() => _selectedFilter = filter);
                                     },
-                                    selectedColor: const Color(0xFF0A4D68).withOpacity(0.2),
+                                    selectedColor: const Color(0xFF0A4D68).withValues(alpha: 0.2),
                                   ),
                                 );
                               }).toList(),
@@ -263,9 +260,9 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           children: [
@@ -305,7 +302,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
     // Determine icon and color based on type
     final icon = isBlood ? Icons.water_drop : Icons.medical_services;
     final color = isBlood ? Colors.red : Colors.blue;
-    final typeLabel = isBlood ? '🩸 Blood Request' : '🛏️ Resource Request';
+    final typeLabel = isBlood ? 'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ Blood Request' : 'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂºÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Resource Request';
     final detailLabel = isBlood 
         ? '$bloodGroup ($quantity units)' 
         : '$resourceType (x$quantity)';
@@ -315,7 +312,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: _getStatusColor(status).withOpacity(0.3),
+          color: _getStatusColor(status).withValues(alpha: 0.3),
         ),
       ),
       child: Padding(
@@ -333,7 +330,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
+                          color: color.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Icon(icon, color: color, size: 20),
@@ -363,7 +360,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _getStatusColor(status).withOpacity(0.1),
+                    color: _getStatusColor(status).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -442,7 +439,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: const Text('✅ Fulfill'),
+                      child: const Text('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ Fulfill'),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -457,7 +454,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: const Text('❌ Reject'),
+                      child: const Text('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ Reject'),
                     ),
                   ),
                 ],
@@ -479,7 +476,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                     Icon(Icons.check_circle, color: Colors.green, size: 16),
                     SizedBox(width: 8),
                     Text(
-                      '✅ Fulfilled successfully',
+                      'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ Fulfilled successfully',
                       style: TextStyle(color: Colors.green, fontSize: 12),
                     ),
                   ],
@@ -501,7 +498,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                     Icon(Icons.cancel, color: Colors.red, size: 16),
                     SizedBox(width: 8),
                     Text(
-                      '❌ Request rejected',
+                      'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ Request rejected',
                       style: TextStyle(color: Colors.red, fontSize: 12),
                     ),
                   ],
@@ -568,7 +565,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                   Text('Request: $detail'),
                   const SizedBox(height: 8),
                   Text(
-                    '⚠️ This will decrease available ${isBlood ? 'blood units' : 'resources'}',
+                    'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â This will decrease available ${isBlood ? 'blood units' : 'resources'}',
                     style: TextStyle(fontSize: 12, color: Colors.orange[700]),
                   ),
                 ],
@@ -589,7 +586,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
             ),
-            child: const Text('✅ Fulfill'),
+            child: const Text('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ Fulfill'),
           ),
         ],
       ),
@@ -622,7 +619,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
         if (response['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('✅ Request ${status}ed successfully'),
+              content: Text('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ Request ${status}ed successfully'),
               backgroundColor: Colors.green,
             ),
           );
@@ -631,6 +628,9 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
           await _loadRequests();
           
           // Refresh hospital data to update resource counts
+          if (!context.mounted) return;
+          if (!context.mounted) return;
+          if (!mounted) return;
           final hospitalProvider = Provider.of<HospitalProvider>(context, listen: false);
           await hospitalProvider.loadHospitalData();
           

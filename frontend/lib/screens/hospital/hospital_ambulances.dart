@@ -1,8 +1,6 @@
 // lib/screens/hospital/hospital_ambulances.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
-import '../../providers/auth_provider.dart';
 
 class HospitalAmbulances extends StatefulWidget {
   const HospitalAmbulances({super.key});
@@ -30,8 +28,8 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
   }
 
   Future<void> _loadData() async {
-    if (!mounted) return;
-    
+    if (!context.mounted) return;
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -40,9 +38,9 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
     try {
       // Load ambulances
       final response = await ApiService.getHospitalAmbulances();
-      
-      if (!mounted) return;
-      
+
+      if (!context.mounted) return;
+
       if (response['success'] && response['data'] != null) {
         setState(() {
           _ambulances = List<Map<String, dynamic>>.from(response['data']);
@@ -55,12 +53,13 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
 
       // Load pending bookings
       final bookingsResponse = await ApiService.getHospitalAmbulanceBookings();
-      
-      if (!mounted) return;
-      
+
+      if (!context.mounted) return;
+
       if (bookingsResponse['success'] && bookingsResponse['data'] != null) {
         setState(() {
-          _pendingBookings = List<Map<String, dynamic>>.from(bookingsResponse['data']);
+          _pendingBookings =
+              List<Map<String, dynamic>>.from(bookingsResponse['data']);
         });
       }
     } catch (e) {
@@ -86,8 +85,8 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
           backgroundColor: const Color(0xFF0A4D68),
           bottom: const TabBar(
             tabs: [
-              Tab(text: '🚑 Ambulances', icon: Icon(Icons.local_taxi)),
-              Tab(text: '📋 Bookings', icon: Icon(Icons.assignment)),
+              Tab(text: 'ÃƒÂ°Ã…Â¸Ã…Â¡Ã¢â‚¬Ëœ Ambulances', icon: Icon(Icons.local_taxi)),
+              Tab(text: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ Bookings', icon: Icon(Icons.assignment)),
             ],
           ),
           actions: [
@@ -110,7 +109,8 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                        const Icon(Icons.error_outline,
+                            size: 64, color: Colors.red),
                         const SizedBox(height: 16),
                         Text(_errorMessage!),
                         const SizedBox(height: 16),
@@ -130,6 +130,592 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
       ),
     );
   }
+
+  // ==================== HELPER METHODS IN STATE ====================
+  void _showAddAmbulanceDialog(BuildContext context) {
+    if (_isProcessing) return;
+
+    final vehicleController = TextEditingController();
+    final driverController = TextEditingController();
+    final phoneController = TextEditingController();
+    String selectedType = 'Basic Life Support';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.local_taxi, color: Color(0xFF0A4D68)),
+            SizedBox(width: 12),
+            Text('Add Ambulance',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: vehicleController,
+                decoration: const InputDecoration(
+                  labelText: 'Vehicle Number *',
+                  prefixIcon: Icon(Icons.confirmation_number),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: driverController,
+                decoration: const InputDecoration(
+                  labelText: 'Driver Name *',
+                  prefixIcon: Icon(Icons.person),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneController,
+                decoration: const InputDecoration(
+                  labelText: 'Driver Phone *',
+                  prefixIcon: Icon(Icons.phone),
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: selectedType,
+                decoration: const InputDecoration(
+                  labelText: 'Ambulance Type *',
+                  prefixIcon: Icon(Icons.medical_services),
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                      value: 'Basic Life Support',
+                      child: Text('Basic Life Support (BLS)')),
+                  DropdownMenuItem(
+                      value: 'Advanced Life Support',
+                      child: Text('Advanced Life Support (ALS)')),
+                  DropdownMenuItem(
+                      value: 'Cardiac Ambulance',
+                      child: Text('Cardiac Ambulance')),
+                  DropdownMenuItem(
+                      value: 'Neonatal Ambulance',
+                      child: Text('Neonatal Ambulance')),
+                ],
+                onChanged: (value) => selectedType = value!,
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info, size: 16, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Ambulance will be available for emergency bookings immediately.',
+                        style: TextStyle(fontSize: 12, color: Colors.blue),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (vehicleController.text.isEmpty ||
+                  driverController.text.isEmpty ||
+                  phoneController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please fill all required fields'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+
+              setState(() => _isProcessing = true);
+              Navigator.pop(context);
+
+              try {
+                final response = await ApiService.registerHospitalAmbulance({
+                  'vehicle_number': vehicleController.text,
+                  'driver_name': driverController.text,
+                  'driver_phone': phoneController.text,
+                  'type': selectedType,
+                });
+
+                if (response['success'] && mounted) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ambulance added successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  await _loadData();
+                } else if (mounted) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                          response['message'] ?? 'Failed to add ambulance'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } finally {
+                if (mounted) {
+                  setState(() => _isProcessing = false);
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0A4D68),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Add Ambulance'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditAmbulanceDialog(
+      BuildContext context, Map<String, dynamic> ambulance) {
+    if (_isProcessing) return;
+
+    final driverController =
+        TextEditingController(text: ambulance['driver_name']);
+    final phoneController =
+        TextEditingController(text: ambulance['driver_phone']);
+    String selectedType = ambulance['type'] ?? 'Basic Life Support';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.edit, color: Colors.blue),
+            SizedBox(width: 12),
+            Text('Edit Ambulance',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: driverController,
+              decoration: const InputDecoration(
+                labelText: 'Driver Name',
+                prefixIcon: Icon(Icons.person),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: phoneController,
+              decoration: const InputDecoration(
+                labelText: 'Driver Phone',
+                prefixIcon: Icon(Icons.phone),
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: selectedType,
+              decoration: const InputDecoration(
+                labelText: 'Ambulance Type',
+                prefixIcon: Icon(Icons.medical_services),
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(
+                    value: 'Basic Life Support',
+                    child: Text('Basic Life Support (BLS)')),
+                DropdownMenuItem(
+                    value: 'Advanced Life Support',
+                    child: Text('Advanced Life Support (ALS)')),
+                DropdownMenuItem(
+                    value: 'Cardiac Ambulance',
+                    child: Text('Cardiac Ambulance')),
+                DropdownMenuItem(
+                    value: 'Neonatal Ambulance',
+                    child: Text('Neonatal Ambulance')),
+              ],
+              onChanged: (value) => selectedType = value!,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              setState(() => _isProcessing = true);
+              Navigator.pop(context);
+
+              try {
+                final response =
+                    await ApiService.updateHospitalAmbulance(ambulance['id'], {
+                  'driver_name': driverController.text,
+                  'driver_phone': phoneController.text,
+                  'type': selectedType,
+                });
+
+                if (response['success'] && mounted) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ambulance updated successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  await _loadData();
+                }
+              } catch (e) {
+                if (mounted) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } finally {
+                if (mounted) {
+                  setState(() => _isProcessing = false);
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF0A4D68),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Save Changes'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _toggleAmbulanceAvailability(
+      int ambulanceId, bool isAvailable) async {
+    if (_isProcessing) return;
+
+    setState(() => _isProcessing = true);
+
+    try {
+      final response = await ApiService.updateAmbulanceAvailability(
+          ambulanceId, isAvailable);
+
+      if (response['success'] && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isAvailable
+                ? 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ambulance is now available'
+                : 'ÃƒÂ°Ã…Â¸Ã…Â¡Ã‚Â« Ambulance is now busy'),
+            backgroundColor: isAvailable ? Colors.green : Colors.orange,
+          ),
+        );
+        await _loadData();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text(response['message'] ?? 'Failed to update availability'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
+  Future<void> _assignAmbulanceToBooking(int bookingId) async {
+    if (_isProcessing) return;
+
+    final availableAmbulances =
+        _ambulances.where((a) => a['is_available'] == true).toList();
+
+    if (availableAmbulances.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No available ambulances to assign'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Assign Ambulance'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Select an ambulance to assign to this booking:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            ...availableAmbulances.map((ambulance) {
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: const Icon(Icons.local_taxi, color: Colors.blue),
+                  title: Text(ambulance['vehicle_number'] ?? 'Ambulance'),
+                  subtitle:
+                      Text('Driver: ${ambulance['driver_name'] ?? 'N/A'}'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    setState(() => _isProcessing = true);
+
+                    try {
+                      final response =
+                          await ApiService.assignAmbulanceToBooking(
+                              bookingId, ambulance['id']);
+
+                      if (response['success'] && mounted) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ambulance assigned successfully'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                        await _loadData();
+                      } else if (mounted) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content:
+                                Text(response['message'] ?? 'Failed to assign'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() => _isProcessing = false);
+                      }
+                    }
+                  },
+                ),
+              );
+            }),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _rejectBooking(int bookingId) async {
+    if (_isProcessing) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Reject Booking'),
+        content: const Text('Are you sure you want to reject this booking?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              setState(() => _isProcessing = true);
+
+              try {
+                final response =
+                    await ApiService.updateBookingStatus(bookingId, 'rejected');
+
+                if (response['success'] && mounted) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Booking rejected'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  await _loadData();
+                } else if (mounted) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(response['message'] ?? 'Failed to reject'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } finally {
+                if (mounted) {
+                  setState(() => _isProcessing = false);
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Reject'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteAmbulance(int ambulanceId) async {
+    if (_isProcessing) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Ambulance'),
+        content: const Text('Are you sure you want to delete this ambulance?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              setState(() => _isProcessing = true);
+
+              try {
+                final response =
+                    await ApiService.deleteHospitalAmbulance(ambulanceId);
+
+                if (response['success'] && mounted) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ambulance deleted successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  await _loadData();
+                } else if (mounted) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(response['message'] ?? 'Failed to delete'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } finally {
+                if (mounted) {
+                  setState(() => _isProcessing = false);
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ==================== AMBULANCES LIST ====================
@@ -139,7 +725,7 @@ class AmbulancesList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.findAncestorStateOfType<_HospitalAmbulancesState>()!;
-    
+
     if (state._ambulances.isEmpty) {
       return Center(
         child: Column(
@@ -182,9 +768,10 @@ class AmbulancesList extends StatelessWidget {
     );
   }
 
-  Widget _buildAmbulanceCard(BuildContext context, Map<String, dynamic> ambulance, _HospitalAmbulancesState state) {
+  Widget _buildAmbulanceCard(BuildContext context,
+      Map<String, dynamic> ambulance, _HospitalAmbulancesState state) {
     final isAvailable = ambulance['is_available'] ?? true;
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
@@ -199,7 +786,8 @@ class AmbulancesList extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isAvailable ? Colors.green.shade50 : Colors.red.shade50,
+                    color:
+                        isAvailable ? Colors.green.shade50 : Colors.red.shade50,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
@@ -232,9 +820,12 @@ class AmbulancesList extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isAvailable ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                    color: isAvailable
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -271,24 +862,33 @@ class AmbulancesList extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: state._isProcessing ? null : () => state._toggleAmbulanceAvailability(ambulance['id'], !isAvailable),
-                    icon: Icon(isAvailable ? Icons.block : Icons.check_circle, size: 18),
-                    label: Text(isAvailable ? 'Mark as Busy' : 'Mark as Available'),
+                    onPressed: state._isProcessing
+                        ? null
+                        : () => state._toggleAmbulanceAvailability(
+                            ambulance['id'], !isAvailable),
+                    icon: Icon(isAvailable ? Icons.block : Icons.check_circle,
+                        size: 18),
+                    label: Text(
+                        isAvailable ? 'Mark as Busy' : 'Mark as Available'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: isAvailable ? Colors.red : Colors.green,
-                      side: BorderSide(color: isAvailable ? Colors.red : Colors.green),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      side: BorderSide(
+                          color: isAvailable ? Colors.red : Colors.green),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => state._showEditAmbulanceDialog(context, ambulance),
+                    onPressed: () =>
+                        state._showEditAmbulanceDialog(context, ambulance),
                     icon: const Icon(Icons.edit, size: 18),
                     label: const Text('Edit'),
                     style: OutlinedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                 ),
@@ -320,7 +920,7 @@ class BookingsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.findAncestorStateOfType<_HospitalAmbulancesState>()!;
-    
+
     if (state._pendingBookings.isEmpty) {
       return const Center(
         child: Column(
@@ -348,13 +948,15 @@ class BookingsList extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         itemCount: state._pendingBookings.length,
         itemBuilder: (context, index) {
-          return _buildBookingCard(context, state._pendingBookings[index], state);
+          return _buildBookingCard(
+              context, state._pendingBookings[index], state);
         },
       ),
     );
   }
 
-  Widget _buildBookingCard(BuildContext context, Map<String, dynamic> booking, _HospitalAmbulancesState state) {
+  Widget _buildBookingCard(BuildContext context, Map<String, dynamic> booking,
+      _HospitalAmbulancesState state) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
@@ -383,16 +985,17 @@ class BookingsList extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '📞 ${booking['patient_phone'] ?? 'N/A'}',
+                        'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã…Â¾ ${booking['patient_phone'] ?? 'N/A'}',
                         style: TextStyle(color: Colors.grey[600]),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.1),
+                    color: Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -417,7 +1020,7 @@ class BookingsList extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    '📍 Pickup Location',
+                    'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â Pickup Location',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                   ),
                   Text(
@@ -426,7 +1029,7 @@ class BookingsList extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    '📋 Patient Condition',
+                    'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ Patient Condition',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                   ),
                   Text(
@@ -452,26 +1055,32 @@ class BookingsList extends StatelessWidget {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: state._isProcessing ? null : () => state._assignAmbulanceToBooking(booking['id']),
+                    onPressed: state._isProcessing
+                        ? null
+                        : () => state._assignAmbulanceToBooking(booking['id']),
                     icon: const Icon(Icons.local_taxi, size: 18),
                     label: const Text('Assign Ambulance'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: state._isProcessing ? null : () => state._rejectBooking(booking['id']),
+                    onPressed: state._isProcessing
+                        ? null
+                        : () => state._rejectBooking(booking['id']),
                     icon: const Icon(Icons.cancel, size: 18),
                     label: const Text('Reject'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red,
                       side: const BorderSide(color: Colors.red),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                 ),
@@ -489,7 +1098,7 @@ class BookingsList extends StatelessWidget {
       final date = DateTime.parse(timestamp);
       final now = DateTime.now();
       final diff = now.difference(date);
-      
+
       if (diff.inMinutes < 1) return 'Just now';
       if (diff.inHours < 1) return '${diff.inMinutes} minutes ago';
       if (diff.inDays < 1) return '${diff.inHours} hours ago';
@@ -497,540 +1106,5 @@ class BookingsList extends StatelessWidget {
     } catch (e) {
       return 'Recently';
     }
-  }
-}
-
-// ==================== HELPER METHODS IN STATE ====================
-extension _HospitalAmbulancesStateExtension on _HospitalAmbulancesState {
-  void _showAddAmbulanceDialog(BuildContext context) {
-    if (_isProcessing) return;
-    
-    final vehicleController = TextEditingController();
-    final driverController = TextEditingController();
-    final phoneController = TextEditingController();
-    String selectedType = 'Basic Life Support';
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.local_taxi, color: Color(0xFF0A4D68)),
-            SizedBox(width: 12),
-            Text('Add Ambulance', style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: vehicleController,
-                decoration: const InputDecoration(
-                  labelText: 'Vehicle Number *',
-                  prefixIcon: Icon(Icons.confirmation_number),
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: driverController,
-                decoration: const InputDecoration(
-                  labelText: 'Driver Name *',
-                  prefixIcon: Icon(Icons.person),
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Driver Phone *',
-                  prefixIcon: Icon(Icons.phone),
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: selectedType,
-                decoration: const InputDecoration(
-                  labelText: 'Ambulance Type *',
-                  prefixIcon: Icon(Icons.medical_services),
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'Basic Life Support', child: Text('Basic Life Support (BLS)')),
-                  DropdownMenuItem(value: 'Advanced Life Support', child: Text('Advanced Life Support (ALS)')),
-                  DropdownMenuItem(value: 'Cardiac Ambulance', child: Text('Cardiac Ambulance')),
-                  DropdownMenuItem(value: 'Neonatal Ambulance', child: Text('Neonatal Ambulance')),
-                ],
-                onChanged: (value) => selectedType = value!,
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info, size: 16, color: Colors.blue),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Ambulance will be available for emergency bookings immediately.',
-                        style: TextStyle(fontSize: 12, color: Colors.blue),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (vehicleController.text.isEmpty || 
-                  driverController.text.isEmpty || 
-                  phoneController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please fill all required fields'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-                return;
-              }
-
-              setState(() => _isProcessing = true);
-              Navigator.pop(context);
-
-              try {
-                final response = await ApiService.registerHospitalAmbulance({
-                  'vehicle_number': vehicleController.text,
-                  'driver_name': driverController.text,
-                  'driver_phone': phoneController.text,
-                  'type': selectedType,
-                });
-                
-                if (response['success'] && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Ambulance added successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                  await _loadData();
-                } else if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(response['message'] ?? 'Failed to add ambulance'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              } finally {
-                if (mounted) {
-                  setState(() => _isProcessing = false);
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0A4D68),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Add Ambulance'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showEditAmbulanceDialog(BuildContext context, Map<String, dynamic> ambulance) {
-    if (_isProcessing) return;
-    
-    final driverController = TextEditingController(text: ambulance['driver_name']);
-    final phoneController = TextEditingController(text: ambulance['driver_phone']);
-    String selectedType = ambulance['type'] ?? 'Basic Life Support';
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.edit, color: Colors.blue),
-            SizedBox(width: 12),
-            Text('Edit Ambulance', style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: driverController,
-              decoration: const InputDecoration(
-                labelText: 'Driver Name',
-                prefixIcon: Icon(Icons.person),
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: phoneController,
-              decoration: const InputDecoration(
-                labelText: 'Driver Phone',
-                prefixIcon: Icon(Icons.phone),
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: selectedType,
-              decoration: const InputDecoration(
-                labelText: 'Ambulance Type',
-                prefixIcon: Icon(Icons.medical_services),
-                border: OutlineInputBorder(),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'Basic Life Support', child: Text('Basic Life Support (BLS)')),
-                DropdownMenuItem(value: 'Advanced Life Support', child: Text('Advanced Life Support (ALS)')),
-                DropdownMenuItem(value: 'Cardiac Ambulance', child: Text('Cardiac Ambulance')),
-                DropdownMenuItem(value: 'Neonatal Ambulance', child: Text('Neonatal Ambulance')),
-              ],
-              onChanged: (value) => selectedType = value!,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              setState(() => _isProcessing = true);
-              Navigator.pop(context);
-
-              try {
-                final response = await ApiService.updateHospitalAmbulance(ambulance['id'], {
-                  'driver_name': driverController.text,
-                  'driver_phone': phoneController.text,
-                  'type': selectedType,
-                });
-                
-                if (response['success'] && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Ambulance updated successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                  await _loadData();
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              } finally {
-                if (mounted) {
-                  setState(() => _isProcessing = false);
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0A4D68),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Save Changes'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _toggleAmbulanceAvailability(int ambulanceId, bool isAvailable) async {
-    if (_isProcessing) return;
-    
-    setState(() => _isProcessing = true);
-
-    try {
-      final response = await ApiService.updateAmbulanceAvailability(ambulanceId, isAvailable);
-      
-      if (response['success'] && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(isAvailable ? '✅ Ambulance is now available' : '🚫 Ambulance is now busy'),
-            backgroundColor: isAvailable ? Colors.green : Colors.orange,
-          ),
-        );
-        await _loadData();
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response['message'] ?? 'Failed to update availability'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isProcessing = false);
-      }
-    }
-  }
-
-  Future<void> _assignAmbulanceToBooking(int bookingId) async {
-    if (_isProcessing) return;
-    
-    final availableAmbulances = _ambulances.where((a) => a['is_available'] == true).toList();
-
-    if (availableAmbulances.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No available ambulances to assign'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Assign Ambulance'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Select an ambulance to assign to this booking:',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            ...availableAmbulances.map((ambulance) {
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: const Icon(Icons.local_taxi, color: Colors.blue),
-                  title: Text(ambulance['vehicle_number'] ?? 'Ambulance'),
-                  subtitle: Text('Driver: ${ambulance['driver_name'] ?? 'N/A'}'),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () async {
-                    Navigator.pop(context);
-                    setState(() => _isProcessing = true);
-
-                    try {
-                      final response = await ApiService.assignAmbulanceToBooking(bookingId, ambulance['id']);
-                      
-                      if (response['success'] && mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('✅ Ambulance assigned successfully'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                        await _loadData();
-                      } else if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(response['message'] ?? 'Failed to assign'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    } finally {
-                      if (mounted) {
-                        setState(() => _isProcessing = false);
-                      }
-                    }
-                  },
-                ),
-              );
-            }),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _rejectBooking(int bookingId) async {
-    if (_isProcessing) return;
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Reject Booking'),
-        content: const Text('Are you sure you want to reject this booking?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              setState(() => _isProcessing = true);
-
-              try {
-                final response = await ApiService.updateBookingStatus(bookingId, 'rejected');
-                
-                if (response['success'] && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Booking rejected'),
-                      backgroundColor: Colors.orange,
-                    ),
-                  );
-                  await _loadData();
-                } else if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(response['message'] ?? 'Failed to reject'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              } finally {
-                if (mounted) {
-                  setState(() => _isProcessing = false);
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Reject'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _deleteAmbulance(int ambulanceId) async {
-    if (_isProcessing) return;
-    
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Ambulance'),
-        content: const Text('Are you sure you want to delete this ambulance?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              setState(() => _isProcessing = true);
-
-              try {
-                final response = await ApiService.deleteHospitalAmbulance(ambulanceId);
-                
-                if (response['success'] && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('✅ Ambulance deleted successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                  await _loadData();
-                } else if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(response['message'] ?? 'Failed to delete'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              } finally {
-                if (mounted) {
-                  setState(() => _isProcessing = false);
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
   }
 }

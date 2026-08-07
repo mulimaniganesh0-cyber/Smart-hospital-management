@@ -33,7 +33,7 @@ class PatientProfile extends StatelessWidget {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10))]),
+                    decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, 10))]),
                     child: const Icon(Icons.person, size: 60, color: Color(0xFF0A4D68)),
                   ),
                   const SizedBox(height: 16),
@@ -73,7 +73,7 @@ class PatientProfile extends StatelessWidget {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       title: Row(
                         children: [
-                          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.logout, color: Colors.red)),
+                          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.logout, color: Colors.red)),
                           const SizedBox(width: 12),
                           const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold)),
                         ],
@@ -112,7 +112,7 @@ class PatientProfile extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF0A4D68).withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: const Color(0xFF0A4D68), size: 20)),
+                Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF0A4D68).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: const Color(0xFF0A4D68), size: 20)),
                 const SizedBox(width: 12),
                 Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ],
@@ -130,7 +130,7 @@ class PatientProfile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, size: 18, color: color)),
+          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, size: 18, color: color)),
           const SizedBox(width: 12),
           SizedBox(width: 120, child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600))),
           Expanded(child: Text(value, style: TextStyle(color: Colors.grey[700]))),
@@ -148,7 +148,7 @@ class PatientProfile extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF0A4D68).withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.edit, color: Color(0xFF0A4D68))),
+            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF0A4D68).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.edit, color: Color(0xFF0A4D68))),
             const SizedBox(width: 12),
             Text('Edit $field', style: const TextStyle(fontWeight: FontWeight.bold)),
           ],
@@ -181,13 +181,13 @@ class PatientProfile extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.water_drop, color: Colors.red)),
+            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.water_drop, color: Colors.red)),
             const SizedBox(width: 12),
             const Text('Edit Blood Group', style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
         content: DropdownButtonFormField<String>(
-          value: selectedGroup.isNotEmpty ? selectedGroup : null,
+          initialValue: selectedGroup.isNotEmpty ? selectedGroup : null,
           decoration: const InputDecoration(labelText: 'Blood Group', border: OutlineInputBorder()),
           items: bloodGroups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
           onChanged: (v) => selectedGroup = v!,

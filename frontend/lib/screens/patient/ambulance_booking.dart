@@ -31,7 +31,6 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
   Position? _currentPosition;
   String _currentAddress = 'Fetching location...';
   bool _isLocationLoading = true;
-  bool _hasLocationPermission = false;
 
   final List<String> _ambulanceTypes = [
     'All Types',
@@ -43,10 +42,10 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
   ];
 
   final List<Map<String, dynamic>> _locationTypes = [
-    {'label': '📍 Live Location', 'value': 'live'},
-    {'label': '🏠 Home', 'value': 'home'},
-    {'label': '💼 Work', 'value': 'work'},
-    {'label': '📍 Custom Address', 'value': 'custom'},
+    {'label': 'Ã°Å¸â€œÂ Live Location', 'value': 'live'},
+    {'label': 'Ã°Å¸ÂÂ  Home', 'value': 'home'},
+    {'label': 'Ã°Å¸â€™Â¼ Work', 'value': 'work'},
+    {'label': 'Ã°Å¸â€œÂ Custom Address', 'value': 'custom'},
   ];
 
   final List<String> _ambulanceSources = [
@@ -78,7 +77,6 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
           setState(() {
             _isLocationLoading = false;
             _currentAddress = 'Location permission denied';
-            _hasLocationPermission = false;
           });
           return;
         }
@@ -88,12 +86,10 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
         setState(() {
           _isLocationLoading = false;
           _currentAddress = 'Location permanently denied';
-          _hasLocationPermission = false;
         });
         return;
       }
 
-      _hasLocationPermission = true;
 
       // Get current position
       final position = await Geolocator.getCurrentPosition(
@@ -160,20 +156,6 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
       default:
         return _currentAddress;
     }
-  }
-
-  double? _getPickupLat() {
-    if (_selectedLocationType == 'live' && _currentPosition != null) {
-      return _currentPosition!.latitude;
-    }
-    return null;
-  }
-
-  double? _getPickupLng() {
-    if (_selectedLocationType == 'live' && _currentPosition != null) {
-      return _currentPosition!.longitude;
-    }
-    return null;
   }
 
   Future<void> _loadNearbyAmbulances() async {
@@ -268,11 +250,11 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.red.shade200),
             ),
-            child: Row(
+            child: const Row(
               children: [
-                const Icon(Icons.emergency, color: Colors.red),
-                const SizedBox(width: 12),
-                const Expanded(
+                Icon(Icons.emergency, color: Colors.red),
+                SizedBox(width: 12),
+                Expanded(
                   child: Text(
                     'Emergency? Call 108 for immediate assistance',
                     style: TextStyle(fontWeight: FontWeight.bold),
@@ -553,7 +535,7 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                Icon(Icons.gps_fixed, size: 14, color: Colors.green),
+                const Icon(Icons.gps_fixed, size: 14, color: Colors.green),
                 const SizedBox(width: 8),
                 Text(
                   'Showing ambulances near: ${_currentAddress.split(',').take(2).join(',')}',
@@ -628,19 +610,19 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
     final bool available = ambulance['is_available'] ?? true;
     final bool isPrivate = ambulance['is_private'] ?? false;
     final String hospitalName = ambulance['hospital_name']?.toString() ?? '';
-    final String driverName = ambulance['driver_name']?.toString() ?? 'Driver';
-    final String driverPhone = ambulance['driver_phone']?.toString() ?? '';
 
     double rating = 4.5;
     final dynamic ratingValue = ambulance['rating'];
     if (ratingValue != null) {
-      if (ratingValue is double)
+      if (ratingValue is double) {
         rating = ratingValue;
-      else if (ratingValue is int)
+      } else if (ratingValue is int) {
         rating = ratingValue.toDouble();
-      else if (ratingValue is String)
+      } else if (ratingValue is String) {
         rating = double.tryParse(ratingValue) ?? 4.5;
-      else if (ratingValue is num) rating = ratingValue.toDouble();
+      } else if (ratingValue is num) {
+        rating = ratingValue.toDouble();
+      }
     }
 
     return Card(
@@ -800,10 +782,14 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
         try {
           final user = Map<String, dynamic>.from(jsonDecode(userJson));
           patientPhone = user['phone'] ?? '';
-        } catch (e) {}
+        } catch (_) {
+          // Keep the booking flow available when locally cached data is invalid.
+        }
       }
 
       // Get patient name
+      if (!context.mounted) return;
+      if (!mounted) return;
       final user =
           Provider.of<AuthProvider>(context, listen: false).currentUser;
       final patientName = user?.name ?? 'Patient';
@@ -863,7 +849,9 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
           final user = Map<String, dynamic>.from(jsonDecode(userJson));
           patientPhone = user['phone'] ?? '';
           patientName = user['name'] ?? 'Patient';
-        } catch (e) {}
+        } catch (_) {
+          // Fall back to the default contact details when locally cached data is invalid.
+        }
       }
 
       final bookingData = {
@@ -904,7 +892,7 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('🚑 Ambulance Booked!'),
+        title: const Text('Ã°Å¸Å¡â€˜ Ambulance Booked!'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -921,16 +909,16 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('📍 Pickup Location:'),
+                  const Text('Ã°Å¸â€œÂ Pickup Location:'),
                   const SizedBox(height: 4),
                   Text(
                     _getPickupAddress(),
                     style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 8),
-                  const Text('⏱️ Estimated Arrival: 5-7 minutes'),
+                  const Text('Ã¢ÂÂ±Ã¯Â¸Â Estimated Arrival: 5-7 minutes'),
                   const SizedBox(height: 4),
-                  Text('🆔 Tracking ID: $trackingId'),
+                  Text('Ã°Å¸â€ â€ Tracking ID: $trackingId'),
                 ],
               ),
             ),

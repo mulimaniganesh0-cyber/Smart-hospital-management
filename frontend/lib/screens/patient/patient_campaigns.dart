@@ -62,8 +62,8 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
           backgroundColor: Colors.red,
           bottom: const TabBar(
             tabs: [
-              Tab(text: '📋 Available Camps', icon: Icon(Icons.campaign)),
-              Tab(text: '📝 My Registrations', icon: Icon(Icons.person)),
+              Tab(text: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ Available Camps', icon: Icon(Icons.campaign)),
+              Tab(text: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â My Registrations', icon: Icon(Icons.person)),
             ],
           ),
           actions: [
@@ -150,8 +150,8 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
                         color: campaign['status'] == 'active' 
-                            ? Colors.green.withOpacity(0.1) 
-                            : Colors.blue.withOpacity(0.1),
+                            ? Colors.green.withValues(alpha: 0.1) 
+                            : Colors.blue.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -290,11 +290,11 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: Colors.green.shade200),
                           ),
-                          child: Row(
+                          child: const Row(
                             children: [
-                              const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                              const SizedBox(width: 8),
-                              const Text(
+                              Icon(Icons.check_circle, color: Colors.green, size: 16),
+                              SizedBox(width: 8),
+                              Text(
                                 'You are registered for this camp',
                                 style: TextStyle(color: Colors.green),
                               ),
@@ -382,7 +382,7 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
+                        color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -397,13 +397,13 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('🏥 ${reg['hospital_name'] ?? 'Hospital'}'),
-                Text('📍 ${reg['location'] ?? 'Location not specified'}'),
-                Text('📅 ${reg['start_date']?.toString().split('T')[0] ?? ''}'),
+                Text('ÃƒÂ°Ã…Â¸Ã‚ÂÃ‚Â¥ ${reg['hospital_name'] ?? 'Hospital'}'),
+                Text('ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â ${reg['location'] ?? 'Location not specified'}'),
+                Text('ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¦ ${reg['start_date']?.toString().split('T')[0] ?? ''}'),
                 if (reg['units_donated'] != null && reg['units_donated'] > 0)
-                  Text('🩸 Units Donated: ${reg['units_donated']}'),
+                  Text('ÃƒÂ°Ã…Â¸Ã‚Â©Ã‚Â¸ Units Donated: ${reg['units_donated']}'),
                 Text(
-                  '📝 Registered: ${reg['registration_date']?.toString().split('T')[0] ?? ''}',
+                  'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â Registered: ${reg['registration_date']?.toString().split('T')[0] ?? ''}',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
                 if (status == 'registered' || status == 'checked_in')
@@ -432,7 +432,7 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '✅ Thank you for donating! You saved a life.',
+                            'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Thank you for donating! You saved a life.',
                             style: TextStyle(color: Colors.green),
                           ),
                         ),
@@ -495,7 +495,7 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: selectedBloodGroup,
+                  initialValue: selectedBloodGroup,
                   decoration: const InputDecoration(
                     labelText: 'Blood Group *',
                     border: OutlineInputBorder(),
@@ -573,7 +573,7 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  '⚠️ Please ensure you meet eligibility criteria before registering.',
+                  'ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â Please ensure you meet eligibility criteria before registering.',
                   style: TextStyle(fontSize: 12, color: Colors.orange),
                   textAlign: TextAlign.center,
                 ),
@@ -615,14 +615,16 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                 });
 
                 if (response['success'] && mounted) {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('✅ Successfully registered for blood donation camp!'),
+                      content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Successfully registered for blood donation camp!'),
                       backgroundColor: Colors.green,
                     ),
                   );
                   _loadData();
                 } else if (mounted) {
+                  if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(response['message'] ?? 'Registration failed'),

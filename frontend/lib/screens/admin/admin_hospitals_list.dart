@@ -371,10 +371,10 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: status == 'verified'
-                          ? Colors.green.withOpacity(0.1)
+                          ? Colors.green.withValues(alpha: 0.1)
                           : status == 'pending'
-                              ? Colors.orange.withOpacity(0.1)
-                              : Colors.red.withOpacity(0.1),
+                              ? Colors.orange.withValues(alpha: 0.1)
+                              : Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(

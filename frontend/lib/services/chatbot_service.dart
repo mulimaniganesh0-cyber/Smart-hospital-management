@@ -3,6 +3,7 @@ import '../models/chat_model.dart';
 import 'api_service.dart';
 
 class ChatbotService {
+  final List<Map<String, String>> _history = [];
   static final Map<String, List<String>> _responses = {
     'hello|hi|hey': [
       'Hello! 👋 How can I help you today?',
@@ -88,6 +89,41 @@ class ChatbotService {
     required double longitude,
     required String language,
   }) async {
+    try {
+      final result = await ApiService.queryChatbot({
+        'message': message,
+        'latitude': latitude,
+        'longitude': longitude,
+        'language': language,
+        'history': _history,
+      });
+      final data = result['data'];
+      if (result['code'] == 'ai_unavailable') {
+        return ChatMessage(
+          text: '${result['message']}',
+          isUser: false,
+        );
+      }
+      if (result['success'] == true && data is Map && data['response'] != null) {
+        final hospitals = data['hospitals'];
+        HospitalRecommendation? recommendation;
+        if (hospitals is List && hospitals.isNotEmpty && hospitals.first is Map) {
+          recommendation = _toRecommendation(
+            Map<String, dynamic>.from(hospitals.first as Map),
+          );
+        }
+        final reply = ChatMessage(
+          text: '${data['response']}',
+          isUser: false,
+          hospitalRecommendation: recommendation,
+        );
+        _remember(message, reply.text);
+        return reply;
+      }
+    } catch (_) {
+      // Use the local guidance below when the server cannot be reached.
+    }
+
     final normalized = message.toLowerCase();
     final needsHospital =
         RegExp(r'hospital|nearby|icu|bed|ventilator').hasMatch(normalized);
@@ -102,7 +138,7 @@ class ChatbotService {
           final recommendation = _toRecommendation(
             Map<String, dynamic>.from(hospitals.first as Map),
           );
-          return ChatMessage(
+          final reply = ChatMessage(
             text: 'I found ${recommendation.name}, about '
                 '${recommendation.distance.toStringAsFixed(1)} km away. '
                 'It currently shows ${recommendation.availableBeds} beds and '
@@ -110,13 +146,28 @@ class ChatbotService {
             isUser: false,
             hospitalRecommendation: recommendation,
           );
+          _remember(message, reply.text);
+          return reply;
         }
       } catch (_) {
         // A helpful local response is preferable to failing the conversation.
       }
     }
 
-    return ChatMessage(text: getResponse(message), isUser: false);
+    final reply = ChatMessage(text: getResponse(message), isUser: false);
+    _remember(message, reply.text);
+    return reply;
+  }
+
+  void resetConversation() => _history.clear();
+
+  void _remember(String userMessage, String assistantMessage) {
+    _history
+      ..add({'role': 'user', 'content': userMessage})
+      ..add({'role': 'assistant', 'content': assistantMessage});
+    if (_history.length > 12) {
+      _history.removeRange(0, _history.length - 12);
+    }
   }
 
   HospitalRecommendation _toRecommendation(Map<String, dynamic> hospital) {

@@ -5,9 +5,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../login_screen.dart';
-import 'admin_dashboard.dart';
 import 'hospital_verification.dart';
-import 'admin_profile.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   const AdminHomeScreen({super.key});
@@ -91,7 +89,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   }
 
   Future<void> _loadDashboardData() async {
-    if (!mounted) return;
+    if (!context.mounted) return;
     
     setState(() {
       _isLoading = true;
@@ -287,7 +285,7 @@ class AdminMetricCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 24),
@@ -363,10 +361,10 @@ class AdminRecentHospitalCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
                       color: isVerified
-                          ? Colors.green.withOpacity(0.1)
+                          ? Colors.green.withValues(alpha: 0.1)
                           : isPending
-                              ? Colors.orange.withOpacity(0.1)
-                              : Colors.red.withOpacity(0.1),
+                              ? Colors.orange.withValues(alpha: 0.1)
+                              : Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -425,7 +423,7 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
   }
 
   Future<void> _loadHospitals() async {
-    if (!mounted) return;
+    if (!context.mounted) return;
     
     setState(() {
       _isLoading = true;
@@ -661,10 +659,10 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: status == 'verified'
-                          ? Colors.green.withOpacity(0.1)
+                          ? Colors.green.withValues(alpha: 0.1)
                           : status == 'pending'
-                              ? Colors.orange.withOpacity(0.1)
-                              : Colors.red.withOpacity(0.1),
+                              ? Colors.orange.withValues(alpha: 0.1)
+                              : Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -729,9 +727,9 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -821,7 +819,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
   }
 
   Future<void> _loadHospitalData() async {
-    if (!mounted) return;
+    if (!context.mounted) return;
     
     setState(() {
       _isLoading = true;
@@ -1173,7 +1171,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.1),
+                      color: color.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Icon(
@@ -1192,7 +1190,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -1359,7 +1357,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             DropdownButtonFormField<String>(
-              value: selectedGroup,
+              initialValue: selectedGroup,
               decoration: const InputDecoration(
                 labelText: 'Blood Group',
                 border: OutlineInputBorder(),

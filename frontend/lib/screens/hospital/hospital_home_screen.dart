@@ -2,12 +2,11 @@
 import 'package:flutter/material.dart';
 import 'package:hospital_resource_management/screens/hospital/hospital_blood_bank.dart';
 import 'package:hospital_resource_management/services/api_service.dart';
+import 'package:hospital_resource_management/services/socket_service.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/hospital_provider.dart';
-import '../login_screen.dart';
 import 'hospital_resources.dart';
-import 'hospital_appointments.dart';
 import 'hospital_staff.dart';
 import 'hospital_ambulances.dart';
 import 'hospital_resource_requests.dart';
@@ -118,9 +117,21 @@ class HospitalDashboard extends StatefulWidget {
 class _HospitalDashboardState extends State<HospitalDashboard> {
   Map<String, dynamic> _stats = {
     'total_patients': 0,
-    'available_beds': 0,
-    'available_icu': 0,
-    'appointments': 0,
+    'today_appointments': 0,
+    'patients_waiting': 0,
+    'doctors_available': 0,
+    'doctors_busy': 0,
+    'general_beds_available': 0,
+    'general_beds_occupied': 0,
+    'icu_beds_available': 0,
+    'icu_beds_occupied': 0,
+    'active_emergencies': 0,
+    'ambulances_available': 0,
+    'ambulances_total': 0,
+    'pharmacy_stock_alerts': 0,
+    'lab_pending_reports': 0,
+    'blood_bank_total_units': 0,
+    'revenue_today': 0,
   };
   bool _isLoading = true;
 
@@ -128,30 +139,53 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
   void initState() {
     super.initState();
     _loadStats();
+    _connectSocketListeners();
+  }
+
+  Future<void> _connectSocketListeners() async {
+    final socket = SocketService.instance;
+    await socket.connect();
+    if (!mounted) return;
+    socket.onResourcesChanged((_) => _loadStats());
+    socket.onNewEmergency((_) => _loadStats());
+    socket.onDashboardStatsChanged((_) => _loadStats());
+    socket.onBloodStockChanged((_) => _loadStats());
   }
 
   Future<void> _loadStats() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     
     try {
-      final response = await ApiService.getHospitalProfile();
-      if (response['success'] && response['data'] != null) {
+      final response = await ApiService.getHospitalDashboardStats();
+      if (response['success'] == true && response['data'] != null) {
         final data = response['data'];
-        final resources = data['resources'] ?? {};
         
         setState(() {
           _stats = {
             'total_patients': data['total_patients'] ?? 0,
-            'available_beds': resources['generalBeds']?['available']?.toInt() ?? 0,
-            'available_icu': resources['icuBeds']?['available']?.toInt() ?? 0,
-            'appointments': data['today_appointments'] ?? 0,
+            'today_appointments': data['today_appointments'] ?? 0,
+            'patients_waiting': data['patients_waiting'] ?? 0,
+            'doctors_available': data['doctors_available'] ?? 0,
+            'doctors_busy': data['doctors_busy'] ?? 0,
+            'general_beds_available': data['general_beds_available'] ?? 0,
+            'general_beds_occupied': data['general_beds_occupied'] ?? 0,
+            'icu_beds_available': data['icu_beds_available'] ?? 0,
+            'icu_beds_occupied': data['icu_beds_occupied'] ?? 0,
+            'active_emergencies': data['active_emergencies'] ?? 0,
+            'ambulances_available': data['ambulances_available'] ?? 0,
+            'ambulances_total': data['ambulances_total'] ?? 0,
+            'pharmacy_stock_alerts': data['pharmacy_stock_alerts'] ?? 0,
+            'lab_pending_reports': data['lab_pending_reports'] ?? 0,
+            'blood_bank_total_units': data['blood_bank_total_units'] ?? 0,
+            'revenue_today': data['revenue_statistics']?['today'] ?? 0,
           };
         });
       }
     } catch (e) {
-      print('Error loading stats: $e');
+      debugPrint('Error loading dashboard stats: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -223,7 +257,7 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
               ),
               const SizedBox(height: 24),
               
-              // Metrics Grid
+              // Metrics Grid - Row 1
               Row(
                 children: [
                   Expanded(
@@ -237,8 +271,8 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildMetricCard(
-                      title: 'Available Beds',
-                      value: _stats['available_beds'].toString(),
+                      title: 'Beds Available',
+                      value: _stats['general_beds_available'].toString(),
                       icon: Icons.king_bed,
                       color: Colors.green,
                     ),
@@ -246,12 +280,13 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
                 ],
               ),
               const SizedBox(height: 12),
+              // Metrics Grid - Row 2
               Row(
                 children: [
                   Expanded(
                     child: _buildMetricCard(
-                      title: 'Available ICU',
-                      value: _stats['available_icu'].toString(),
+                      title: 'ICU Available',
+                      value: _stats['icu_beds_available'].toString(),
                       icon: Icons.local_hospital,
                       color: Colors.red,
                     ),
@@ -259,10 +294,56 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildMetricCard(
-                      title: 'Today\'s Appointments',
-                      value: _stats['appointments'].toString(),
+                      title: 'Today\'s Appts',
+                      value: _stats['today_appointments'].toString(),
                       icon: Icons.calendar_today,
                       color: Colors.orange,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Metrics Grid - Row 3
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildMetricCard(
+                      title: 'Active Emergencies',
+                      value: _stats['active_emergencies'].toString(),
+                      icon: Icons.emergency,
+                      color: Colors.redAccent,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildMetricCard(
+                      title: 'Ambulances',
+                      value: '${_stats['ambulances_available']}/${_stats['ambulances_total']}',
+                      icon: Icons.local_shipping,
+                      color: Colors.teal,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Metrics Grid - Row 4
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildMetricCard(
+                      title: 'Doctors Available',
+                      value: _stats['doctors_available'].toString(),
+                      icon: Icons.person,
+                      color: Colors.indigo,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildMetricCard(
+                      title: 'Blood Units',
+                      value: _stats['blood_bank_total_units'].toString(),
+                      icon: Icons.bloodtype,
+                      color: Colors.pink,
                     ),
                   ),
                 ],
@@ -377,7 +458,7 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 24),
@@ -409,9 +490,9 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           children: [
@@ -559,16 +640,16 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        leading: CircleAvatar(
+        leading: const CircleAvatar(
           backgroundColor: Colors.red,
-          child: const Icon(Icons.emergency, color: Colors.white),
+          child: Icon(Icons.emergency, color: Colors.white),
         ),
         title: Text(emergency['patient_name'] ?? 'Unknown Patient'),
         subtitle: Text(emergency['emergency_type'] ?? 'Medical Emergency'),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.red.withOpacity(0.1),
+            color: Colors.red.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
@@ -610,11 +691,14 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
                 emergency['id'], 
                 'assigned'
               );
+              if (!context.mounted) return;
               Navigator.pop(context);
               if (response['success']) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Emergency team notified')),
                 );
+                if (!context.mounted) return;
                 Provider.of<HospitalProvider>(context, listen: false).loadHospitalData();
               }
             },
@@ -679,7 +763,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                           onSelected: (selected) {
                             setState(() => _selectedFilter = filter);
                           },
-                          selectedColor: const Color(0xFF0A4D68).withOpacity(0.2),
+                          selectedColor: const Color(0xFF0A4D68).withValues(alpha: 0.2),
                         ),
                       );
                     },
@@ -725,7 +809,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -778,6 +862,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
   Future<void> _updateStatus(BuildContext context, int id, String status, HospitalProvider provider) async {
     final success = await provider.updateAppointmentStatus(id, status);
     if (success && mounted) {
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Appointment $status')),
       );

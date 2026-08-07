@@ -323,7 +323,7 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 DropdownButtonFormField<String>(
-                  value: selectedGroup,
+                  initialValue: selectedGroup,
                   decoration: const InputDecoration(
                     labelText: 'Blood Group *',
                     border: OutlineInputBorder(),
@@ -422,6 +422,7 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
                   });
                   
                   if (response['success'] == true && mounted) {
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Blood request submitted successfully to the selected hospital'),
@@ -430,6 +431,7 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
                     );
                     _loadBloodBanks();
                   } else if (mounted) {
+                    if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(response['message'] ?? 'Request failed. Please try again.'),

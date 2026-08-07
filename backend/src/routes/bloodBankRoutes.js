@@ -18,6 +18,9 @@ router.get('/:hospitalId', bloodBankController.getBloodAvailability);
 // Blood request (patient)
 router.post('/request', protect, bloodBankController.requestBlood);
 
+// Emergency blood request (patient - auto-approved)
+router.post('/emergency-request', protect, bloodBankController.emergencyBloodRequest);
+
 // Update blood stock (hospital)
 router.put('/stock', protect, authorize('hospital'), bloodBankController.updateBloodStock);
 
@@ -26,6 +29,16 @@ router.post('/add-expiry', protect, authorize('hospital'), bloodBankController.a
 
 // Use blood units (hospital)
 router.post('/use', protect, authorize('hospital'), bloodBankController.useBloodUnits);
+
+// Approve / Reject blood requests (hospital)
+router.put('/request/:requestId/approve', protect, authorize('hospital'), bloodBankController.approveBloodRequest);
+router.put('/request/:requestId/reject', protect, authorize('hospital'), bloodBankController.rejectBloodRequest);
+
+// Inter-hospital blood transfer (hospital)
+router.post('/transfer', protect, authorize('hospital'), bloodBankController.transferBlood);
+
+// Blood bank analytics (hospital)
+router.get('/analytics', protect, authorize('hospital'), bloodBankController.getBloodBankAnalytics);
 
 // Donation history (hospital)
 router.get('/donation-history', protect, authorize('hospital'), bloodBankController.getDonationHistory);
@@ -37,7 +50,8 @@ router.put('/notifications/read-all', protect, authorize('hospital'), bloodBankC
 
 // Check expiry (hospital)
 router.post('/check-expiry', protect, authorize('hospital'), bloodBankController.checkBloodExpiry);
-// src/routes/bloodBankRoutes.js
+
+// Debug
 router.get('/debug/all', protect, authorize('hospital'), bloodBankController.debugGetAllBloodBank);
 
 module.exports = router;

@@ -25,7 +25,7 @@ class _BloodBankExpiryManagementState extends State<BloodBankExpiryManagement> {
   // lib/screens/hospital/blood_bank_expiry.dart - Update _loadData method
 
 Future<void> _loadData() async {
-  if (!mounted) return;
+  if (!context.mounted) return;
   
   setState(() {
     _isLoading = true;
@@ -34,9 +34,9 @@ Future<void> _loadData() async {
 
   try {
     final response = await ApiService.getBloodStockWithExpiry();
-    print('Blood stock response: $response');
+    debugPrint('Blood stock response: $response');
     
-    if (!mounted) return;
+    if (!context.mounted) return;
     
     if (response['success'] && response['data'] != null) {
       setState(() {
@@ -50,7 +50,7 @@ Future<void> _loadData() async {
       });
     }
   } catch (e) {
-    print('Error loading blood stock: $e');
+    debugPrint('Error loading blood stock: $e');
     if (mounted) {
       setState(() {
         _errorMessage = 'Network error: $e';
@@ -119,6 +119,7 @@ Future<void> _loadData() async {
                 onPressed: () async {
                   await ApiService.markAllNotificationsRead();
                   _loadData();
+                  if (!context.mounted) return;
                   Navigator.pop(context);
                 },
                 child: const Text('Mark all as read'),
@@ -215,7 +216,6 @@ Future<void> _loadData() async {
     final good = _summary['by_status']?['good'] ?? 0;
     final warning = _summary['by_status']?['warning'] ?? 0;
     final critical = _summary['by_status']?['critical'] ?? 0;
-    final expired = _summary['by_status']?['expired'] ?? 0;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -237,9 +237,9 @@ Future<void> _loadData() async {
         margin: const EdgeInsets.symmetric(horizontal: 2),
         padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Column(
           children: [
@@ -301,7 +301,7 @@ Future<void> _loadData() async {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
+                        color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
@@ -332,7 +332,7 @@ Future<void> _loadData() async {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -415,7 +415,7 @@ Future<void> _loadData() async {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: selectedGroup,
+                initialValue: selectedGroup,
                 decoration: const InputDecoration(
                   labelText: 'Blood Group *',
                   border: OutlineInputBorder(),
@@ -494,21 +494,23 @@ Future<void> _loadData() async {
               final response = await ApiService.addBloodWithExpiry({
                 'blood_group': selectedGroup,
                 'units': units,
-                'donation_date': donationDate?.toIso8601String().split('T')[0],
+                'donation_date': donationDate.toIso8601String().split('T')[0],
                 'expiry_date': expiryDate!.toIso8601String().split('T')[0],
                 'donor_name': '',
                 'donor_phone': '',
               });
 
               if (response['success']) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('✅ Blood added successfully'),
+                    content: Text('ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Blood added successfully'),
                     backgroundColor: Colors.green,
                   ),
                 );
                 _loadData();
               } else {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(response['message'] ?? 'Failed to add blood'),
@@ -573,14 +575,16 @@ Future<void> _loadData() async {
               });
 
               if (response['success']) {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('✅ Blood units used successfully'),
+                    content: Text('ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Blood units used successfully'),
                     backgroundColor: Colors.green,
                   ),
                 );
                 _loadData();
               } else {
+                if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(response['message'] ?? 'Failed to use blood'),

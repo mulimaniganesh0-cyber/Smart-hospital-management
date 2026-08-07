@@ -5,9 +5,6 @@ import '../../services/api_service.dart';
 import '../../providers/auth_provider.dart';
 import 'patient_my_requests.dart';
 import 'patient_home_screen.dart';
-// At the top of patient_resource_request.dart
-import 'patient_my_requests.dart';
-import 'patient_home_screen.dart';
 
 class PatientResourceRequest extends StatefulWidget {
   const PatientResourceRequest({super.key});
@@ -73,7 +70,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
         });
       }
     } catch (e) {
-      print('Error loading patient data: $e');
+      debugPrint('Error loading patient data: $e');
     }
   }
 
@@ -87,7 +84,6 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
           _hospitals = List<Map<String, dynamic>>.from(response['data']);
           if (_hospitals.isNotEmpty) {
             _selectedHospitalId = _hospitals[0]['id'].toString();
-            _selectedHospitalData = _hospitals[0];
             _hospitalAddress = _hospitals[0]['address'] ?? '';
             _loadHospitalResources(_hospitals[0]['id']);
           }
@@ -115,7 +111,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
     try {
       final hospitalIdInt = int.parse(hospitalId.toString());
       
-      print('Loading resources for hospital: $hospitalIdInt');
+      debugPrint('Loading resources for hospital: $hospitalIdInt');
       
       // Load blood availability
       final bloodResponse = await ApiService.getBloodAvailability(hospitalIdInt);
@@ -131,12 +127,12 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
         setState(() {
           _bloodAvailability = availability;
         });
-        print('Blood availability loaded: $_bloodAvailability');
+        debugPrint('Blood availability loaded: $_bloodAvailability');
       }
 
       // Load hospital resources
       final hospitalResponse = await ApiService.getHospitalResources(hospitalIdInt);
-      print('Hospital resources response: $hospitalResponse');
+      debugPrint('Hospital resources response: $hospitalResponse');
       
       if (hospitalResponse['success'] && hospitalResponse['data'] != null) {
         final data = hospitalResponse['data'];
@@ -148,14 +144,14 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
             'oxygen_beds': data['oxygen_supported_beds_available'] ?? 0,
           };
         });
-        print('Hospital resources set: $_hospitalResources');
+        debugPrint('Hospital resources set: $_hospitalResources');
       } else {
         setState(() {
           _resourceError = hospitalResponse['message'] ?? 'Failed to load resources';
         });
       }
     } catch (e) {
-      print('Error loading hospital resources: $e');
+      debugPrint('Error loading hospital resources: $e');
       setState(() {
         _resourceError = 'Error loading resources: $e';
       });
@@ -166,7 +162,6 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
     }
   }
 
-  Map<String, dynamic>? _selectedHospitalData;
 
   bool _isBloodAvailable(String bloodGroup) {
     final stock = _bloodAvailability[bloodGroup];
@@ -190,7 +185,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
     };
     final key = mapping[resourceType] ?? '';
     final available = _hospitalResources[key] ?? 0;
-    print('Resource availability - $resourceType: $available (key: $key)');
+    debugPrint('Resource availability - $resourceType: $available (key: $key)');
     return available;
   }
 
@@ -210,7 +205,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
           children: [
             Icon(Icons.error, color: Colors.red),
             SizedBox(width: 8),
-            Text('❌ Error'),
+            Text('âŒ Error'),
           ],
         ),
         content: Text(message),
@@ -235,7 +230,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
           children: [
             Icon(Icons.check_circle, color: Colors.green),
             SizedBox(width: 8),
-            Text('✅ Request Submitted'),
+            Text('âœ… Request Submitted'),
           ],
         ),
         content: Column(
@@ -251,7 +246,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text(
-                '📋 The hospital will review your request and respond shortly. You can track the status in your bookings.',
+                'ðŸ“‹ The hospital will review your request and respond shortly. You can track the status in your bookings.',
                 style: TextStyle(fontSize: 12, color: Colors.blue),
               ),
             ),
@@ -413,7 +408,6 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                                   (h) => h['id'].toString() == value,
                                   orElse: () => _hospitals.first,
                                 );
-                                _selectedHospitalData = hospital;
                                 _hospitalAddress = hospital['address'] ?? '';
                                 _loadHospitalResources(hospital['id']);
                               });
@@ -627,8 +621,8 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                                 Expanded(
                                   child: Text(
                                     _isBloodAvailable(_selectedBloodGroup!)
-                                        ? '✅ Blood is available. Units: ${_getBloodUnits(_selectedBloodGroup!)}'
-                                        : '⚠️ Blood group unavailable or insufficient stock. Available: ${_getBloodUnits(_selectedBloodGroup!)} units',
+                                        ? 'âœ… Blood is available. Units: ${_getBloodUnits(_selectedBloodGroup!)}'
+                                        : 'âš ï¸ Blood group unavailable or insufficient stock. Available: ${_getBloodUnits(_selectedBloodGroup!)} units',
                                     style: TextStyle(
                                       color: _isBloodAvailable(_selectedBloodGroup!)
                                           ? Colors.green.shade700
@@ -676,8 +670,8 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                               Expanded(
                                 child: Text(
                                   _isResourceAvailable(_selectedResourceType!)
-                                      ? '✅ Resource is available. Units: ${_getResourceAvailability(_selectedResourceType!)}'
-                                      : '⚠️ Resource unavailable or insufficient stock. Available: ${_getResourceAvailability(_selectedResourceType!)} units',
+                                      ? 'âœ… Resource is available. Units: ${_getResourceAvailability(_selectedResourceType!)}'
+                                      : 'âš ï¸ Resource unavailable or insufficient stock. Available: ${_getResourceAvailability(_selectedResourceType!)} units',
                                   style: TextStyle(
                                     color: _isResourceAvailable(_selectedResourceType!)
                                         ? Colors.green.shade700

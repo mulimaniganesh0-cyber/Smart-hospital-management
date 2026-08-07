@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import 'login_screen.dart';
 
 class SignupScreen extends StatefulWidget {
   final String userType;
@@ -48,7 +47,7 @@ class _SignupScreenState extends State<SignupScreen> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.admin_panel_settings, size: 80, color: Colors.red),
@@ -87,7 +86,7 @@ class _SignupScreenState extends State<SignupScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.white, const Color(0xFF0A4D68).withOpacity(0.05)],
+            colors: [Colors.white, const Color(0xFF0A4D68).withValues(alpha: 0.05)],
           ),
         ),
         child: SingleChildScrollView(
@@ -117,11 +116,11 @@ class _SignupScreenState extends State<SignupScreen> {
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: Colors.green.shade200),
                     ),
-                    child: Row(
+                    child: const Row(
                       children: [
                         Icon(Icons.local_hospital, color: Colors.green),
-                        const SizedBox(width: 12),
-                        const Text(
+                        SizedBox(width: 12),
+                        Text(
                           'Hospital Details',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
@@ -192,11 +191,11 @@ class _SignupScreenState extends State<SignupScreen> {
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: Colors.blue.shade200),
                     ),
-                    child: Row(
+                    child: const Row(
                       children: [
                         Icon(Icons.person, color: Colors.blue),
-                        const SizedBox(width: 12),
-                        const Text(
+                        SizedBox(width: 12),
+                        Text(
                           'Personal Details',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
@@ -235,11 +234,11 @@ class _SignupScreenState extends State<SignupScreen> {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: Colors.purple.shade200),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
                       Icon(Icons.lock, color: Colors.purple),
-                      const SizedBox(width: 12),
-                      const Text(
+                      SizedBox(width: 12),
+                      Text(
                         'Security',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
@@ -345,7 +344,7 @@ class _SignupScreenState extends State<SignupScreen> {
         prefixIcon: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF0A4D68).withOpacity(0.1),
+            color: const Color(0xFF0A4D68).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: const Color(0xFF0A4D68), size: 20),
@@ -378,10 +377,10 @@ class _SignupScreenState extends State<SignupScreen> {
         prefixIcon: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF0A4D68).withOpacity(0.1),
+            color: const Color(0xFF0A4D68).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(Icons.lock_outline, color: const Color(0xFF0A4D68), size: 20),
+          child: const Icon(Icons.lock_outline, color: Color(0xFF0A4D68), size: 20),
         ),
         suffixIcon: IconButton(
           icon: Icon(
@@ -422,7 +421,7 @@ class _SignupScreenState extends State<SignupScreen> {
         prefixIcon: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF0A4D68).withOpacity(0.1),
+            color: const Color(0xFF0A4D68).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: const Color(0xFF0A4D68), size: 20),
@@ -433,7 +432,7 @@ class _SignupScreenState extends State<SignupScreen> {
         filled: true,
         fillColor: Colors.white,
       ),
-      value: value.isNotEmpty ? value : null,
+      initialValue: value.isNotEmpty ? value : null,
       items: items.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
       onChanged: onChanged,
       validator: (v) => v == null || v.isEmpty ? 'Please select $label' : null,
@@ -455,7 +454,7 @@ class _SignupScreenState extends State<SignupScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF0A4D68).withOpacity(0.1),
+                color: const Color(0xFF0A4D68).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(Icons.cake, color: Color(0xFF0A4D68), size: 20),
@@ -562,7 +561,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
+                    color: Colors.green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.check_circle, color: Colors.green),

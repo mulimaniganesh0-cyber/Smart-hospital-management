@@ -13,11 +13,9 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
-  String _verificationCode = '';
   String _newPassword = '';
   String _confirmPassword = '';
   int _currentStep = 0;
-  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +30,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.white, const Color(0xFF0A4D68).withOpacity(0.05)],
+            colors: [Colors.white, const Color(0xFF0A4D68).withValues(alpha: 0.05)],
           ),
         ),
         child: SingleChildScrollView(
@@ -73,7 +71,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           labelText: 'Email Address',
                           prefixIcon: Container(
                             padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: const Color(0xFF0A4D68).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                            decoration: BoxDecoration(color: const Color(0xFF0A4D68).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
                             child: const Icon(Icons.email_outlined, color: Color(0xFF0A4D68), size: 20),
                           ),
                           hintText: 'Enter your registered email',
@@ -109,12 +107,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       ),
                       const SizedBox(height: 24),
                       TextField(
-                        onChanged: (value) => _verificationCode = value,
                         decoration: InputDecoration(
                           labelText: 'Verification Code',
                           prefixIcon: Container(
                             padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: const Color(0xFF0A4D68).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                            decoration: BoxDecoration(color: const Color(0xFF0A4D68).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
                             child: const Icon(Icons.security, color: Color(0xFF0A4D68), size: 20),
                           ),
                           hintText: 'Enter 6-digit code',
@@ -158,7 +155,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           labelText: 'New Password',
                           prefixIcon: Container(
                             padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: const Color(0xFF0A4D68).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                            decoration: BoxDecoration(color: const Color(0xFF0A4D68).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
                             child: const Icon(Icons.lock_outline, color: Color(0xFF0A4D68), size: 20),
                           ),
                           hintText: 'Enter new password',
@@ -175,7 +172,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           labelText: 'Confirm Password',
                           prefixIcon: Container(
                             padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(color: const Color(0xFF0A4D68).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                            decoration: BoxDecoration(color: const Color(0xFF0A4D68).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
                             child: const Icon(Icons.lock_outline, color: Color(0xFF0A4D68), size: 20),
                           ),
                           hintText: 'Confirm your new password',
@@ -301,12 +298,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       );
       return;
     }
-    setState(() => _isLoading = true);
     await Future.delayed(const Duration(seconds: 1));
     setState(() {
-      _isLoading = false;
       _currentStep = 1;
     });
+    if (!context.mounted) return;
+    if (!context.mounted) return;
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Verification code sent to your email'), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating),
     );
@@ -337,7 +335,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.check_circle, color: Colors.green)),
+            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.check_circle, color: Colors.green)),
             const SizedBox(width: 12),
             const Text('Success', style: TextStyle(fontWeight: FontWeight.bold)),
           ],

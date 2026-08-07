@@ -45,9 +45,9 @@ class HospitalProvider extends ChangeNotifier {
     
     if (profileResponse['success'] == true && profileResponse['data'] != null) {
       _hospitalData = profileResponse['data'];
-      print('🏥 Hospital data loaded: ${_hospitalData?['name']} (ID: ${_hospitalData?['id']})');
+      debugPrint('ðŸ¥ Hospital data loaded: ${_hospitalData?['name']} (ID: ${_hospitalData?['id']})');
     } else {
-      print('Failed to load hospital profile: ${profileResponse['message']}');
+      debugPrint('Failed to load hospital profile: ${profileResponse['message']}');
     }
 
     // Load staff
@@ -55,10 +55,10 @@ class HospitalProvider extends ChangeNotifier {
       final staffResponse = await ApiService.getHospitalStaff();
       if (staffResponse['success'] == true && staffResponse['data'] != null) {
         _staff = List<Map<String, dynamic>>.from(staffResponse['data']);
-        print('👥 Staff loaded: ${_staff.length} members');
+        debugPrint('ðŸ‘¥ Staff loaded: ${_staff.length} members');
       }
     } catch (e) {
-      print('Error loading staff: $e');
+      debugPrint('Error loading staff: $e');
       _staff = [];
     }
 
@@ -69,12 +69,12 @@ class HospitalProvider extends ChangeNotifier {
         final bloodResponse = await ApiService.getBloodAvailability(hospitalId);
         if (bloodResponse['success'] == true && bloodResponse['data'] != null) {
           _bloodStock = List<Map<String, dynamic>>.from(bloodResponse['data']);
-          print('🩸 Blood stock loaded: ${_bloodStock.length} entries');
+          debugPrint('ðŸ©¸ Blood stock loaded: ${_bloodStock.length} entries');
         } else {
           _bloodStock = [];
         }
       } catch (e) {
-        print('Error loading blood stock: $e');
+        debugPrint('Error loading blood stock: $e');
         _bloodStock = [];
       }
       
@@ -83,10 +83,10 @@ class HospitalProvider extends ChangeNotifier {
         final bloodRequestsResponse = await ApiService.getHospitalBloodRequests();
         if (bloodRequestsResponse['success'] == true && bloodRequestsResponse['data'] != null) {
           _bloodRequests = List<Map<String, dynamic>>.from(bloodRequestsResponse['data']);
-          print('Blood requests loaded: ${_bloodRequests.length} requests');
+          debugPrint('Blood requests loaded: ${_bloodRequests.length} requests');
         }
       } catch (e) {
-        print('Error loading blood requests: $e');
+        debugPrint('Error loading blood requests: $e');
       }
       
       // Load resource requests
@@ -94,10 +94,10 @@ class HospitalProvider extends ChangeNotifier {
         final resourceRequestsResponse = await ApiService.getHospitalResourceRequests();
         if (resourceRequestsResponse['success'] == true && resourceRequestsResponse['data'] != null) {
           _resourceRequests = List<Map<String, dynamic>>.from(resourceRequestsResponse['data']);
-          print('Resource requests loaded: ${_resourceRequests.length} requests');
+          debugPrint('Resource requests loaded: ${_resourceRequests.length} requests');
         }
       } catch (e) {
-        print('Error loading resource requests: $e');
+        debugPrint('Error loading resource requests: $e');
       }
 
       _allRequests = [];
@@ -116,7 +116,7 @@ class HospitalProvider extends ChangeNotifier {
         _appointments = List<Map<String, dynamic>>.from(appointmentsResponse['data']);
       }
     } catch (e) {
-      print('Error loading appointments: $e');
+      debugPrint('Error loading appointments: $e');
     }
 
     try {
@@ -125,14 +125,14 @@ class HospitalProvider extends ChangeNotifier {
         _emergencies = List<Map<String, dynamic>>.from(emergenciesResponse['data']);
       }
     } catch (e) {
-      print('Error loading emergencies: $e');
+      debugPrint('Error loading emergencies: $e');
     }
 
     _isInitialized = true;
 
   } catch (e) {
     _errorMessage = 'Network error: $e';
-    print('Error loading hospital data: $e');
+    debugPrint('Error loading hospital data: $e');
   }
 
   _isLoading = false;
@@ -145,10 +145,10 @@ class HospitalProvider extends ChangeNotifier {
     _notify();
 
     try {
-      print('Adding staff via provider: $staffData');
+      debugPrint('Adding staff via provider: $staffData');
       
       final response = await ApiService.addHospitalStaff(staffData);
-      print('Add staff response: ${response['success']}');
+      debugPrint('Add staff response: ${response['success']}');
       
       if (response['success'] == true) {
         await loadHospitalData();
@@ -156,7 +156,7 @@ class HospitalProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      print('Add staff error: $e');
+      debugPrint('Add staff error: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -181,7 +181,7 @@ class HospitalProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      print('Update resource error: $e');
+      debugPrint('Update resource error: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -197,10 +197,10 @@ class HospitalProvider extends ChangeNotifier {
     _notify();
 
     try {
-      print('Fulfilling resource request: $requestId');
+      debugPrint('Fulfilling resource request: $requestId');
       
       final response = await ApiService.fulfillResourceRequest(requestId);
-      print('Fulfill resource request response: ${response['success']}');
+      debugPrint('Fulfill resource request response: ${response['success']}');
       
       if (response['success'] == true) {
         await loadHospitalData();
@@ -210,7 +210,7 @@ class HospitalProvider extends ChangeNotifier {
         return false;
       }
     } catch (e) {
-      print('Fulfill resource request error: $e');
+      debugPrint('Fulfill resource request error: $e');
       _errorMessage = 'Network error: $e';
       return false;
     } finally {
@@ -224,10 +224,10 @@ class HospitalProvider extends ChangeNotifier {
     _notify();
 
     try {
-      print('Rejecting resource request: $requestId');
+      debugPrint('Rejecting resource request: $requestId');
       
       final response = await ApiService.rejectResourceRequest(requestId);
-      print('Reject resource request response: ${response['success']}');
+      debugPrint('Reject resource request response: ${response['success']}');
       
       if (response['success'] == true) {
         await loadHospitalData();
@@ -235,7 +235,7 @@ class HospitalProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      print('Reject resource request error: $e');
+      debugPrint('Reject resource request error: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -248,10 +248,10 @@ class HospitalProvider extends ChangeNotifier {
     _notify();
 
     try {
-      print('Fulfilling blood request: $requestId');
+      debugPrint('Fulfilling blood request: $requestId');
       
       final response = await ApiService.fulfillBloodRequest(requestId);
-      print('Fulfill blood request response: ${response['success']}');
+      debugPrint('Fulfill blood request response: ${response['success']}');
       
       if (response['success'] == true) {
         await loadHospitalData();
@@ -259,7 +259,7 @@ class HospitalProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      print('Fulfill blood request error: $e');
+      debugPrint('Fulfill blood request error: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -272,10 +272,10 @@ class HospitalProvider extends ChangeNotifier {
     _notify();
 
     try {
-      print('Rejecting blood request: $requestId');
+      debugPrint('Rejecting blood request: $requestId');
       
       final response = await ApiService.rejectBloodRequest(requestId);
-      print('Reject blood request response: ${response['success']}');
+      debugPrint('Reject blood request response: ${response['success']}');
       
       if (response['success'] == true) {
         await loadHospitalData();
@@ -283,7 +283,7 @@ class HospitalProvider extends ChangeNotifier {
       }
       return false;
     } catch (e) {
-      print('Reject blood request error: $e');
+      debugPrint('Reject blood request error: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -329,7 +329,7 @@ Future<bool> addBloodStock(String bloodGroup, int units, String expiryDate) asyn
     _errorMessage = response['message'] ?? 'Failed to add blood stock';
     return false;
   } catch (e) {
-    print('Add blood stock error: $e');
+    debugPrint('Add blood stock error: $e');
     _errorMessage = 'Network error: $e';
     return false;
   } finally {
@@ -356,7 +356,7 @@ Future<bool> updateBloodStock(String bloodGroup, int units, String expiryDate) a
     }
     return false;
   } catch (e) {
-    print('Update blood stock error: $e');
+    debugPrint('Update blood stock error: $e');
     return false;
   } finally {
     _isLoading = false;
@@ -378,7 +378,7 @@ Future<bool> deleteBloodStock(String bloodGroup) async {
     }
     return false;
   } catch (e) {
-    print('Delete blood stock error: $e');
+    debugPrint('Delete blood stock error: $e');
     return false;
   } finally {
     _isLoading = false;
@@ -412,7 +412,7 @@ Future<bool> deleteBloodStock(String bloodGroup) async {
       }
       return false;
     } catch (e) {
-      print('Error adding new resource: $e');
+      debugPrint('Error adding new resource: $e');
       return false;
     } finally {
       _isLoading = false;
@@ -436,7 +436,4 @@ Future<bool> deleteBloodStock(String bloodGroup) async {
     }
   }
 
-  void dispose() {
-    super.dispose();
-  }
 }

@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'providers/auth_provider.dart';
 import 'providers/patient_provider.dart';
 import 'providers/hospital_provider.dart';
-import 'screens/login_screen.dart';
 import 'screens/landing_screen.dart';
 import 'screens/patient/patient_home_screen.dart';
 import 'screens/hospital/hospital_home_screen.dart';
@@ -49,7 +48,7 @@ class HospitalResourceApp extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0A4D68),
               foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 50),
+              minimumSize: const Size(0, 50),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
