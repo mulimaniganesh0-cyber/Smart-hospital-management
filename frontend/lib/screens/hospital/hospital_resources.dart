@@ -36,7 +36,9 @@ class _HospitalResourcesState extends State<HospitalResources> {
   Widget build(BuildContext context) {
     final provider = Provider.of<HospitalProvider>(context);
     final data = provider.hospitalData;
-    final resources = data?['resources'] ?? {};
+    final resources = data?['resources'] is Map
+        ? Map<String, dynamic>.from(data!['resources'] as Map)
+        : <String, dynamic>{};
 
     // Handle error state
     if (provider.errorMessage != null && provider.hospitalData == null) {
@@ -88,11 +90,16 @@ class _HospitalResourcesState extends State<HospitalResources> {
           title: const Text('Manage Resources'),
           bottom: const TabBar(
             tabs: [
+              Tab(text: 'Resources', icon: Icon(Icons.medical_services)),
+              Tab(text: 'Requests', icon: Icon(Icons.assignment)),
+            ],
+          ), /*
+            tabs: [
               Tab(text: 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â  Resources', icon: Icon(Icons.medical_services)),
               Tab(text: 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¹ Requests', icon: Icon(Icons.assignment)),
             ],
           ),
-          actions: [
+          */ actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: () => provider.loadHospitalData(),
@@ -591,8 +598,9 @@ class _HospitalResourcesState extends State<HospitalResources> {
                       occupied,
                     ),
                     icon: const Icon(Icons.new_releases),
+                    label: Text('Discharge Patient (Free One $title)'), /*
                     label: Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ Discharge Patient (Free One $title)'),
-                    style: ElevatedButton.styleFrom(
+                    */ style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade700,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(

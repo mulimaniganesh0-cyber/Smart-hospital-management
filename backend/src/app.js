@@ -19,6 +19,8 @@ const reportRoutes = require('./routes/reportRoutes');
 const donationCampaignRoutes = require('./routes/donationCampaignRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
+const medicalRoutes = require('./routes/medicalRoutes');
+const specialtyRoutes = require('./routes/specialtyRoutes');
 
 const app = express();
 
@@ -107,6 +109,7 @@ app.use((req, res, next) => {
 // ==================== ROUTES ====================
 app.use('/api/auth', authRoutes);
 app.use('/api/hospitals', hospitalRoutes);
+app.use('/api/specialties', specialtyRoutes);
 app.use('/api/patients', patientRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/emergency', emergencyRoutes);
@@ -118,6 +121,9 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/campaigns', donationCampaignRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/medical', medicalRoutes);
+// Backward-compatible public API paths. Their handlers still require authentication.
+app.use('/api', medicalRoutes);
 
 
 // Health check endpoint

@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const User = require('./src/models/User');
 const Hospital = require('./src/models/Hospital');
 const Patient = require('./src/models/Patient');
+const { ensureMedicalSchema } = require('./src/config/medicalSchema');
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || '')
   .split(',')
@@ -312,6 +313,16 @@ const startServer = async () => {
   
   if (isDbConnected) {
     await ensureDatabaseSchema();
+    await ensureMedicalSchema(pool);
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hospital_id INTEGER REFERENCES hospitals(id) ON DELETE SET NULL`);
+    await pool.query(`ALTER TABLE doctors ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
+    // Older databases stored a doctor name only. The booking controller uses the
+    // real doctor relationship, so upgrade those installations safely on startup.
+    await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS doctor_id INTEGER REFERENCES doctors(id) ON DELETE SET NULL`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_appointments_doctor_schedule ON appointments (doctor_id, appointment_date, appointment_time)`);
+    await pool.query(`ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS area VARCHAR(100), ADD COLUMN IF NOT EXISTS country VARCHAR(100), ADD COLUMN IF NOT EXISTS hospital_type VARCHAR(100), ADD COLUMN IF NOT EXISTS departments TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS specialties TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS services TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS emergency_available BOOLEAN NOT NULL DEFAULT FALSE`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_hospitals_coordinates ON hospitals(latitude, longitude) WHERE latitude IS NOT NULL AND longitude IS NOT NULL`);
+    await pool.query(`UPDATE users u SET hospital_id = d.hospital_id FROM doctors d WHERE d.user_id = u.id AND u.hospital_id IS NULL`);
   }
   
   server.listen(PORT, () => {

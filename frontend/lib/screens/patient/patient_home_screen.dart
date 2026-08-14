@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../providers/patient_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/location_service.dart';
 import 'patient_nearby_hospitals.dart';
 import 'patient_bookings.dart';
 import 'patient_profile.dart';
@@ -124,7 +125,12 @@ class _PatientDashboardState extends State<PatientDashboard> {
     if (!context.mounted) return;
 
     try {
-      final response = await ApiService.getNearbyHospitals(28.6139, 77.2090);
+      final position = await LocationService.getCurrentLocation();
+      if (position == null) {
+        if (mounted) setState(() => _stats = {'nearby_hospitals': 0, 'available_icus': 0, 'blood_units': 0});
+        return;
+      }
+      final response = await ApiService.getNearbyHospitals(position.latitude, position.longitude);
       if (!context.mounted) return;
 
       if (response['success'] && response['data'] != null) {

@@ -5,6 +5,17 @@ exports.createAppointment = async (req, res) => {
   try {
     const userId = req.user.id;
     const { hospital_id, doctor_id, appointment_date, appointment_time, symptoms } = req.body;
+    const hospitalId = Number(hospital_id);
+    const doctorId = Number(doctor_id);
+
+    if (!Number.isInteger(hospitalId) || !Number.isInteger(doctorId) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(String(appointment_date || '')) ||
+        !/^\d{2}:\d{2}(:\d{2})?$/.test(String(appointment_time || ''))) {
+      return res.status(400).json({ success: false, message: 'Select a hospital, an available doctor, and a valid appointment date and time' });
+    }
+    if (new Date(`${appointment_date}T00:00:00`) < new Date(new Date().toDateString())) {
+      return res.status(400).json({ success: false, message: 'Appointment date cannot be in the past' });
+    }
     
     // Get patient id
     const patientResult = await pool.query(
@@ -17,12 +28,31 @@ exports.createAppointment = async (req, res) => {
     }
     
     const patientId = patientResult.rows[0].id;
+
+    const doctorResult = await pool.query(`
+      SELECT d.id FROM doctors d
+      JOIN hospitals h ON h.id = d.hospital_id
+      WHERE d.id = $1 AND d.hospital_id = $2 AND d.availability_status = true AND h.is_verified = true`,
+      [doctorId, hospitalId]
+    );
+    if (doctorResult.rows.length === 0) {
+      return res.status(400).json({ success: false, message: 'The selected doctor is not available at this hospital' });
+    }
+
+    const duplicate = await pool.query(`
+      SELECT id FROM appointments WHERE patient_id=$1 AND doctor_id=$2 AND appointment_date=$3 AND appointment_time=$4
+        AND status NOT IN ('cancelled','rejected') LIMIT 1`,
+      [patientId, doctorId, appointment_date, appointment_time]
+    );
+    if (duplicate.rows.length) {
+      return res.status(409).json({ success: false, message: 'You already have an appointment with this doctor at the selected time' });
+    }
     
     const result = await pool.query(
       `INSERT INTO appointments (patient_id, hospital_id, doctor_id, appointment_date, appointment_time, symptoms, status)
        VALUES ($1, $2, $3, $4, $5, $6, 'pending')
        RETURNING *`,
-      [patientId, hospital_id, doctor_id, appointment_date, appointment_time, symptoms]
+      [patientId, hospitalId, doctorId, appointment_date, appointment_time, symptoms?.trim() || null]
     );
     
     res.status(201).json({

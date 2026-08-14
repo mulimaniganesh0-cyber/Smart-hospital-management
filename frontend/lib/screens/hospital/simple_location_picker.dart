@@ -1,5 +1,7 @@
 // lib/screens/hospital/simple_location_picker.dart
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
+import '../../services/location_service.dart';
 
 class SimpleLocationPicker extends StatefulWidget {
   final Function(double, double, String) onLocationSelected;
@@ -23,6 +25,7 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
   final TextEditingController _latitudeController = TextEditingController();
   final TextEditingController _longitudeController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
+  bool _loadingLocation = false;
 
   @override
   void initState() {
@@ -73,6 +76,8 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
               maxLines: 2,
             ),
             const SizedBox(height: 16),
+            OutlinedButton.icon(onPressed: _loadingLocation ? null : _useCurrentLocation, icon: const Icon(Icons.my_location), label: const Text('Use Current Location')),
+            const SizedBox(height: 12),
             
             // Latitude Field
             TextField(
@@ -98,6 +103,8 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(onPressed: _loadingLocation ? null : _searchAddress, icon: const Icon(Icons.search), label: const Text('Search Address')),
             const SizedBox(height: 24),
             
             // Help Text
@@ -182,7 +189,7 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
     final double? lat = double.tryParse(_latitudeController.text);
     final double? lng = double.tryParse(_longitudeController.text);
 
-    if (lat == null || lng == null) {
+    if (lat == null || lng == null || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter valid numbers for latitude and longitude'),
@@ -198,5 +205,32 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
 
     widget.onLocationSelected(lat, lng, address);
     Navigator.pop(context);
+  }
+
+  Future<void> _useCurrentLocation() async {
+    setState(() => _loadingLocation = true);
+    try {
+      final position = await LocationService.getCurrentLocation();
+      if (position == null) throw Exception('Location permission was not granted or location services are off');
+      _latitudeController.text = position.latitude.toStringAsFixed(6);
+      _longitudeController.text = position.longitude.toStringAsFixed(6);
+      final places = await placemarkFromCoordinates(position.latitude, position.longitude);
+      if (places.isNotEmpty) _addressController.text = [places.first.name, places.first.street, places.first.locality, places.first.administrativeArea, places.first.postalCode].whereType<String>().where((v) => v.isNotEmpty).join(', ');
+      if (mounted) setState(() {});
+    } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e'))); }
+    finally { if (mounted) setState(() => _loadingLocation = false); }
+  }
+
+  Future<void> _searchAddress() async {
+    if (_addressController.text.trim().isEmpty) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a hospital name or address first'))); return; }
+    setState(() => _loadingLocation = true);
+    try {
+      final results = await locationFromAddress(_addressController.text.trim());
+      if (results.isEmpty) throw Exception('No matching location found');
+      _latitudeController.text = results.first.latitude.toStringAsFixed(6);
+      _longitudeController.text = results.first.longitude.toStringAsFixed(6);
+      if (mounted) setState(() {});
+    } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Address search failed: $e'))); }
+    finally { if (mounted) setState(() => _loadingLocation = false); }
   }
 }

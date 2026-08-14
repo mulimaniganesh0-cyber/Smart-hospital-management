@@ -504,7 +504,7 @@ Future<void> _loadData() async {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Blood added successfully'),
+                    content: Text(' Blood added successfully'),
                     backgroundColor: Colors.green,
                   ),
                 );
@@ -578,7 +578,7 @@ Future<void> _loadData() async {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Blood units used successfully'),
+                    content: Text(' Blood units used successfully'),
                     backgroundColor: Colors.green,
                   ),
                 );

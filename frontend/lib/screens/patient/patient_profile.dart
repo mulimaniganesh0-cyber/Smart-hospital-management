@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/patient_provider.dart';
 import '../login_screen.dart';
+import 'health_record_screen.dart';
 
 class PatientProfile extends StatelessWidget {
   const PatientProfile({super.key});
@@ -54,12 +55,15 @@ class PatientProfile extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             _buildInfoCard(
-              title: 'Medical History',
-              icon: Icons.history,
+              title: 'Health Record',
+              icon: Icons.health_and_safety,
               children: [
-                _buildInfoRow(Icons.medical_information, 'Allergies', 'None reported', Colors.purple, () {}),
-                _buildInfoRow(Icons.medical_information, 'Chronic Conditions', 'None reported', Colors.blue, () {}),
-                _buildInfoRow(Icons.medical_information, 'Recent Surgeries', 'None reported', Colors.teal, () {}),
+                const Text('View and maintain your health timeline, readings, conditions, medicines, and other patient-provided records.'),
+                const SizedBox(height: 12),
+                SizedBox(width: double.infinity, child: ElevatedButton.icon(
+                  icon: const Icon(Icons.folder_shared), label: const Text('View Health Record'),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HealthRecordScreen())),
+                )),
               ],
             ),
             const SizedBox(height: 24),

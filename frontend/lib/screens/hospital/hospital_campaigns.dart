@@ -792,7 +792,7 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Campaign created successfully!'),
+                      content: Text(' Campaign created successfully!'),
                       backgroundColor: Colors.green,
                     ),
                   );

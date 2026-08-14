@@ -8,7 +8,8 @@ class HospitalResourceRequests extends StatefulWidget {
   const HospitalResourceRequests({super.key});
 
   @override
-  State<HospitalResourceRequests> createState() => _HospitalResourceRequestsState();
+  State<HospitalResourceRequests> createState() =>
+      _HospitalResourceRequestsState();
 }
 
 class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
@@ -18,7 +19,13 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
   String _selectedType = 'all';
   List<Map<String, dynamic>> _requests = [];
 
-  final List<String> _statusFilters = ['all', 'pending', 'approved', 'fulfilled', 'rejected'];
+  final List<String> _statusFilters = [
+    'all',
+    'pending',
+    'approved',
+    'fulfilled',
+    'rejected'
+  ];
   final List<String> _typeFilters = ['all', 'blood', 'resource'];
 
   @override
@@ -39,43 +46,49 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
       // Load both blood and resource requests
       final bloodResponse = await ApiService.getHospitalBloodRequests();
       final resourceResponse = await ApiService.getHospitalResourceRequests();
-      
+
       List<Map<String, dynamic>> allRequests = [];
-      
+
       // Add blood requests with type marker
       if (bloodResponse['success'] == true && bloodResponse['data'] != null) {
-        final bloodRequests = List<Map<String, dynamic>>.from(bloodResponse['data']);
+        final bloodRequests = (bloodResponse['data'] as List)
+            .whereType<Map>()
+            .map((request) => Map<String, dynamic>.from(request))
+            .toList();
         allRequests.addAll(bloodRequests.map((r) {
           r['_type'] = 'blood';
           r['display_name'] = 'Blood Request';
           return r;
         }));
       }
-      
+
       // Add resource requests with type marker
-      if (resourceResponse['success'] == true && resourceResponse['data'] != null) {
-        final resourceRequests = List<Map<String, dynamic>>.from(resourceResponse['data']);
+      if (resourceResponse['success'] == true &&
+          resourceResponse['data'] != null) {
+        final resourceRequests = (resourceResponse['data'] as List)
+            .whereType<Map>()
+            .map((request) => Map<String, dynamic>.from(request))
+            .toList();
         allRequests.addAll(resourceRequests.map((r) {
           r['_type'] = 'resource';
           r['display_name'] = 'Resource Request';
           return r;
         }));
       }
-      
+
       // Sort by date (newest first)
       allRequests.sort((a, b) {
         final dateA = a['request_date'] ?? a['created_at'] ?? '';
         final dateB = b['request_date'] ?? b['created_at'] ?? '';
         return dateB.compareTo(dateA);
       });
-      
+
       setState(() {
         _requests = allRequests;
         _isLoading = false;
       });
-      
-      debugPrint('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ Loaded ${allRequests.length} total requests');
-      
+
+      debugPrint('Loaded ${allRequests.length} total requests');
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to load requests: $e';
@@ -87,12 +100,12 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
 
   List<Map<String, dynamic>> get _filteredRequests {
     var filtered = _requests;
-    
+
     // Filter by type
     if (_selectedType != 'all') {
       filtered = filtered.where((r) => r['_type'] == _selectedType).toList();
     }
-    
+
     // Filter by status
     if (_selectedFilter != 'all') {
       filtered = filtered.where((r) {
@@ -100,15 +113,15 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
         return status == _selectedFilter;
       }).toList();
     }
-    
+
     return filtered;
   }
 
   int _getCountByStatus(String status) {
     if (status == 'all') return _requests.length;
-    return _requests.where((r) => 
-      (r['status']?.toString().toLowerCase() ?? '') == status
-    ).length;
+    return _requests
+        .where((r) => (r['status']?.toString().toLowerCase() ?? '') == status)
+        .length;
   }
 
   @override
@@ -131,7 +144,8 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const Icon(Icons.error_outline,
+                          size: 64, color: Colors.red),
                       const SizedBox(height: 16),
                       Text(_errorMessage!),
                       const SizedBox(height: 16),
@@ -149,26 +163,41 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                       padding: const EdgeInsets.all(12),
                       child: Row(
                         children: [
-                          _buildStatsCard('Total', _requests.length, Colors.blue, Icons.list),
+                          _buildStatsCard('Total', _requests.length,
+                              Colors.blue, Icons.list),
                           const SizedBox(width: 8),
-                          _buildStatsCard('Pending', _getCountByStatus('pending'), Colors.orange, Icons.pending),
+                          _buildStatsCard(
+                              'Pending',
+                              _getCountByStatus('pending'),
+                              Colors.orange,
+                              Icons.pending),
                           const SizedBox(width: 8),
-                          _buildStatsCard('Fulfilled', _getCountByStatus('fulfilled'), Colors.green, Icons.check_circle),
+                          _buildStatsCard(
+                              'Fulfilled',
+                              _getCountByStatus('fulfilled'),
+                              Colors.green,
+                              Icons.check_circle),
                           const SizedBox(width: 8),
-                          _buildStatsCard('Rejected', _getCountByStatus('rejected'), Colors.red, Icons.cancel),
+                          _buildStatsCard(
+                              'Rejected',
+                              _getCountByStatus('rejected'),
+                              Colors.red,
+                              Icons.cancel),
                         ],
                       ),
                     ),
 
                     // Filters
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
                             'Request Type',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),
                           SingleChildScrollView(
@@ -178,12 +207,17 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 4),
                                   child: FilterChip(
-                                    label: Text(type == 'all' ? 'All' : type == 'blood' ? 'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ Blood' : 'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂºÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Resource'),
+                                    label: Text(type == 'all'
+                                        ? 'All'
+                                        : type == 'blood'
+                                            ? ' Blood'
+                                            : ' Resource'),
                                     selected: _selectedType == type,
                                     onSelected: (selected) {
                                       setState(() => _selectedType = type);
                                     },
-                                    selectedColor: const Color(0xFF0A4D68).withValues(alpha: 0.2),
+                                    selectedColor: const Color(0xFF0A4D68)
+                                        .withValues(alpha: 0.2),
                                   ),
                                 );
                               }).toList(),
@@ -192,7 +226,8 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                           const SizedBox(height: 8),
                           const Text(
                             'Status',
-                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),
                           SingleChildScrollView(
@@ -202,12 +237,15 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 4),
                                   child: FilterChip(
-                                    label: Text(filter == 'all' ? 'All' : filter.toUpperCase()),
+                                    label: Text(filter == 'all'
+                                        ? 'All'
+                                        : filter.toUpperCase()),
                                     selected: _selectedFilter == filter,
                                     onSelected: (selected) {
                                       setState(() => _selectedFilter = filter);
                                     },
-                                    selectedColor: const Color(0xFF0A4D68).withValues(alpha: 0.2),
+                                    selectedColor: const Color(0xFF0A4D68)
+                                        .withValues(alpha: 0.2),
                                   ),
                                 );
                               }).toList(),
@@ -224,7 +262,8 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(Icons.request_page, size: 64, color: Colors.grey),
+                                  const Icon(Icons.request_page,
+                                      size: 64, color: Colors.grey),
                                   const SizedBox(height: 16),
                                   Text(
                                     'No ${_selectedFilter == 'all' ? '' : _selectedFilter} requests',
@@ -294,17 +333,21 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
     final isBlood = request['_type'] == 'blood';
     final patientName = request['patient_name'] ?? 'Unknown';
     final patientPhone = request['patient_phone'] ?? 'N/A';
-    final createdAt = request['request_date'] ?? request['created_at'] ?? DateTime.now().toIso8601String();
+    final createdAt = request['request_date'] ??
+        request['created_at'] ??
+        DateTime.now().toIso8601String();
     final bloodGroup = request['blood_group'] ?? '';
     final resourceType = request['resource_type'] ?? 'General Bed';
     final quantity = request['units_required'] ?? request['quantity'] ?? 1;
-    
+
     // Determine icon and color based on type
     final icon = isBlood ? Icons.water_drop : Icons.medical_services;
     final color = isBlood ? Colors.red : Colors.blue;
-    final typeLabel = isBlood ? 'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ Blood Request' : 'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂºÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Resource Request';
-    final detailLabel = isBlood 
-        ? '$bloodGroup ($quantity units)' 
+    final typeLabel = isBlood
+        ? 'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ Blood Request'
+        : 'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â°ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂºÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â Resource Request';
+    final detailLabel = isBlood
+        ? '$bloodGroup ($quantity units)'
         : '$resourceType (x$quantity)';
 
     return Card(
@@ -349,7 +392,8 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                             ),
                             Text(
                               typeLabel,
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey[600]),
                             ),
                           ],
                         ),
@@ -358,7 +402,8 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: _getStatusColor(status).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -401,7 +446,8 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
             ),
 
             // Notes
-            if (request['description'] != null && request['description'].toString().isNotEmpty) ...[
+            if (request['description'] != null &&
+                request['description'].toString().isNotEmpty) ...[
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(8),
@@ -416,7 +462,8 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                     Expanded(
                       child: Text(
                         request['description'],
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ),
                   ],
@@ -439,13 +486,15 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: const Text('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ Fulfill'),
+                      child: const Text(
+                          'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ Fulfill'),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => _updateRequestStatus(request, 'rejected'),
+                      onPressed: () =>
+                          _updateRequestStatus(request, 'rejected'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red,
                         side: const BorderSide(color: Colors.red),
@@ -454,7 +503,8 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: const Text('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ Reject'),
+                      child: const Text(
+                          'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ Reject'),
                     ),
                   ),
                 ],
@@ -530,7 +580,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
     final isBlood = request['_type'] == 'blood';
     final patientName = request['patient_name'] ?? 'patient';
     final quantity = request['units_required'] ?? request['quantity'] ?? 1;
-    final detail = isBlood 
+    final detail = isBlood
         ? 'Blood: ${request['blood_group'] ?? 'Unknown'} ($quantity units)'
         : 'Resource: ${request['resource_type'] ?? 'General Bed'} (x$quantity)';
 
@@ -540,10 +590,11 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(isBlood ? Icons.water_drop : Icons.medical_services, 
-                 color: isBlood ? Colors.red : Colors.blue),
+            Icon(isBlood ? Icons.water_drop : Icons.medical_services,
+                color: isBlood ? Colors.red : Colors.blue),
             const SizedBox(width: 12),
-            Text(isBlood ? 'Fulfill Blood Request' : 'Fulfill Resource Request'),
+            Text(
+                isBlood ? 'Fulfill Blood Request' : 'Fulfill Resource Request'),
           ],
         ),
         content: Column(
@@ -586,14 +637,16 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
             ),
-            child: const Text('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ Fulfill'),
+            child: const Text(
+                'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ Fulfill'),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _updateRequestStatus(Map<String, dynamic> request, String status) async {
+  Future<void> _updateRequestStatus(
+      Map<String, dynamic> request, String status) async {
     final requestId = request['id'];
     final isBlood = request['_type'] == 'blood';
 
@@ -619,21 +672,22 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
         if (response['success'] == true) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ Request ${status}ed successfully'),
+              content: Text(
+                  'ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ Request ${status}ed successfully'),
               backgroundColor: Colors.green,
             ),
           );
-          
+
           // Refresh the list
           await _loadRequests();
-          
+
           // Refresh hospital data to update resource counts
           if (!context.mounted) return;
           if (!context.mounted) return;
           if (!mounted) return;
-          final hospitalProvider = Provider.of<HospitalProvider>(context, listen: false);
+          final hospitalProvider =
+              Provider.of<HospitalProvider>(context, listen: false);
           await hospitalProvider.loadHospitalData();
-          
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

@@ -85,8 +85,8 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
           backgroundColor: const Color(0xFF0A4D68),
           bottom: const TabBar(
             tabs: [
-              Tab(text: 'ÃƒÂ°Ã…Â¸Ã…Â¡Ã¢â‚¬Ëœ Ambulances', icon: Icon(Icons.local_taxi)),
-              Tab(text: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ Bookings', icon: Icon(Icons.assignment)),
+              Tab(text: ' Ambulances', icon: Icon(Icons.local_taxi)),
+              Tab(text: ' Bookings', icon: Icon(Icons.assignment)),
             ],
           ),
           actions: [
@@ -265,7 +265,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ambulance added successfully'),
+                      content: Text(' Ambulance added successfully'),
                       backgroundColor: Colors.green,
                     ),
                   );
@@ -448,8 +448,8 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isAvailable
-                ? 'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ambulance is now available'
-                : 'ÃƒÂ°Ã…Â¸Ã…Â¡Ã‚Â« Ambulance is now busy'),
+                ? ' Ambulance is now available'
+                : ' Ambulance is now busy'),
             backgroundColor: isAvailable ? Colors.green : Colors.orange,
           ),
         );
@@ -531,7 +531,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ambulance assigned successfully'),
+                            content: Text(' Ambulance assigned successfully'),
                             backgroundColor: Colors.green,
                           ),
                         );
@@ -605,7 +605,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Booking rejected'),
+                      content: Text(' Booking rejected'),
                       backgroundColor: Colors.orange,
                     ),
                   );
@@ -675,7 +675,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ambulance deleted successfully'),
+                      content: Text(' Ambulance deleted successfully'),
                       backgroundColor: Colors.green,
                     ),
                   );
@@ -985,7 +985,7 @@ class BookingsList extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã…Â¾ ${booking['patient_phone'] ?? 'N/A'}',
+                        ' ${booking['patient_phone'] ?? 'N/A'}',
                         style: TextStyle(color: Colors.grey[600]),
                       ),
                     ],
@@ -1020,7 +1020,7 @@ class BookingsList extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â Pickup Location',
+                    ' Pickup Location',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                   ),
                   Text(

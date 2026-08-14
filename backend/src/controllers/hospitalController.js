@@ -186,18 +186,19 @@ exports.updateResources = async (req, res) => {
 
 exports.getNearbyHospitals = async (req, res) => {
   try {
-    const { lat, lng, radius = 20, sortBy = 'distance' } = req.query;
+    const { lat, lng, radius = 20, sortBy = 'distance', specialty, emergency, icu, beds, bloodBank } = req.query;
     
-    const userLat = parseFloat(lat) || 28.6139;
-    const userLng = parseFloat(lng) || 77.2090;
-    const maxRadius = parseFloat(radius) || 20;
+    const userLat = Number(lat);
+    const userLng = Number(lng);
+    const maxRadius = Number(radius);
+    if (!Number.isFinite(userLat) || !Number.isFinite(userLng) || !Number.isFinite(maxRadius) || userLat < -90 || userLat > 90 || userLng < -180 || userLng > 180 || maxRadius <= 0) return res.status(400).json({ success: false, message: 'Valid latitude, longitude, and radius are required' });
 
     const haversineFormula = `
       (6371 * acos(
         LEAST(1.0, GREATEST(-1.0,
-          cos(radians($1)) * cos(radians(COALESCE(h.latitude, 28.6139))) *
-          cos(radians(COALESCE(h.longitude, 77.2090)) - radians($2)) +
-          sin(radians($1)) * sin(radians(COALESCE(h.latitude, 28.6139)))
+          cos(radians($1)) * cos(radians(h.latitude)) *
+          cos(radians(h.longitude) - radians($2)) +
+          sin(radians($1)) * sin(radians(h.latitude))
         ))
       ))
     `;
@@ -238,9 +239,8 @@ exports.getNearbyHospitals = async (req, res) => {
         h.phone,
         h.email,
         COALESCE(h.rating, 4.5) as rating,
-        h.is_verified,
-        COALESCE(h.latitude, 28.6139) as latitude,
-        COALESCE(h.longitude, 77.2090) as longitude,
+        h.is_verified, h.specialties, h.emergency_available,
+        h.latitude, h.longitude,
         COALESCE(hr.general_beds_total, 0) as total_beds,
         COALESCE(hr.general_beds_available, 0) as available_beds,
         COALESCE(hr.icu_beds_total, 0) as icu_beds,
@@ -255,12 +255,17 @@ exports.getNearbyHospitals = async (req, res) => {
         (SELECT COUNT(*) FROM appointments a WHERE a.hospital_id = h.id AND a.status = 'pending' AND a.appointment_date = CURRENT_DATE) * 15 as waiting_time
       FROM hospitals h
       LEFT JOIN hospital_resources hr ON h.id = hr.hospital_id
-      WHERE h.is_verified = true AND ${haversineFormula} <= $3
+      WHERE h.is_verified = true AND h.latitude IS NOT NULL AND h.longitude IS NOT NULL AND ${haversineFormula} <= $3
+        AND ($4::text IS NULL OR $4 = ANY(h.specialties))
+        AND ($5::boolean IS NOT TRUE OR h.emergency_available = true)
+        AND ($6::boolean IS NOT TRUE OR COALESCE(hr.icu_beds_available, 0) > 0)
+        AND ($7::boolean IS NOT TRUE OR COALESCE(hr.general_beds_available, 0) > 0)
+        AND ($8::boolean IS NOT TRUE OR EXISTS (SELECT 1 FROM blood_bank bb WHERE bb.hospital_id = h.id AND bb.units_available > 0))
       ORDER BY ${orderByClause}
       LIMIT 50
     `;
 
-    const result = await pool.query(query, [userLat, userLng, maxRadius]);
+    const result = await pool.query(query, [userLat, userLng, maxRadius, specialty || null, emergency === 'true', icu === 'true', beds === 'true', bloodBank === 'true']);
 
     const hospitals = await Promise.all(result.rows.map(async (hospital) => {
       const distKm = parseFloat(hospital.distance) || 0.5;
@@ -270,14 +275,6 @@ exports.getNearbyHospitals = async (req, res) => {
         `SELECT COALESCE(SUM(units_available), 0) as total_units
          FROM blood_bank 
          WHERE hospital_id = $1`,
-        [hospital.id]
-      );
-      
-      const specialtiesResult = await pool.query(
-        `SELECT DISTINCT specialization 
-         FROM doctors 
-         WHERE hospital_id = $1 AND specialization IS NOT NULL
-         LIMIT 5`,
         [hospital.id]
       );
       
@@ -304,8 +301,8 @@ exports.getNearbyHospitals = async (req, res) => {
         doctor_count: parseInt(hospital.doctor_count || 0),
         waiting_time: parseInt(hospital.waiting_time || 10),
         travel_time: travelTimeMins,
-        specialties: specialtiesResult.rows.map(r => r.specialization),
-        emergency_services: true,
+        specialties: hospital.specialties || [],
+        emergency_services: hospital.emergency_available === true,
         distance: `${distKm.toFixed(1)} km`,
         distance_val: distKm,
         last_updated: hospital.last_updated,
@@ -329,7 +326,9 @@ exports.getNearbyHospitals = async (req, res) => {
 
 exports.getAllHospitals = async (req, res) => {
   try {
-    const { city, verified } = req.query;
+    const { city, search, specialty, emergency, icu, beds, bloodBank, page = 1, limit = 20 } = req.query;
+    const pageNumber = Math.max(1, Number(page) || 1);
+    const pageSize = Math.min(50, Math.max(1, Number(limit) || 20));
     
     let query = `
       SELECT 
@@ -337,17 +336,26 @@ exports.getAllHospitals = async (req, res) => {
         h.name,
         h.address,
         h.city,
+        h.state,
+        h.latitude,
+        h.longitude,
         h.phone,
         h.email,
         h.rating,
-        h.is_verified,
+        h.is_verified, h.specialties, h.emergency_available as emergency_services, h.services,
         COALESCE(hr.general_beds_total, 0) as total_beds,
         COALESCE(hr.general_beds_available, 0) as available_beds,
         COALESCE(hr.icu_beds_total, 0) as icu_beds,
-        COALESCE(hr.icu_beds_available, 0) as available_icu
+        COALESCE(hr.icu_beds_available, 0) as available_icu,
+        COALESCE(hr.ventilators_total, 0) as ventilator_count,
+        COALESCE(hr.ventilators_available, 0) as available_ventilators,
+        COALESCE(hr.oxygen_supported_beds_total, 0) as oxygen_beds_total,
+        COALESCE(hr.oxygen_supported_beds_available, 0) as oxygen_beds_available,
+        COALESCE((SELECT SUM(bb.units_available) FROM blood_bank bb WHERE bb.hospital_id = h.id), 0) as blood_units,
+        COALESCE(hr.updated_at, h.created_at) as last_updated
       FROM hospitals h
       LEFT JOIN hospital_resources hr ON h.id = hr.hospital_id
-      WHERE 1=1
+      WHERE h.is_verified = true
     `;
     
     const params = [];
@@ -359,17 +367,30 @@ exports.getAllHospitals = async (req, res) => {
       paramIndex++;
     }
     
-    if (verified === 'true') {
-      query += ` AND h.is_verified = true`;
+    if (search) {
+      query += ` AND (h.name ILIKE $${paramIndex} OR h.city ILIKE $${paramIndex} OR h.state ILIKE $${paramIndex} OR h.address ILIKE $${paramIndex} OR h.pincode ILIKE $${paramIndex} OR EXISTS (SELECT 1 FROM doctors d WHERE d.hospital_id = h.id AND (d.specialization ILIKE $${paramIndex} OR d.name ILIKE $${paramIndex})))`;
+      params.push(`%${search}%`);
+      paramIndex++;
     }
-    
-    query += ` ORDER BY h.name LIMIT 50`;
-    
+    if (specialty) {
+      query += ` AND $${paramIndex} = ANY(h.specialties)`;
+      params.push(specialty);
+      paramIndex++;
+    }
+    if (emergency === 'true') query += ` AND h.emergency_available = true`;
+    if (icu === 'true') query += ` AND COALESCE(hr.icu_beds_available, 0) > 0`;
+    if (beds === 'true') query += ` AND COALESCE(hr.general_beds_available, 0) > 0`;
+    if (bloodBank === 'true') query += ` AND EXISTS (SELECT 1 FROM blood_bank bb WHERE bb.hospital_id = h.id AND bb.units_available > 0)`;
+    const countQuery = `SELECT COUNT(*) FROM (${query}) filtered_hospitals`;
+    const countResult = await pool.query(countQuery, params);
+    query += ` ORDER BY h.name LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    params.push(pageSize, (pageNumber - 1) * pageSize);
     const result = await pool.query(query, params);
     res.json({
       success: true,
       count: result.rows.length,
       data: result.rows,
+      pagination: { page: pageNumber, limit: pageSize, total: Number(countResult.rows[0].count), totalPages: Math.ceil(Number(countResult.rows[0].count) / pageSize) },
     });
   } catch (error) {
     console.error('Get all hospitals error:', error);
@@ -844,5 +865,42 @@ exports.getDashboardStats = async (req, res) => {
   } catch (error) {
     console.error('Get dashboard stats error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+exports.updateHospitalLocation = async (req, res) => {
+  try {
+    const hospitalId = Number(req.params.hospitalId);
+    const { address, area, city, state, country, pincode, latitude, longitude, departments, specialties, services, emergency_available } = req.body;
+    const lat = Number(latitude); const lng = Number(longitude);
+    if (!Number.isInteger(hospitalId) || !Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return res.status(400).json({ success: false, message: 'A valid confirmed location is required' });
+    const result = await pool.query(`UPDATE hospitals SET address=COALESCE($1,address), area=COALESCE($2,area), city=COALESCE($3,city), state=COALESCE($4,state), country=COALESCE($5,country), pincode=COALESCE($6,pincode), latitude=$7, longitude=$8, departments=COALESCE($9,departments), specialties=COALESCE($10,specialties), services=COALESCE($11,services), emergency_available=COALESCE($12,emergency_available), updated_at=CURRENT_TIMESTAMP WHERE id=$13 AND user_id=$14 RETURNING *`, [address, area, city, state, country, pincode, lat, lng, Array.isArray(departments) ? departments : null, Array.isArray(specialties) ? specialties : null, Array.isArray(services) ? services : null, typeof emergency_available === 'boolean' ? emergency_available : null, hospitalId, req.user.id]);
+    if (!result.rowCount) return res.status(404).json({ success: false, message: 'Hospital not found' });
+    res.json({ success: true, data: result.rows[0] });
+  } catch (error) { res.status(500).json({ success: false, message: 'Unable to update hospital location' }); }
+};
+
+// Public directory detail.  Only approved hospitals are visible to patients.
+exports.getHospitalDetails = async (req, res) => {
+  try {
+    const hospitalId = Number(req.params.hospitalId);
+    if (!Number.isInteger(hospitalId) || hospitalId <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid hospital ID is required' });
+    }
+    const result = await pool.query(`
+      SELECT h.id, h.name, h.address, h.city, h.state, h.pincode, h.phone, h.email,
+             h.latitude, h.longitude, h.rating, h.is_verified, h.specialties, h.services, h.emergency_available,
+             COALESCE(hr.general_beds_total, 0) total_beds,
+             COALESCE(hr.general_beds_available, 0) available_beds,
+             COALESCE(hr.icu_beds_total, 0) icu_beds,
+             COALESCE(hr.icu_beds_available, 0) available_icu
+      FROM hospitals h LEFT JOIN hospital_resources hr ON hr.hospital_id = h.id
+      WHERE h.id = $1 AND h.is_verified = true`, [hospitalId]);
+    if (!result.rowCount) return res.status(404).json({ success: false, message: 'Hospital not found' });
+    const doctors = await pool.query(`SELECT id, name, specialization, qualification, experience_years, consultation_fee, phone FROM doctors WHERE hospital_id = $1 AND availability_status = true ORDER BY name`, [hospitalId]);
+    res.json({ success: true, data: { ...result.rows[0], doctors: doctors.rows } });
+  } catch (error) {
+    console.error('Get hospital details error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 };

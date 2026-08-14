@@ -58,16 +58,8 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
     });
 
     try {
-      // Try to get from provider first
-      final provider = Provider.of<HospitalProvider>(context, listen: false);
-      if (provider.appointments.isNotEmpty) {
-        _appointments = List<Map<String, dynamic>>.from(provider.appointments);
-        debugPrint('Loaded ${_appointments.length} appointments from provider');
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      // Fallback to API call
+      // Always refresh from the hospital-scoped API. Provider data may be stale
+      // when a patient creates an appointment after the dashboard was loaded.
       final response = await ApiService.getHospitalAppointments();
       debugPrint('Hospital appointments response: $response');
 

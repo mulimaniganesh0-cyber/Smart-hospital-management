@@ -3,7 +3,26 @@ const { pool } = require('../config/database');
 
 class Hospital {
   static async create(hospitalData) {
-    const { user_id, name, registration_number, address, city, state, pincode, phone, email, latitude, longitude } = hospitalData;
+    const { 
+      user_id, 
+      name, 
+      registration_number, 
+      address, 
+      area, 
+      city, 
+      state, 
+      country, 
+      pincode, 
+      hospital_type, 
+      departments = [], 
+      specialties = [], 
+      services = [], 
+      emergency_available = false, 
+      phone, 
+      email, 
+      latitude, 
+      longitude 
+    } = hospitalData;
     
     // Generate a unique registration number
     let regNumber = registration_number;
@@ -43,17 +62,67 @@ class Hospital {
     
     console.log(`Creating hospital with registration number: ${finalRegNumber}`);
     
+    // FIX: Convert arrays to PostgreSQL array format '{}' instead of []
+    const formatArray = (arr) => {
+      if (!arr || !Array.isArray(arr) || arr.length === 0) {
+        return '{}';  // Empty array in PostgreSQL format
+      }
+      // For non-empty arrays, wrap each element in quotes and join
+      return `{${arr.map(item => `"${item}"`).join(',')}}`;
+    };
+
+    // FIX: Also handle when departments/specialties/services might be null
+    const departmentsArray = departments && Array.isArray(departments) && departments.length > 0 
+      ? formatArray(departments) 
+      : '{}';
+    const specialtiesArray = specialties && Array.isArray(specialties) && specialties.length > 0 
+      ? formatArray(specialties) 
+      : '{}';
+    const servicesArray = services && Array.isArray(services) && services.length > 0 
+      ? formatArray(services) 
+      : '{}';
+
+    // FIX: Use $11::text[] to cast the parameter as text array
     const result = await pool.query(
-      `INSERT INTO hospitals (user_id, name, registration_number, address, city, state, pincode, phone, email, latitude, longitude, verification_status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-       RETURNING *`,
-      [user_id, name, finalRegNumber, address, city, state, pincode, phone, email, latitude, longitude, 'pending']
+      `INSERT INTO hospitals (
+        user_id, name, registration_number, address, area, city, state, 
+        country, pincode, hospital_type, departments, specialties, services, 
+        emergency_available, phone, email, latitude, longitude, verification_status
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::text[], $12::text[], $13::text[], $14, $15, $16, $17, $18, $19)
+      RETURNING *`,
+      [
+        user_id, 
+        name, 
+        finalRegNumber, 
+        address, 
+        area || null, 
+        city, 
+        state, 
+        country || null, 
+        pincode, 
+        hospital_type || null, 
+        departmentsArray,  // Now in '{}' format
+        specialtiesArray,  // Now in '{}' format
+        servicesArray,     // Now in '{}' format
+        emergency_available, 
+        phone, 
+        email, 
+        latitude, 
+        longitude, 
+        'pending'
+      ]
     );
     
     // Initialize resources
     await pool.query(
-      `INSERT INTO hospital_resources (hospital_id, general_beds_total, general_beds_available, icu_beds_total, icu_beds_available, ventilators_total, ventilators_available, oxygen_supported_beds_total, oxygen_supported_beds_available)
-       VALUES ($1, 200, 200, 20, 20, 30, 30, 10, 10)`,
+      `INSERT INTO hospital_resources (
+        hospital_id, general_beds_total, general_beds_available, 
+        icu_beds_total, icu_beds_available, 
+        ventilators_total, ventilators_available, 
+        oxygen_supported_beds_total, oxygen_supported_beds_available
+      )
+      VALUES ($1, 200, 200, 20, 20, 30, 30, 10, 10)`,
       [result.rows[0].id]
     );
     

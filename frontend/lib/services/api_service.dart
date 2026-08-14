@@ -29,6 +29,53 @@ class ApiService {
     };
   }
 
+  // ==================== MEDICAL RECORDS ====================
+  static Future<Map<String, dynamic>> getMedicalOnboardingStatus() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/medical/onboarding-status'), headers: await _getHeaders());
+      return json.decode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> saveMedicalProfile(Map<String, dynamic> profile) async {
+    try {
+      final response = await http.put(Uri.parse('$baseUrl/medical/profile'), headers: await _getHeaders(), body: json.encode(profile));
+      return json.decode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getMedicalTimeline(int patientId) async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/medical/patients/$patientId/timeline'), headers: await _getHeaders());
+      return json.decode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> createMedicalRecord(Map<String, dynamic> record) async {
+    try {
+      final response = await http.post(Uri.parse('$baseUrl/medical/records'), headers: await _getHeaders(), body: json.encode(record));
+      return json.decode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateHealthRecord(int recordId, Map<String, dynamic> record) async {
+    try { final response = await http.put(Uri.parse('$baseUrl/health-records/$recordId'), headers: await _getHeaders(), body: json.encode(record)); return json.decode(response.body); }
+    catch (e) { return {'success': false, 'message': 'Network error: $e'}; }
+  }
+
+  static Future<Map<String, dynamic>> removeHealthRecord(int recordId, {String? reason}) async {
+    try { final response = await http.delete(Uri.parse('$baseUrl/health-records/$recordId'), headers: await _getHeaders(), body: json.encode({'reason': reason})); return json.decode(response.body); }
+    catch (e) { return {'success': false, 'message': 'Network error: $e'}; }
+  }
+
   // ==================== AUTH ENDPOINTS ====================
   static Future<Map<String, dynamic>> register(
       Map<String, dynamic> userData) async {
@@ -635,17 +682,28 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> getAllHospitals(
-      {String? city, String? verified}) async {
+      {String? city, String? verified, String? search, String? specialty, bool? emergency, bool? icu, bool? beds, bool? bloodBank, int page = 1, int limit = 50}) async {
     try {
-      String url = '$baseUrl/hospitals/all';
-      if (city != null) url += '?city=$city';
-      if (verified != null) {
-        url += '${city != null ? '&' : '?'}verified=$verified';
-      }
-
-      final response = await http.get(Uri.parse(url));
+      final query = <String, String>{'page': '$page', 'limit': '$limit'};
+      if (city?.isNotEmpty == true) query['city'] = city!;
+      if (search?.isNotEmpty == true) query['search'] = search!;
+      if (specialty?.isNotEmpty == true) query['specialty'] = specialty!;
+      if (emergency == true) query['emergency'] = 'true';
+      if (icu == true) query['icu'] = 'true';
+      if (beds == true) query['beds'] = 'true';
+      if (bloodBank == true) query['bloodBank'] = 'true';
+      final response = await http.get(Uri.parse('$baseUrl/hospitals').replace(queryParameters: query));
       return json.decode(response.body);
     } catch (e) {
+      return {'success': false, 'data': []};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getSpecialties() async {
+    try {
+      final response = await http.get(Uri.parse('$baseUrl/specialties'));
+      return json.decode(response.body);
+    } catch (_) {
       return {'success': false, 'data': []};
     }
   }
@@ -1588,6 +1646,11 @@ class ApiService {
     double lng, {
     double radius = 20,
     String sortBy = 'distance',
+    String? specialty,
+    bool? emergency,
+    bool? icu,
+    bool? beds,
+    bool? bloodBank,
   }) async {
     try {
       final headers = await _getHeaders();
@@ -1597,6 +1660,11 @@ class ApiService {
         'lng': '$lng',
         'radius': '$radius',
         'sortBy': sortBy,
+        if (specialty?.isNotEmpty == true) 'specialty': specialty!,
+        if (emergency == true) 'emergency': 'true',
+        if (icu == true) 'icu': 'true',
+        if (beds == true) 'beds': 'true',
+        if (bloodBank == true) 'bloodBank': 'true',
       }).query;
       String url = '$baseUrl/hospitals/nearby?$query';
 
@@ -1814,7 +1882,7 @@ class ApiService {
     try {
       final headers = await _getHeaders();
       final response = await http.post(
-        Uri.parse('$baseUrl/blood-bank/add'),
+        Uri.parse('$baseUrl/blood-bank/add-expiry'),
         headers: headers,
         body: json.encode({
           'blood_group': bloodGroup,
@@ -1838,7 +1906,7 @@ class ApiService {
     try {
       final headers = await _getHeaders();
       final response = await http.get(
-        Uri.parse('$baseUrl/blood-bank/hospital/$hospitalId'),
+        Uri.parse('$baseUrl/blood-bank/$hospitalId'),
         headers: headers,
       );
 
@@ -1872,7 +1940,7 @@ class ApiService {
     try {
       final headers = await _getHeaders();
       final response = await http.get(
-        Uri.parse('$baseUrl/blood-bank/hospital'),
+        Uri.parse('$baseUrl/blood-bank/stock'),
         headers: headers,
       );
 
@@ -1880,16 +1948,32 @@ class ApiService {
 
       // Ensure data has the expected structure
       if (data['success'] == true) {
+        final rawSummary = Map<String, dynamic>.from(
+          data['data']?['summary'] as Map? ?? const {},
+        );
+        final expiringSoon = rawSummary['expiring_soon'];
+        final expiringSoonUnits = expiringSoon is List
+            ? expiringSoon.fold<int>(0, (total, item) {
+                final units = item is Map ? item['units'] : 0;
+                return total + (units is num ? units.toInt() : 0);
+              })
+            : (expiringSoon is num ? expiringSoon.toInt() : 0);
+        final byStatus = rawSummary['by_status'];
+        final expiredUnits = byStatus is Map && byStatus['expired'] is num
+            ? (byStatus['expired'] as num).toInt()
+            : (rawSummary['expired'] is num
+                ? (rawSummary['expired'] as num).toInt()
+                : 0);
+
         return {
           'success': true,
           'data': {
-            'blood_stock': data['data']?['stock'] ?? [],
-            'summary': data['data']?['summary'] ??
-                {
-                  'total_units': 0,
-                  'expiring_soon': 0,
-                  'expired': 0,
-                },
+            'blood_stock': data['data']?['blood_stock'] ?? [],
+            'summary': {
+              'total_units': rawSummary['total_units'] ?? 0,
+              'expiring_soon': expiringSoonUnits,
+              'expired': expiredUnits,
+            },
           }
         };
       }
@@ -1909,7 +1993,7 @@ class ApiService {
     try {
       final headers = await _getHeaders();
       final response = await http.put(
-        Uri.parse('$baseUrl/blood-bank/update'),
+        Uri.parse('$baseUrl/blood-bank/stock'),
         headers: headers,
         body: json.encode({
           'blood_group': bloodGroup,
@@ -1932,7 +2016,7 @@ class ApiService {
     try {
       final headers = await _getHeaders();
       final response = await http.delete(
-        Uri.parse('$baseUrl/blood-bank/delete/$bloodGroup'),
+        Uri.parse('$baseUrl/blood-bank/stock/${Uri.encodeComponent(bloodGroup)}'),
         headers: headers,
       );
 

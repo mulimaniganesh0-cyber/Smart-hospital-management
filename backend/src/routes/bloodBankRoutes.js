@@ -12,8 +12,8 @@ router.get('/all', bloodBankController.getAllBloodBanks);
 // Blood stock with expiry (HOSPITAL only)
 router.get('/stock/expiry', protect, authorize('hospital'), bloodBankController.getBloodStockWithExpiry);
 
-// Blood availability by hospital (public)
-router.get('/:hospitalId', bloodBankController.getBloodAvailability);
+// Declare named endpoints before /:hospitalId so they are never parsed as IDs.
+router.get('/stock', protect, authorize('hospital'), bloodBankController.getBloodStockWithExpiry);
 
 // Blood request (patient)
 router.post('/request', protect, bloodBankController.requestBlood);
@@ -23,6 +23,7 @@ router.post('/emergency-request', protect, bloodBankController.emergencyBloodReq
 
 // Update blood stock (hospital)
 router.put('/stock', protect, authorize('hospital'), bloodBankController.updateBloodStock);
+router.delete('/stock/:bloodGroup', protect, authorize('hospital'), bloodBankController.deleteBloodStock);
 
 // Add blood with expiry (hospital)
 router.post('/add-expiry', protect, authorize('hospital'), bloodBankController.addBloodWithExpiry);
@@ -53,5 +54,8 @@ router.post('/check-expiry', protect, authorize('hospital'), bloodBankController
 
 // Debug
 router.get('/debug/all', protect, authorize('hospital'), bloodBankController.debugGetAllBloodBank);
+
+// Parameterized route must remain last.
+router.get('/:hospitalId', bloodBankController.getBloodAvailability);
 
 module.exports = router;

@@ -163,7 +163,8 @@ exports.requestBlood = async (req, res) => {
 exports.updateBloodStock = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { bloodGroup, units } = req.body;
+    const bloodGroup = req.body.blood_group ?? req.body.bloodGroup;
+    const units = Number(req.body.units);
     
     console.log('Updating blood stock:', { userId, bloodGroup, units });
     
@@ -181,6 +182,10 @@ exports.updateBloodStock = async (req, res) => {
     
     const hospitalId = hospitalResult.rows[0].id;
     
+    if (!bloodGroup || !Number.isInteger(units) || units < 0) {
+      return res.status(400).json({ success: false, message: 'A valid blood group and non-negative unit count are required' });
+    }
+
     const result = await pool.query(
       `INSERT INTO blood_bank (hospital_id, blood_group, units_available, last_updated)
        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
@@ -1158,4 +1163,26 @@ const _getBloodSummary = (bloodStock) => {
   });
 
   return summary;
+};
+
+exports.deleteBloodStock = async (req, res) => {
+  try {
+    const hospitalResult = await pool.query(
+      'SELECT id FROM hospitals WHERE user_id = $1', [req.user.id]
+    );
+    if (hospitalResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Hospital not found' });
+    }
+    const result = await pool.query(
+      'DELETE FROM blood_bank WHERE hospital_id = $1 AND blood_group = $2 RETURNING id',
+      [hospitalResult.rows[0].id, req.params.bloodGroup]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Blood group not found' });
+    }
+    res.json({ success: true, message: 'Blood stock deleted successfully' });
+  } catch (error) {
+    console.error('Delete blood stock error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
 };

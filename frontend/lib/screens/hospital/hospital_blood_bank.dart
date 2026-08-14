@@ -42,13 +42,21 @@ Future<void> _loadBloodBank() async {
       // Handle both response formats
       if (data != null) {
         // If data has 'blood_stock' field (from our API)
-        if (data['blood_stock'] != null) {
-          _bloodStock = List<Map<String, dynamic>>.from(data['blood_stock']);
-          _summary = data['summary'] ?? {};
+        if (data['blood_stock'] is List) {
+          _bloodStock = (data['blood_stock'] as List)
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
+          _summary = data['summary'] is Map
+              ? Map<String, dynamic>.from(data['summary'])
+              : {};
         } 
         // If data is a list directly
         else if (data is List) {
-          _bloodStock = List<Map<String, dynamic>>.from(data);
+          _bloodStock = data
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
           _summary = {
             'total_units': _bloodStock.fold<int>(0, (sum, item) {
   final value = item['units_available'] ?? 0;
@@ -60,19 +68,24 @@ Future<void> _loadBloodBank() async {
         }
         // If data has 'stock' field
         else if (data['stock'] != null) {
-          _bloodStock = List<Map<String, dynamic>>.from(data['stock']);
-          _summary = data['summary'] ?? {};
+          _bloodStock = (data['stock'] as List)
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
+          _summary = data['summary'] is Map
+              ? Map<String, dynamic>.from(data['summary'])
+              : {};
         }
       }
       
-      debugPrint('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ Loaded ${_bloodStock.length} blood stocks');
+      debugPrint(' Loaded ${_bloodStock.length} blood stocks');
     } else {
       _errorMessage = response['message'] ?? 'Failed to load blood bank';
-      debugPrint('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ Failed to load blood bank: $_errorMessage');
+      debugPrint(' Failed to load blood bank: $_errorMessage');
     }
   } catch (e) {
     _errorMessage = 'Network error: $e';
-    debugPrint('ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ Network error: $e');
+    debugPrint(' Network error: $e');
   } finally {
     setState(() => _isLoading = false);
   }
@@ -219,11 +232,11 @@ Future<void> _loadBloodBank() async {
                       padding: const EdgeInsets.all(12),
                       child: Row(
                         children: [
-                          _buildSummaryCard('Total Units', _summary['total_units'] ?? 0, Colors.blue),
+                          _buildSummaryCard('Total Units', _asInt(_summary['total_units']), Colors.blue),
                           const SizedBox(width: 8),
-                          _buildSummaryCard('Near Expiry', _summary['expiring_soon'] ?? 0, Colors.orange),
+                          _buildSummaryCard('Near Expiry', _asInt(_summary['expiring_soon']), Colors.orange),
                           const SizedBox(width: 8),
-                          _buildSummaryCard('Expired', _summary['expired'] ?? 0, Colors.red),
+                          _buildSummaryCard('Expired', _asInt(_summary['expired']), Colors.red),
                         ],
                       ),
                     ),
@@ -375,8 +388,13 @@ Future<void> _loadBloodBank() async {
     );
   }
 
+  int _asInt(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
   Future<void> _editBloodStock(Map<String, dynamic> stock) async {
-    int units = stock['units_available'] ?? 0;
+    int units = _asInt(stock['units_available']);
     DateTime selectedDate = stock['expiry_date'] != null 
         ? DateTime.parse(stock['expiry_date'])
         : DateTime.now().add(const Duration(days: 30));

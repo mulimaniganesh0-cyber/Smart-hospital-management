@@ -62,8 +62,8 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
           backgroundColor: Colors.red,
           bottom: const TabBar(
             tabs: [
-              Tab(text: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ Available Camps', icon: Icon(Icons.campaign)),
-              Tab(text: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â My Registrations', icon: Icon(Icons.person)),
+              Tab(text: ' Available Camps', icon: Icon(Icons.campaign)),
+              Tab(text: ' My Registrations', icon: Icon(Icons.person)),
             ],
           ),
           actions: [
@@ -573,7 +573,7 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                 ),
                 const SizedBox(height: 12),
                 const Text(
-                  'ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â Please ensure you meet eligibility criteria before registering.',
+                  ' Please ensure you meet eligibility criteria before registering.',
                   style: TextStyle(fontSize: 12, color: Colors.orange),
                   textAlign: TextAlign.center,
                 ),
@@ -618,7 +618,7 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Successfully registered for blood donation camp!'),
+                      content: Text(' Successfully registered for blood donation camp!'),
                       backgroundColor: Colors.green,
                     ),
                   );

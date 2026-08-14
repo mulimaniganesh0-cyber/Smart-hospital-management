@@ -33,6 +33,16 @@ exports.register = async (req, res) => {
         message: 'Invalid user type'
       });
     }
+    if (user_type === 'hospital') {
+      const hospital = additional_data || {};
+      const required = ['hospital_name', 'registration_number', 'address', 'area', 'city', 'state', 'country', 'pincode'];
+      const missing = required.filter((field) => !String(hospital[field] || '').trim());
+      const latitude = Number(hospital.latitude);
+      const longitude = Number(hospital.longitude);
+      if (missing.length || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || hospital.location_confirmed !== true) {
+        return res.status(400).json({ success: false, message: 'Hospital details and a confirmed valid map location are required', fields: missing });
+      }
+    }
     
     // Check if user exists
     const userExists = await User.findByEmail(email);
@@ -67,26 +77,22 @@ exports.register = async (req, res) => {
           emergency_contact_name: additional_data?.emergency_contact_name,
         });
       } else if (user_type === 'hospital') {
-        // Generate a unique registration number if not provided
-        let registrationNumber = additional_data?.registration_number;
-        if (!registrationNumber) {
-          const timestamp = Date.now();
-          const namePrefix = name.substring(0, 3).toUpperCase();
-          registrationNumber = `HOSP${namePrefix}${timestamp.toString().slice(-6)}`;
-        }
-        
         await Hospital.create({
           user_id: user.id,
           name: additional_data?.hospital_name || name,
-          registration_number: registrationNumber,
-          address: additional_data?.address || 'Address not provided',
-          city: additional_data?.city || 'City',
-          state: additional_data?.state || 'State',
-          pincode: additional_data?.pincode || '000000',
+          registration_number: additional_data.registration_number,
+          address: additional_data.address,
+          area: additional_data.area,
+          city: additional_data.city,
+          state: additional_data.state,
+          country: additional_data.country,
+          pincode: additional_data.pincode,
+          hospital_type: additional_data.hospital_type,
+          departments: additional_data.departments || [], specialties: additional_data.specialties || [], services: additional_data.services || [],
+          emergency_available: Boolean(additional_data.emergency_available),
           phone: phone || '',
           email: email,
-          latitude: additional_data?.latitude || null,
-          longitude: additional_data?.longitude || null,
+          latitude: Number(additional_data.latitude), longitude: Number(additional_data.longitude),
         });
       }
     } catch (profileError) {

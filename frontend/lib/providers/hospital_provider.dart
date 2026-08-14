@@ -44,7 +44,7 @@ class HospitalProvider extends ChangeNotifier {
     final profileResponse = await ApiService.getHospitalProfile();
     
     if (profileResponse['success'] == true && profileResponse['data'] != null) {
-      _hospitalData = profileResponse['data'];
+      _hospitalData = Map<String, dynamic>.from(profileResponse['data'] as Map);
       debugPrint('ðŸ¥ Hospital data loaded: ${_hospitalData?['name']} (ID: ${_hospitalData?['id']})');
     } else {
       debugPrint('Failed to load hospital profile: ${profileResponse['message']}');

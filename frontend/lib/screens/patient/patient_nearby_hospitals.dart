@@ -20,10 +20,14 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
   List<Map<String, dynamic>> _rawHospitals = [];
   String? _errorMessage;
 
-  double _userLat = 28.6139;
-  double _userLng = 77.2090;
+  double? _userLat;
+  double? _userLng;
   double _selectedRadius = 10.0;
   String _selectedSort = 'distance';
+  bool _nearbyOnly = false;
+  String _search = '';
+  List<String> _specialties = [];
+  String? _selectedSpecialty;
 
   final Map<String, String> _sortOptions = {
     'distance': 'Distance (Nearest)',
@@ -39,7 +43,20 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
   @override
   void initState() {
     super.initState();
+    _loadSpecialties();
     _initLocationAndLoad();
+  }
+
+  Future<void> _loadSpecialties() async {
+    final response = await ApiService.getSpecialties();
+    if (!mounted || response['success'] != true || response['data'] is! List) return;
+    setState(() {
+      _specialties = (response['data'] as List)
+          .whereType<Map>()
+          .map((item) => item['name']?.toString() ?? '')
+          .where((name) => name.isNotEmpty)
+          .toList();
+    });
   }
 
   Future<void> _initLocationAndLoad() async {
@@ -60,12 +77,11 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
     });
 
     try {
-      final response = await ApiService.getNearbyHospitals(
-        _userLat,
-        _userLng,
-        radius: _selectedRadius,
-        sortBy: _selectedSort,
-      );
+      final response = _nearbyOnly
+          ? (_userLat == null || _userLng == null
+              ? {'success': false, 'message': 'Location permission is needed for nearby hospitals. You can still browse all hospitals.'}
+              : await ApiService.getNearbyHospitals(_userLat!, _userLng!, radius: _selectedRadius, sortBy: _selectedSort, specialty: _selectedSpecialty))
+          : await ApiService.getAllHospitals(search: _search, specialty: _selectedSpecialty);
 
       if (!mounted) return;
 
@@ -114,7 +130,7 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nearby Hospitals'),
+        title: Text(_nearbyOnly ? 'Nearby Hospitals' : 'Hospital Directory'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -131,8 +147,35 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
             color: Colors.blue.shade50,
             child: Column(
               children: [
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Nearby hospitals only'),
+                  subtitle: Text(_nearbyOnly ? 'Showing hospitals within the selected radius' : 'Showing all approved hospitals on the platform'),
+                  value: _nearbyOnly,
+                  onChanged: (value) { setState(() => _nearbyOnly = value); _loadHospitals(); },
+                ),
+                if (!_nearbyOnly) TextField(
+                  decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search name, city, specialty or doctor'),
+                  onSubmitted: (value) { setState(() => _search = value); _loadHospitals(); },
+                ),
+                if (!_nearbyOnly) const SizedBox(height: 8),
+                if (_specialties.isNotEmpty)
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedSpecialty,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.medical_services),
+                      labelText: 'Find healthcare by specialty',
+                    ),
+                    items: [
+                      const DropdownMenuItem<String>(value: null, child: Text('All specialties')),
+                      ..._specialties.map((specialty) => DropdownMenuItem(value: specialty, child: Text(specialty))),
+                    ],
+                    onChanged: (value) { setState(() => _selectedSpecialty = value); _loadHospitals(); },
+                  ),
+                if (_specialties.isNotEmpty) const SizedBox(height: 8),
                 // Radius selection
-                Row(
+                if (_nearbyOnly) Row(
                   children: [
                     const Text('Distance:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                     const SizedBox(width: 8),
@@ -153,10 +196,10 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                     )),
                   ],
                 ),
-                const SizedBox(height: 8),
+                if (_nearbyOnly) const SizedBox(height: 8),
 
                 // Sort selection
-                Row(
+                if (_nearbyOnly) Row(
                   children: [
                     const Text('Sort by:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                     const SizedBox(width: 8),
@@ -217,7 +260,7 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                               children: [
                                 const Icon(Icons.local_hospital_outlined, size: 64, color: Colors.grey),
                                 const SizedBox(height: 16),
-                                const Text('No hospitals found in this radius', style: TextStyle(fontSize: 16)),
+                                Text(_nearbyOnly ? 'No hospitals found in this radius' : 'No approved hospitals found', style: const TextStyle(fontSize: 16)),
                                 const SizedBox(height: 16),
                                 ElevatedButton(onPressed: _loadHospitals, child: const Text('Refresh')),
                               ],
@@ -244,8 +287,12 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
     final travelTime = raw['travel_time'] ?? math.max(2, (hospital.availableBeds % 15) + 3);
     final waitingTime = raw['waiting_time'] ?? 15;
     final doctorCount = raw['doctor_count'] ?? 4;
-    final lat = raw['latitude'] ?? 28.6139;
-    final lng = raw['longitude'] ?? 77.2090;
+    double? parseCoordinate(dynamic value) {
+      if (value is num) return value.toDouble();
+      return double.tryParse(value?.toString() ?? '');
+    }
+    final lat = parseCoordinate(raw['latitude']);
+    final lng = parseCoordinate(raw['longitude']);
 
     // Calculate occupancy percentage
     final occupancyPercent = hospital.totalBeds > 0
@@ -292,7 +339,7 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                   if (hospital.isVerified)
                     const Icon(Icons.verified, color: Colors.green, size: 16),
                   const SizedBox(width: 4),
-                  Row(
+                  if (_nearbyOnly) Row(
                     children: [
                       const Icon(Icons.star, color: Colors.amber, size: 16),
                       Text(' ${hospital.rating}'),
@@ -367,7 +414,7 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                         ],
                       ),
                     ),
-                  ElevatedButton.icon(
+                  if (lat != null && lng != null) ElevatedButton.icon(
                     onPressed: () => _launchGoogleMapsNavigation(lat, lng, hospital.name),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue.shade700,
@@ -761,8 +808,11 @@ class _BookingScreenState extends State<BookingScreen> {
 
     try {
       final response = await ApiService.getHospitalDoctors(widget.hospital.id);
-      if (response['success'] && response['data'] != null) {
-        _doctors = List<Map<String, dynamic>>.from(response['data']);
+      if (response['success'] == true && response['data'] is List) {
+        _doctors = (response['data'] as List)
+            .whereType<Map>()
+            .map((doctor) => Map<String, dynamic>.from(doctor))
+            .toList();
 
         // Extract unique departments
         final departments = _doctors
@@ -1122,7 +1172,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
       debugPrint('Appointment response: $response');
 
-      if (response['success'] && mounted) {
+      if (response['success'] == true && mounted) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(

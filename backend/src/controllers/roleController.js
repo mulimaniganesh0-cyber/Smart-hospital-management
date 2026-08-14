@@ -34,12 +34,14 @@ exports.createStaffUser = async (req, res) => {
 
     const hospitalAdminId = req.user.id;
 
-    // Check if user is hospital admin
+    // The account that owns a hospital is its administrator.  Older accounts
+    // may not have a separate hospital_admin role, so rely on the hospital
+    // relationship instead of a client-supplied role.
     const adminCheck = await pool.query(
-      'SELECT id, role FROM users WHERE id = $1 AND role IN ($2, $3)',
-      [hospitalAdminId, 'hospital_admin', 'super_admin']
+      `SELECT u.id, u.user_type, u.role FROM users u
+       WHERE u.id = $1 AND (u.user_type = 'hospital' OR u.role IN ('hospital_admin', 'super_admin'))`,
+      [hospitalAdminId]
     );
-
     if (adminCheck.rows.length === 0) {
       return res.status(403).json({ 
         success: false, 
@@ -64,11 +66,24 @@ exports.createStaffUser = async (req, res) => {
 
     // Check if email already exists
     const userExists = await pool.query(
-      'SELECT id FROM users WHERE email = $1',
+      'SELECT id, user_type, hospital_id FROM users WHERE email = $1',
       [email]
     );
 
     if (userExists.rows.length > 0) {
+      const existing = userExists.rows[0];
+      // Repair staff accounts created by an earlier release that did not save
+      // their hospital relationship; never reassign an already-owned account.
+      if (existing.user_type === 'staff' && existing.hospital_id == null) {
+        await pool.query('UPDATE users SET hospital_id = $1, role = $2, hospital_role = $2 WHERE id = $3', [hospitalId, role, existing.id]);
+        if (role === 'doctor') {
+          await pool.query(`INSERT INTO doctors (hospital_id, user_id, name, specialization, qualification, experience_years, phone, email, availability_status)
+            SELECT $1, $2, $3, $4, $5, $6, $7, $8, true
+            WHERE NOT EXISTS (SELECT 1 FROM doctors WHERE user_id = $2)`,
+            [hospitalId, existing.id, name, department || 'General', qualifications || '', experience_years || 0, phone, email]);
+        }
+        return res.json({ success: true, message: 'Existing staff account linked to this hospital successfully', data: { id: existing.id } });
+      }
       return res.status(400).json({ 
         success: false, 
         message: 'Email already exists' 
@@ -82,10 +97,10 @@ exports.createStaffUser = async (req, res) => {
 
     // Create user
     const userResult = await pool.query(
-      `INSERT INTO users (name, email, phone, password_hash, user_type, role, hospital_role, permissions)
-       VALUES ($1, $2, $3, $4, 'staff', $5, $6, $7)
+      `INSERT INTO users (name, email, phone, password_hash, user_type, role, hospital_role, permissions, hospital_id)
+       VALUES ($1, $2, $3, $4, 'staff', $5, $6, $7, $8)
        RETURNING id, name, email, phone, role, hospital_role`,
-      [name, email, phone, password_hash, role, role, permissions || []]
+      [name, email, phone, password_hash, role, role, permissions || [], hospitalId]
     );
 
     const user = userResult.rows[0];
@@ -93,7 +108,7 @@ exports.createStaffUser = async (req, res) => {
     // Create doctor record if role is doctor
     if (role === 'doctor') {
       await pool.query(
-        `INSERT INTO doctors (hospital_id, user_id, name, specialization, qualification, experience_years, phone, email, is_active)
+        `INSERT INTO doctors (hospital_id, user_id, name, specialization, qualification, experience_years, phone, email, availability_status)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true)`,
         [hospitalId, user.id, name, department || 'General', qualifications, experience_years || 0, phone, email]
       );
@@ -147,11 +162,7 @@ exports.getHospitalStaff = async (req, res) => {
               d.experience_years, d.availability_status
        FROM users u
        LEFT JOIN doctors d ON u.id = d.user_id AND d.hospital_id = $1
-       WHERE u.user_type = 'staff' AND u.id IN (
-         SELECT user_id FROM doctors WHERE hospital_id = $1
-         UNION
-         SELECT user_id FROM users WHERE role IN ('hospital_admin', 'super_admin')
-       )
+       WHERE u.user_type = 'staff' AND u.hospital_id = $1
        ORDER BY u.created_at DESC`,
       [hospitalId]
     );
@@ -177,14 +188,13 @@ exports.updateStaffRole = async (req, res) => {
     const { role, permissions } = req.body;
     const adminId = req.user.id;
 
-    // Check if admin has permission
     const adminCheck = await pool.query(
-      'SELECT role FROM users WHERE id = $1',
+      `SELECT u.role, u.user_type FROM users u WHERE u.id = $1
+       AND (u.user_type = 'hospital' OR u.role IN ('hospital_admin', 'super_admin'))`,
       [adminId]
     );
 
-    if (adminCheck.rows.length === 0 || 
-        !['hospital_admin', 'super_admin'].includes(adminCheck.rows[0].role)) {
+    if (adminCheck.rows.length === 0) {
       return res.status(403).json({ 
         success: false, 
         message: 'Unauthorized to update staff roles' 
@@ -195,9 +205,9 @@ exports.updateStaffRole = async (req, res) => {
       `UPDATE users 
        SET role = $1, hospital_role = $1, permissions = $2,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3 AND user_type = 'staff'
+       WHERE id = $3 AND user_type = 'staff' AND hospital_id = (SELECT id FROM hospitals WHERE user_id = $4)
        RETURNING id, name, email, role, permissions`,
-      [role, permissions || [], staffId]
+      [role, permissions || [], staffId, adminId]
     );
 
     if (result.rows.length === 0) {
@@ -229,12 +239,12 @@ exports.deleteStaffUser = async (req, res) => {
     const adminId = req.user.id;
 
     const adminCheck = await pool.query(
-      'SELECT role FROM users WHERE id = $1',
+      `SELECT u.role, u.user_type FROM users u WHERE u.id = $1
+       AND (u.user_type = 'hospital' OR u.role IN ('hospital_admin', 'super_admin'))`,
       [adminId]
     );
 
-    if (adminCheck.rows.length === 0 || 
-        !['hospital_admin', 'super_admin'].includes(adminCheck.rows[0].role)) {
+    if (adminCheck.rows.length === 0) {
       return res.status(403).json({ 
         success: false, 
         message: 'Unauthorized to delete staff users' 
@@ -250,8 +260,8 @@ exports.deleteStaffUser = async (req, res) => {
     }
 
     const result = await pool.query(
-      'DELETE FROM users WHERE id = $1 AND user_type = $2 RETURNING id',
-      [staffId, 'staff']
+      'DELETE FROM users WHERE id = $1 AND user_type = $2 AND hospital_id = (SELECT id FROM hospitals WHERE user_id = $3) RETURNING id',
+      [staffId, 'staff', adminId]
     );
 
     if (result.rows.length === 0) {
