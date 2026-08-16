@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/patient_provider.dart';
+import '../../services/api_service.dart';
 import 'patient_nearby_hospitals.dart';
 
 class PatientBookings extends StatelessWidget {
@@ -117,53 +118,29 @@ class PatientBookings extends StatelessWidget {
     );
   }
 
-  void _showRescheduleDialog(BuildContext context, Map<String, dynamic> booking) {
-    final newDate = TextEditingController(text: booking['appointment_date']);
-    final newTime = TextEditingController(text: booking['appointment_time']);
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Reschedule Appointment'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: newDate,
-              decoration: const InputDecoration(
-                labelText: 'New Date',
-                prefixIcon: Icon(Icons.calendar_today),
-                hintText: 'YYYY-MM-DD',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: newTime,
-              decoration: const InputDecoration(
-                labelText: 'New Time',
-                prefixIcon: Icon(Icons.access_time),
-                hintText: 'HH:MM AM/PM',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Reschedule request submitted')),
-              );
-            },
-            child: const Text('Submit'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _showRescheduleDialog(BuildContext context, Map<String, dynamic> booking) async {
+    final rawId = booking['id'];
+    final appointmentId = rawId is num ? rawId.toInt() : int.tryParse('$rawId');
+    if (appointmentId == null) return;
+    final initial = DateTime.tryParse('${booking['appointment_date']}') ?? DateTime.now().add(const Duration(days: 1));
+    final date = await showDatePicker(context: context, initialDate: initial.isAfter(DateTime.now()) ? initial : DateTime.now().add(const Duration(days: 1)), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
+    if (date == null || !context.mounted) return;
+    final formatted = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final slotResult = await ApiService.getAppointmentSlots(appointmentId, formatted);
+    if (!context.mounted) return;
+    final slots = slotResult['success'] == true ? List<Map<String, dynamic>>.from(slotResult['data'] ?? []) : <Map<String, dynamic>>[];
+    if (slots.isEmpty) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(slotResult['message'] ?? 'No available slots on this date'))); return; }
+    final selected = await showModalBottomSheet<String>(context: context, builder: (sheetContext) => SafeArea(child: ListView(
+      shrinkWrap: true,
+      children: [const ListTile(title: Text('Select an available time')), ...slots.map((slot) => ListTile(title: Text('${slot['time']}'), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.pop(sheetContext, '${slot['time']}')))],
+    )));
+    if (selected == null || !context.mounted) return;
+    final result = await ApiService.rescheduleAppointment(appointmentId, formatted, selected);
+    if (!context.mounted) return;
+    if (result['success'] == true) {
+      await Provider.of<PatientProvider>(context, listen: false).loadPatientData();
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Appointment rescheduled')));
+    } else { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['message'] ?? 'Unable to reschedule appointment'))); }
   }
 }
 

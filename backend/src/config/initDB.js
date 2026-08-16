@@ -36,6 +36,13 @@ const createTables = async () => {
       verification_status VARCHAR(50) DEFAULT 'pending',
       rating DECIMAL(3, 2) DEFAULT 0,
       total_reviews INTEGER DEFAULT 0,
+      google_rating DECIMAL(2, 1),
+      google_review_count INTEGER,
+      google_place_id TEXT,
+      google_maps_url TEXT,
+      rating_source VARCHAR(50),
+      rating_verified BOOLEAN DEFAULT FALSE,
+      rating_last_updated TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
@@ -98,6 +105,33 @@ const createTables = async () => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
+
+    // A configured slot is the source of truth for booking and rescheduling.
+    // Hospitals can populate these from their scheduling dashboard; patients
+    // never receive a fabricated list of availability.
+    `CREATE TABLE IF NOT EXISTS doctor_available_slots (
+      id SERIAL PRIMARY KEY,
+      doctor_id INTEGER NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+      slot_date DATE NOT NULL,
+      slot_time TIME NOT NULL,
+      is_available BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(doctor_id, slot_date, slot_time)
+    )`,
+    `CREATE TABLE IF NOT EXISTS appointment_reschedule_history (
+      id SERIAL PRIMARY KEY,
+      appointment_id INTEGER NOT NULL REFERENCES appointments(id) ON DELETE CASCADE,
+      previous_date DATE NOT NULL,
+      previous_time TIME NOT NULL,
+      new_date DATE NOT NULL,
+      new_time TIME NOT NULL,
+      changed_by_user_id INTEGER REFERENCES users(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_active_doctor_appointment_slot
+      ON appointments(doctor_id, appointment_date, appointment_time)
+      WHERE status NOT IN ('cancelled', 'rejected', 'completed')`,
 
     // Emergency Requests table
     `CREATE TABLE IF NOT EXISTS emergency_requests (

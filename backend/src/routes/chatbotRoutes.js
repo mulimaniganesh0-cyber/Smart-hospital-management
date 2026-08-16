@@ -6,5 +6,6 @@ const { protect } = require('../middleware/auth');
 
 // Chatbot query endpoint (authenticated)
 router.post('/query', protect, chatbotController.queryChatbot);
+router.get('/hospitals/search', protect, chatbotController.searchHospitals);
 
 module.exports = router;

@@ -224,7 +224,7 @@ exports.getNearbyHospitals = async (req, res) => {
         orderByClause = 'waiting_time ASC, distance ASC';
         break;
       case 'rating':
-        orderByClause = 'rating DESC, distance ASC';
+        orderByClause = 'h.google_rating DESC NULLS LAST, distance ASC';
         break;
       default:
         orderByClause = 'distance ASC';
@@ -238,7 +238,10 @@ exports.getNearbyHospitals = async (req, res) => {
         h.city,
         h.phone,
         h.email,
-        COALESCE(h.rating, 4.5) as rating,
+        h.google_rating, h.google_review_count, h.google_place_id, h.google_maps_url,
+        h.rating_source, h.rating_verified, h.rating_last_updated,
+        (SELECT ROUND(AVG(r.rating)::numeric, 1) FROM hospital_reviews r WHERE r.hospital_id=h.id AND r.is_visible=true) patient_rating,
+        (SELECT COUNT(*) FROM hospital_reviews r WHERE r.hospital_id=h.id AND r.is_visible=true) patient_review_count,
         h.is_verified, h.specialties, h.emergency_available,
         h.latitude, h.longitude,
         COALESCE(hr.general_beds_total, 0) as total_beds,
@@ -285,7 +288,15 @@ exports.getNearbyHospitals = async (req, res) => {
         city: hospital.city,
         phone: hospital.phone,
         email: hospital.email,
-        rating: parseFloat(hospital.rating) || 4.5,
+        google_rating: hospital.rating_verified ? Number(hospital.google_rating) : null,
+        google_review_count: hospital.rating_verified ? Number(hospital.google_review_count) : null,
+        google_place_id: hospital.rating_verified ? hospital.google_place_id : null,
+        google_maps_url: hospital.rating_verified ? hospital.google_maps_url : null,
+        rating_source: hospital.rating_verified ? hospital.rating_source : null,
+        rating_verified: hospital.rating_verified === true,
+        rating_last_updated: hospital.rating_verified ? hospital.rating_last_updated : null,
+        patient_rating: hospital.patient_rating == null ? null : Number(hospital.patient_rating),
+        patient_review_count: Number(hospital.patient_review_count || 0),
         is_verified: hospital.is_verified,
         latitude: parseFloat(hospital.latitude),
         longitude: parseFloat(hospital.longitude),
@@ -341,7 +352,10 @@ exports.getAllHospitals = async (req, res) => {
         h.longitude,
         h.phone,
         h.email,
-        h.rating,
+        h.google_rating, h.google_review_count, h.google_place_id, h.google_maps_url,
+        h.rating_source, h.rating_verified, h.rating_last_updated,
+        (SELECT ROUND(AVG(r.rating)::numeric, 1) FROM hospital_reviews r WHERE r.hospital_id=h.id AND r.is_visible=true) patient_rating,
+        (SELECT COUNT(*) FROM hospital_reviews r WHERE r.hospital_id=h.id AND r.is_visible=true) patient_review_count,
         h.is_verified, h.specialties, h.emergency_available as emergency_services, h.services,
         COALESCE(hr.general_beds_total, 0) as total_beds,
         COALESCE(hr.general_beds_available, 0) as available_beds,
@@ -889,7 +903,10 @@ exports.getHospitalDetails = async (req, res) => {
     }
     const result = await pool.query(`
       SELECT h.id, h.name, h.address, h.city, h.state, h.pincode, h.phone, h.email,
-             h.latitude, h.longitude, h.rating, h.is_verified, h.specialties, h.services, h.emergency_available,
+             h.latitude, h.longitude, h.google_rating, h.google_review_count, h.google_place_id, h.google_maps_url,
+             h.rating_source, h.rating_verified, h.rating_last_updated, h.is_verified, h.specialties, h.services, h.emergency_available,
+             (SELECT ROUND(AVG(r.rating)::numeric, 1) FROM hospital_reviews r WHERE r.hospital_id=h.id AND r.is_visible=true) patient_rating,
+             (SELECT COUNT(*) FROM hospital_reviews r WHERE r.hospital_id=h.id AND r.is_visible=true) patient_review_count,
              COALESCE(hr.general_beds_total, 0) total_beds,
              COALESCE(hr.general_beds_available, 0) available_beds,
              COALESCE(hr.icu_beds_total, 0) icu_beds,

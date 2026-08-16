@@ -6,7 +6,12 @@ class Hospital {
   final String city;
   final String phone;
   final String email;
-  final double rating;
+  final double? googleRating;
+  final int? googleReviewCount;
+  final String? googlePlaceId;
+  final String? googleMapsUrl;
+  final bool ratingVerified;
+  final String? ratingLastUpdated;
   final bool isVerified;
   
   // Resource fields
@@ -32,7 +37,12 @@ class Hospital {
     required this.city,
     required this.phone,
     required this.email,
-    required this.rating,
+    this.googleRating,
+    this.googleReviewCount,
+    this.googlePlaceId,
+    this.googleMapsUrl,
+    this.ratingVerified = false,
+    this.ratingLastUpdated,
     required this.isVerified,
     required this.totalBeds,
     required this.availableBeds,
@@ -84,7 +94,12 @@ class Hospital {
     city: json['city']?.toString() ?? '',
     phone: json['phone']?.toString() ?? '',
     email: json['email']?.toString() ?? '',
-    rating: parseDouble(json['rating']),
+    googleRating: json['rating_verified'] == true ? parseDouble(json['google_rating']) : null,
+    googleReviewCount: json['rating_verified'] == true ? parseInt(json['google_review_count']) : null,
+    googlePlaceId: json['rating_verified'] == true ? json['google_place_id']?.toString() : null,
+    googleMapsUrl: json['rating_verified'] == true ? json['google_maps_url']?.toString() : null,
+    ratingVerified: json['rating_verified'] == true,
+    ratingLastUpdated: json['rating_verified'] == true ? json['rating_last_updated']?.toString() : null,
     isVerified: json['is_verified'] == true,
     totalBeds: parseInt(json['total_beds']),
     availableBeds: parseInt(json['available_beds']),
@@ -110,7 +125,12 @@ class Hospital {
       'city': city,
       'phone': phone,
       'email': email,
-      'rating': rating,
+      'google_rating': googleRating,
+      'google_review_count': googleReviewCount,
+      'google_place_id': googlePlaceId,
+      'google_maps_url': googleMapsUrl,
+      'rating_verified': ratingVerified,
+      'rating_last_updated': ratingLastUpdated,
       'is_verified': isVerified,
       'total_beds': totalBeds,
       'available_beds': availableBeds,

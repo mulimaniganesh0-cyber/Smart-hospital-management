@@ -699,6 +699,16 @@ class ApiService {
     }
   }
 
+  static Future<Map<String, dynamic>> getAppointmentSlots(int appointmentId, String date) async {
+    try { final response = await http.get(Uri.parse('$baseUrl/appointments/$appointmentId/available-slots?date=$date'), headers: await _getHeaders()); return json.decode(response.body); }
+    catch (e) { return {'success': false, 'message': 'Network error: $e'}; }
+  }
+
+  static Future<Map<String, dynamic>> rescheduleAppointment(int appointmentId, String date, String time) async {
+    try { final response = await http.put(Uri.parse('$baseUrl/appointments/$appointmentId/reschedule'), headers: await _getHeaders(), body: json.encode({'date': date, 'time': time})); return json.decode(response.body); }
+    catch (e) { return {'success': false, 'message': 'Network error: $e'}; }
+  }
+
   static Future<Map<String, dynamic>> getSpecialties() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/specialties'));

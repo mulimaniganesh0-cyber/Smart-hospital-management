@@ -10,7 +10,11 @@
     "create-db": "node create-db.js",
     "seed:hospitals": "node src/scripts/seedTestHospitals.js",
     "seed:specialties": "node src/scripts/seedTestHospitals.js",
-    "seed:test-data": "node src/scripts/seedTestHospitals.js"
+    "seed:test-data": "node src/scripts/seedTestHospitals.js",
+    "migrate:appointment-scheduling": "node src/scripts/migrateAppointmentScheduling.js",
+    "migrate:google-places-ratings": "node src/scripts/migrateGooglePlacesRatings.js",
+    "seed:google-rating-references": "node src/scripts/seedGoogleRatingReferences.js",
+    "migrate:patient-reviews": "node src/scripts/migratePatientReviews.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

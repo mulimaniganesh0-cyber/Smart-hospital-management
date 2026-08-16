@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/chat_model.dart';
 import '../../services/chatbot_service.dart';
 import '../../services/location_service.dart';
+import 'patient_emergency_request.dart';
+import 'patient_nearby_hospitals.dart';
+import 'patient_bookings.dart';
+import 'health_record_screen.dart';
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
@@ -37,13 +42,14 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     super.initState();
     _messages.add(
       ChatMessage(
-        text: 'Hello! Iâ€™m CareGuide, your hospital resource assistant. '
+        text: 'Hello! I am CareGuide, your hospital resource assistant. '
             'I can help you find nearby care, understand services, and '
             'navigate urgent requests.',
         isUser: false,
       ),
     );
-    _loadLocation();
+    // Ask only when the user requests nearby care or taps the location banner.
+    // This keeps location permission purposeful and avoids assuming a location.
   }
 
   @override
@@ -73,8 +79,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     try {
       final response = await _assistant.sendMessage(
         message: text,
-        latitude: _position?.latitude ?? 0,
-        longitude: _position?.longitude ?? 0,
+        latitude: _position?.latitude,
+        longitude: _position?.longitude,
         language: LocationService.getLanguageCode(_language),
       );
       if (!context.mounted) return;
@@ -197,9 +203,13 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                     onRecommendationTap:
                         _messages[index].hospitalRecommendation == null
                             ? null
-                            : () => _showRecommendation(
-                                  _messages[index].hospitalRecommendation!,
-                                ),
+                            : () => _showRecommendation(_messages[index].hospitalRecommendation!),
+                    onHospitalTap: (hospital) => _showRecommendation(hospital),
+                    onLocation: _messages[index].requiresLocation
+                        ? () => _retryWithLocation(_messages[index])
+                        : null,
+                    onSos: _messages[index].showSos ? _openSos : null,
+                    onAction: _handleAction,
                   );
                 },
               ),
@@ -225,8 +235,63 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (context) => _HospitalSheet(hospital: hospital),
+      builder: (context) => _HospitalSheet(
+          hospital: hospital,
+          onDirections: () => _openDirections(hospital),
+          onCall: () => _callHospital(hospital),
+          onBook: _openDirectory),
     );
+  }
+
+  Future<void> _retryWithLocation(ChatMessage message) async {
+    await _loadLocation();
+    if (!mounted) return;
+    if (_position == null) {
+      setState(() => _messages.add(ChatMessage(
+            text:
+                'I can’t access your current location right now. You can enable location permission, search by city or area, or open the hospital directory.',
+            isUser: false,
+          )));
+      _scrollToBottom();
+      return;
+    }
+    _send(_messages.length > 1
+        ? _messages[_messages.length - 2].text
+        : 'Find a hospital near me');
+  }
+
+  Future<void> _openDirections(HospitalRecommendation hospital) async {
+    if (hospital.latitude == 0 && hospital.longitude == 0) return;
+    await launchUrl(
+        Uri.parse(
+            'https://www.google.com/maps/dir/?api=1&destination=${hospital.latitude},${hospital.longitude}'),
+        mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _callHospital(HospitalRecommendation hospital) async {
+    if (hospital.phone.isEmpty) return;
+    await launchUrl(Uri(scheme: 'tel', path: hospital.phone));
+  }
+
+  void _openDirectory() => Navigator.of(context)
+      .push(MaterialPageRoute(builder: (_) => const PatientNearbyHospitals()));
+  void _openSos() => Navigator.of(context)
+      .push(MaterialPageRoute(builder: (_) => const PatientEmergencyRequest()));
+
+  void _handleAction(CareGuideAction action) {
+    switch (action.type) {
+      case 'EMERGENCY_SOS':
+        _openSos();
+      case 'BOOK_APPOINTMENT':
+      case 'VIEW_HOSPITALS':
+        _openDirectory();
+      case 'VIEW_APPOINTMENTS':
+        Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const PatientBookings()));
+      case 'VIEW_HEALTH_RECORD':
+        Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const HealthRecordScreen()));
+    }
   }
 }
 
@@ -274,10 +339,20 @@ class _LocationBanner extends StatelessWidget {
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message, this.onRecommendationTap});
+  const _MessageBubble(
+      {required this.message,
+      this.onRecommendationTap,
+      required this.onHospitalTap,
+      this.onLocation,
+      this.onSos,
+      required this.onAction});
 
   final ChatMessage message;
   final VoidCallback? onRecommendationTap;
+  final ValueChanged<HospitalRecommendation> onHospitalTap;
+  final VoidCallback? onLocation;
+  final VoidCallback? onSos;
+  final ValueChanged<CareGuideAction> onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -327,13 +402,51 @@ class _MessageBubble extends StatelessWidget {
                             color:
                                 isUser ? Colors.white : const Color(0xFF1F2937),
                             height: 1.4)),
-                    if (onRecommendationTap != null) ...[
+                    if (onRecommendationTap != null && message.hospitals.length == 1) ...[
                       const SizedBox(height: 10),
                       OutlinedButton.icon(
                         onPressed: onRecommendationTap,
                         icon:
                             const Icon(Icons.local_hospital_outlined, size: 17),
                         label: const Text('View hospital details'),
+                      ),
+                    ],
+                    if (onLocation != null) ...[
+                      const SizedBox(height: 8),
+                      FilledButton.icon(
+                          onPressed: onLocation,
+                          icon: const Icon(Icons.my_location),
+                          label: const Text('Use my location')),
+                    ],
+                    if (onSos != null) ...[
+                      const SizedBox(height: 8),
+                      FilledButton.icon(
+                          onPressed: onSos,
+                          style: FilledButton.styleFrom(
+                              backgroundColor: Colors.red),
+                          icon: const Icon(Icons.sos),
+                          label: const Text('Emergency SOS')),
+                    ],
+                    if (message.hospitals.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      ...message.hospitals.map((hospital) => _ChatHospitalCard(
+                        hospital: hospital,
+                        onDetails: () => onHospitalTap(hospital),
+                        onBook: () => onAction(const CareGuideAction(type: 'BOOK_APPOINTMENT', label: 'Book Appointment')),
+                      )),
+                    ],
+                    if (message.actions.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: message.actions
+                            .where((action) => action.type != 'EMERGENCY_SOS')
+                            .map((action) => OutlinedButton(
+                                  onPressed: () => onAction(action),
+                                  child: Text(action.label),
+                                ))
+                            .toList(),
                       ),
                     ],
                     const SizedBox(height: 4),
@@ -352,6 +465,29 @@ class _MessageBubble extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ChatHospitalCard extends StatelessWidget {
+  const _ChatHospitalCard({required this.hospital, required this.onDetails, required this.onBook});
+  final HospitalRecommendation hospital;
+  final VoidCallback onDetails;
+  final VoidCallback onBook;
+  @override
+  Widget build(BuildContext context) => Card(
+    margin: const EdgeInsets.only(top: 8),
+    child: Padding(padding: const EdgeInsets.all(10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(hospital.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+      Text(hospital.distance > 0 ? '${hospital.distance.toStringAsFixed(1)} km away' : hospital.address, style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
+      if (hospital.ratingVerified && hospital.googleRating != null)
+        Text('Google ${hospital.googleRating!.toStringAsFixed(1)}${hospital.googleReviewCount == null ? '' : ' (${hospital.googleReviewCount} reviews)'}', style: const TextStyle(fontSize: 12)),
+      ...hospital.doctors.map((doctor) => Padding(
+        padding: const EdgeInsets.only(top: 7),
+        child: Text('${doctor.name}\n${doctor.specialization} · ${doctor.experienceYears} years${doctor.consultationFee == null ? '' : ' · ₹${doctor.consultationFee!.toStringAsFixed(0)}'}\nAvailable appointments: ${doctor.availableSlots}', style: const TextStyle(fontSize: 12)),
+      )),
+      const SizedBox(height: 6),
+      Wrap(spacing: 8, children: [OutlinedButton(onPressed: onDetails, child: const Text('View Hospital')), FilledButton(onPressed: onBook, child: const Text('Book Appointment'))]),
+    ])),
+  );
 }
 
 class _TypingIndicator extends StatelessWidget {
@@ -438,8 +574,15 @@ class _Composer extends StatelessWidget {
 }
 
 class _HospitalSheet extends StatelessWidget {
-  const _HospitalSheet({required this.hospital});
+  const _HospitalSheet(
+      {required this.hospital,
+      required this.onDirections,
+      required this.onCall,
+      required this.onBook});
   final HospitalRecommendation hospital;
+  final VoidCallback onDirections;
+  final VoidCallback onCall;
+  final VoidCallback onBook;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -482,6 +625,21 @@ class _HospitalSheet extends StatelessWidget {
             Text(
                 '${hospital.distance.toStringAsFixed(1)} km away Â· ${hospital.phone}',
                 style: const TextStyle(color: Colors.blueGrey)),
+            const SizedBox(height: 16),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              OutlinedButton.icon(
+                  onPressed: onDirections,
+                  icon: const Icon(Icons.directions),
+                  label: const Text('Directions')),
+              OutlinedButton.icon(
+                  onPressed: onCall,
+                  icon: const Icon(Icons.call),
+                  label: const Text('Call hospital')),
+              FilledButton.icon(
+                  onPressed: onBook,
+                  icon: const Icon(Icons.calendar_month),
+                  label: const Text('Book appointment')),
+            ]),
           ],
         ),
       );

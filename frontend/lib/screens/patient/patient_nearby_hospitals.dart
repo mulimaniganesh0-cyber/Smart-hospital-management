@@ -339,10 +339,10 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                   if (hospital.isVerified)
                     const Icon(Icons.verified, color: Colors.green, size: 16),
                   const SizedBox(width: 4),
-                  if (_nearbyOnly) Row(
+                  if (hospital.ratingVerified && hospital.googleRating != null) Row(
                     children: [
                       const Icon(Icons.star, color: Colors.amber, size: 16),
-                      Text(' ${hospital.rating}'),
+                      Text(' ${hospital.googleRating!.toStringAsFixed(1)}${hospital.googleReviewCount == null ? '' : ' (${hospital.googleReviewCount})'}'),
                     ],
                   ),
                 ],
@@ -578,6 +578,19 @@ class HospitalDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
+
+            if (hospital.ratingVerified && hospital.googleRating != null) ...[
+              const Text('Google rating', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Row(children: [
+                const Icon(Icons.star, color: Colors.amber),
+                const SizedBox(width: 6),
+                Text('${hospital.googleRating!.toStringAsFixed(1)} on Google${hospital.googleReviewCount == null ? '' : ' · ${hospital.googleReviewCount} reviews'}'),
+              ]),
+              const SizedBox(height: 4),
+              const Text('Google rating shown for reference. Ratings may change on Google Maps.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+              const SizedBox(height: 20),
+            ],
             
             // Resources Section
             Text(
@@ -649,12 +662,7 @@ class HospitalDetailScreen extends StatelessWidget {
                         backgroundColor: const Color(0xFF0A4D68).withValues(alpha: 0.1),
                       );
                     }).toList()
-                  : [
-                      Chip(
-                        label: const Text('General Medicine'),
-                        backgroundColor: Colors.grey.shade200,
-                      ),
-                    ],
+                  : [const Text('Not available')],
             ),
             const SizedBox(height: 20),
             

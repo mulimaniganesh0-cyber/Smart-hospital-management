@@ -38,11 +38,11 @@ class HospitalCard extends StatelessWidget {
                   if (hospital.isVerified)
                     const Icon(Icons.verified, color: Colors.green, size: 16),
                   const SizedBox(width: 4),
-                  Text(
-                    hospital.rating.toString(),
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                  const Icon(Icons.star, color: Colors.amber, size: 16),
+                  if (hospital.ratingVerified && hospital.googleRating != null) ...[
+                    Text(hospital.googleRating!.toStringAsFixed(1), style: const TextStyle(fontWeight: FontWeight.w500)),
+                    const Icon(Icons.star, color: Colors.amber, size: 16),
+                    if (hospital.googleReviewCount != null) Text(' (${hospital.googleReviewCount})', style: const TextStyle(fontSize: 11)),
+                  ],
                 ],
               ),
               const SizedBox(height: 4),

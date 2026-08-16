@@ -21,6 +21,8 @@ const roleRoutes = require('./routes/roleRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
 const medicalRoutes = require('./routes/medicalRoutes');
 const specialtyRoutes = require('./routes/specialtyRoutes');
+const doctorRoutes = require('./routes/doctorRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
 
 const app = express();
 
@@ -121,7 +123,12 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/campaigns', donationCampaignRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/chatbot', chatbotRoutes);
+// CareGuide's explicit integration namespace. Kept alongside /api/chatbot so
+// deployed mobile clients using the original endpoint continue to work.
+app.use('/api/careguide', chatbotRoutes);
 app.use('/api/medical', medicalRoutes);
+app.use('/api/doctors', doctorRoutes);
+app.use('/api', reviewRoutes);
 // Backward-compatible public API paths. Their handlers still require authentication.
 app.use('/api', medicalRoutes);
 
