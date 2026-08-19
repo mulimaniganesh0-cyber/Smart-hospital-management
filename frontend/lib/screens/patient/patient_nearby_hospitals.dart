@@ -116,14 +116,38 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
     }
   }
 
-  void _launchGoogleMapsNavigation(double lat, double lng, String name) async {
-    final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&destination_place_id=$name');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      final fallbackUri = Uri.parse('https://maps.google.com/?q=$lat,$lng');
-      await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
+  Future<void> _launchGoogleMapsNavigation(double lat, double lng, String name) async {
+    try {
+      // Navigation must always use a fresh GPS fix, never the location fetched
+      // when this screen opened or an origin inferred by Google Maps.
+      final patientPosition = await LocationService.getFreshPatientLocation();
+      if (!mounted) return;
+      setState(() {
+        _userLat = patientPosition.latitude;
+        _userLng = patientPosition.longitude;
+      });
+      debugPrint('PATIENT LIVE LOCATION latitude: ${patientPosition.latitude}, longitude: ${patientPosition.longitude}, accuracy: ${patientPosition.accuracy}, timestamp: ${patientPosition.timestamp}');
+      debugPrint('HOSPITAL DESTINATION hospital: $name, latitude: $lat, longitude: $lng');
+      debugPrint('NAVIGATION origin: ${patientPosition.latitude},${patientPosition.longitude}; destination: $lat,$lng');
+
+      final uri = Uri.https('www.google.com', '/maps/dir/', {
+        'api': '1',
+        'origin': '${patientPosition.latitude},${patientPosition.longitude}',
+        'destination': '$lat,$lng',
+        'travelmode': 'driving',
+      });
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
+        _showLocationMessage('Unable to open Google Maps.');
+      }
+    } on PatientLocationException catch (error) {
+      if (mounted) _showLocationMessage(error.message);
+    } catch (_) {
+      if (mounted) _showLocationMessage('Unable to get your current location. Please enable GPS/location permission and try again.');
     }
+  }
+
+  void _showLocationMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -147,6 +171,14 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
             color: Colors.blue.shade50,
             child: Column(
               children: [
+                if (_userLat != null && _userLng != null)
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
+                    child: Text('📍 Your current location\n${_userLat!.toStringAsFixed(6)}, ${_userLng!.toStringAsFixed(6)} • Location updated just now', style: const TextStyle(fontSize: 12)),
+                  ),
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Nearby hospitals only'),

@@ -4,11 +4,11 @@ const { respond, searchHospitals } = require('../services/careGuideService');
 // before the conversational response is assembled.
 exports.queryChatbot = async (req, res) => {
   try {
-    const { message, latitude, longitude, context } = req.body;
+    const { message, latitude, longitude, context, history } = req.body;
     if (!String(message || '').trim()) {
       return res.status(400).json({ success: false, message: 'Message is required' });
     }
-    const data = await respond({ message, latitude, longitude, userId: req.user?.id, context });
+    const data = await respond({ message, latitude, longitude, userId: req.user?.id, context, history });
     res.json({ success: true, data });
   } catch (error) {
     console.error('CareGuide query error:', error);

@@ -77,10 +77,26 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _scrollToBottom();
 
     try {
+      // CareGuide must not reuse a previous patient's or an old session's
+      // location for nearby/emergency requests.
+      Position? requestPosition = _position;
+      final needsLiveLocation = RegExp(
+        r'nearby|near me|closest|nearest|emergency|ambulance|sos',
+        caseSensitive: false,
+      ).hasMatch(text);
+      if (needsLiveLocation) {
+        try {
+          requestPosition = await LocationService.getFreshPatientLocation();
+          if (mounted) setState(() => _position = requestPosition);
+        } on PatientLocationException {
+          requestPosition = null;
+          if (mounted) setState(() => _position = null);
+        }
+      }
       final response = await _assistant.sendMessage(
         message: text,
-        latitude: _position?.latitude,
-        longitude: _position?.longitude,
+        latitude: requestPosition?.latitude,
+        longitude: requestPosition?.longitude,
         language: LocationService.getLanguageCode(_language),
       );
       if (!context.mounted) return;
@@ -262,10 +278,24 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   Future<void> _openDirections(HospitalRecommendation hospital) async {
     if (hospital.latitude == 0 && hospital.longitude == 0) return;
-    await launchUrl(
-        Uri.parse(
-            'https://www.google.com/maps/dir/?api=1&destination=${hospital.latitude},${hospital.longitude}'),
-        mode: LaunchMode.externalApplication);
+    try {
+      final position = await LocationService.getFreshPatientLocation();
+      if (!mounted) return;
+      setState(() => _position = position);
+      debugPrint('PATIENT LIVE LOCATION latitude: ${position.latitude}, longitude: ${position.longitude}, accuracy: ${position.accuracy}, timestamp: ${position.timestamp}');
+      debugPrint('HOSPITAL DESTINATION hospital: ${hospital.name}, latitude: ${hospital.latitude}, longitude: ${hospital.longitude}');
+      final uri = Uri.https('www.google.com', '/maps/dir/', {
+        'api': '1',
+        'origin': '${position.latitude},${position.longitude}',
+        'destination': '${hospital.latitude},${hospital.longitude}',
+        'travelmode': 'driving',
+      });
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unable to open Google Maps.')));
+      }
+    } on PatientLocationException catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    }
   }
 
   Future<void> _callHospital(HospitalRecommendation hospital) async {
