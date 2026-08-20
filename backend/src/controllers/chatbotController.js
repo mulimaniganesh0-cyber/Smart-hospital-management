@@ -1,17 +1,21 @@
 const { respond, searchHospitals } = require('../services/careGuideService');
+const { AiServiceError } = require('../services/aiService');
 
 // CareGuide is tool-first: hospital facts come from live PostgreSQL records
 // before the conversational response is assembled.
 exports.queryChatbot = async (req, res) => {
   try {
-    const { message, latitude, longitude, context, history } = req.body;
+    const { message, latitude, longitude, context, history, conversationHistory } = req.body;
     if (!String(message || '').trim()) {
       return res.status(400).json({ success: false, message: 'Message is required' });
     }
-    const data = await respond({ message, latitude, longitude, userId: req.user?.id, context, history });
+    const data = await respond({ message, latitude, longitude, userId: req.user?.id, context, history: conversationHistory || history });
     res.json({ success: true, data });
   } catch (error) {
     console.error('CareGuide query error:', error);
+    if (error instanceof AiServiceError || error?.code === 'AI_SERVICE_UNAVAILABLE') {
+      return res.status(503).json({ success: false, error: 'AI_SERVICE_UNAVAILABLE', message: 'The AI assistant is temporarily unavailable. Please try again.' });
+    }
     res.status(500).json({ success: false, message: 'CareGuide could not complete that request right now.' });
   }
 };

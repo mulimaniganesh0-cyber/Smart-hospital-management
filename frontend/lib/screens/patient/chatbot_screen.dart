@@ -104,12 +104,15 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         _messages.add(response);
         _isLoading = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (!context.mounted) return;
+      final text = error.toString().contains('AI assistant is temporarily unavailable')
+          ? 'The AI assistant is temporarily unavailable. Please try again.'
+          : 'I could not complete that request. Please try again.';
       setState(() {
         _messages.add(
           ChatMessage(
-            text: 'I could not complete that request. Please try again.',
+            text: text,
             isUser: false,
           ),
         );

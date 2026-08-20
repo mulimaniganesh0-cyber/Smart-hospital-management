@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { generateCareGuideReply } = require('./aiService');
 
 // Structured clinical guidance. These profiles provide safe triage and
 // education; they are intentionally not a diagnostic engine.
@@ -7,6 +8,7 @@ const SYMPTOM_PROFILES = [
   { system: 'respiratory', specialty: 'Pulmonology', terms: ['cough', 'cold', 'wheezing', 'shortness of breath', 'breathless', 'sore throat', 'chest congestion', 'asthma', 'phlegm', 'sputum'], possible: ['a viral respiratory infection', 'allergy or asthma-related irritation', 'another chest infection'], questions: ['How long has this been happening?', 'Do you have fever, wheezing, chest pain, or phlegm/blood?', 'Are you having trouble breathing at rest?'], care: 'Rest, drink fluids, and avoid smoke or other triggers.' },
   { system: 'neurological', specialty: 'Neurology', terms: ['headache', 'migraine', 'dizzy', 'dizziness', 'vertigo', 'numbness', 'tingling', 'weakness', 'seizure', 'confusion', 'speech difficulty', 'tremor'], possible: ['a migraine or tension headache', 'inner-ear or hydration-related dizziness', 'a neurological condition that needs assessment'], questions: ['When did this start, and was it sudden?', 'Any one-sided weakness, numbness, trouble speaking, fainting, or vision change?', 'Is this the worst or a different headache for you?'], care: 'Rest somewhere safe and avoid driving while dizzy or confused.' },
   { system: 'gastrointestinal', specialty: 'Gastroenterology', terms: ['stomach pain', 'tummy hurts', 'abdominal pain', 'vomiting', 'nausea', 'diarrhea', 'constipation', 'heartburn', 'acidity', 'bloating', 'blood in stool', 'jaundice'], possible: ['indigestion or acid reflux', 'gastroenteritis or food-related illness', 'another abdominal condition requiring examination'], questions: ['Where exactly is the pain and how severe is it?', 'When did it start, and is it getting worse?', 'Any vomiting, fever, diarrhea/constipation, or blood in stool?'], care: 'Take small sips of fluid if you can keep them down and avoid heavy foods.' },
+  { system: 'kidney stones', specialty: 'Urology', terms: ['kidney stone', 'kidney stones', 'renal stone', 'renal colic'], possible: ['a kidney or ureter stone', 'a urinary tract infection or irritation', 'another kidney or urinary-tract condition'], questions: ['Is there severe side/back pain, nausea, vomiting, fever, or blood in urine?', 'Are you able to pass urine normally?', 'Have you had stones before or a family history of them?'], care: 'Drink fluids if you can and have not been told to restrict them. Do not delay assessment for severe pain, fever, or trouble passing urine.' },
   { system: 'urinary', specialty: 'Urology', terms: ['pain while urinating', 'burning urination', 'burns when i pee', 'pee hurts', 'frequent urination', 'blood in urine', 'flank pain', 'kidney pain', 'unable to urinate', 'urinary urgency'], possible: ['a urinary tract infection', 'urinary irritation', 'a kidney or bladder stone'], questions: ['Do you have fever or chills?', 'Any blood in urine, side/back pain, nausea, or vomiting?', 'Are you urinating more often or unable to urinate?'], care: 'Stay hydrated unless a clinician has told you to limit fluids.' },
   { system: 'endocrine/metabolic', specialty: 'General Medicine', terms: ['diabetes', 'blood sugar', 'excessive thirst', 'very thirsty', 'shaky', 'shakiness', 'heat intolerance', 'cold intolerance', 'thyroid'], possible: ['a blood-sugar change', 'dehydration', 'a thyroid or other metabolic issue'], questions: ['Do you have diabetes or another long-term condition?', 'Can you check your blood sugar if you normally monitor it?', 'Any sweating, confusion, fainting, vomiting, or severe weakness?'], care: 'Follow your existing clinician-approved diabetes or chronic-care plan; do not change prescription medication based on chat advice.' },
   { system: 'musculoskeletal', specialty: 'Orthopedics', terms: ['back pain', 'neck pain', 'knee pain', 'knee swollen', 'joint pain', 'shoulder pain', 'sprain', 'fracture', 'fell', 'hurt my leg', 'muscle pain'], possible: ['a strain or sprain', 'joint inflammation', 'an injury that may need imaging'], questions: ['Was there an injury or fall?', 'Is there swelling, deformity, numbness, weakness, or inability to move/put weight on it?', 'How severe is the pain?'], care: 'Rest the affected area and avoid forcing painful movement.' },
@@ -47,10 +49,10 @@ function clinicalText(value) {
     // Common missing-space and everyday-language forms are resolved before
     // word-level fuzzy matching, which keeps the correction context-aware.
     .replace(/\b(chestpain|chest paining|heart pain)\b/g, ' chest pain ')
-    .replace(/\b(stomachpain|stomac(?:h|k)? pain|tummy hurts?|belly pain|stomach (?:is )?(?:hurting|hurts|upset))\b/g, ' abdominal pain ')
+    .replace(/\b(stomachpain|stomach pain|stomch pain|stomac(?:h|k)? pain|tummy hurts?|belly pain|(?:my )?stom(?:a)?ch (?:is )?(?:hurting|hurts|hurt|paining|upset))\b/g, ' abdominal pain ')
     .replace(/\b(eyepain|eyes? (?:are )?(?:blur|not clear)|can(?:not|t) see (?:clearly|properly))\b/g, ' blurred vision ')
     .replace(/\b(backpain|my back is pain|kidney side (?:is )?(?:hurting|pain))\b/g, ' back pain ')
-    .replace(/\b(pee pain|pee burns?|my pee is burning|pain while peeing|it burns when i pee|hurts when i pee)\b/g, ' burning urination ')
+    .replace(/\b(pee pain|urine pain|pee burns?|my pee is burning|pain while peeing|it burns when i pee|hurts when i pee)\b/g, ' burning urination ')
     .replace(/\b(feel like throwing up|keep throwing up)\b/g, ' vomiting ')
     .replace(/\b(head (?:is )?spinning|head is spining)\b/g, ' dizziness ')
     .replace(/\b(heart (?:is )?(?:racing|beating fast|beating too much))\b/g, ' palpitations ')
@@ -67,7 +69,7 @@ function clinicalText(value) {
   const corrected = fuzzyCorrectClinicalWords(phraseNormalised);
   return corrected
     .replace(/\b(bukhar|feverish)\b|बुखार|ज्वर/gi, ' fever ')
-    .replace(/\b(sir dard|head pain)\b|सिर दर्द|डोके दुखणे|ತಲೆನೋವು/gi, ' headache ')
+    .replace(/\b(sir dard|head pain|(?:my )?head (?:is )?(?:hurting|hurts|hurt|paining))\b|सिर दर्द|डोके दुखणे|ತಲೆನೋವು/gi, ' headache ')
     .replace(/\b(pet dard|tummy pain)\b|पेट दर्द|पोट दुखणे|ಹೊಟ್ಟೆ ನೋವು/gi, ' abdominal pain ')
     .replace(/\b(saans|breath problem)\b|सांस.*(?:दिक्कत|तकलीफ)|श्वास.*त्रास|ಉಸಿರಾಟ.*ತೊಂದರೆ/gi, ' shortness of breath ')
     .replace(/\b(seene mein dard|chest mein dard)\b|सीने में दर्द|छातीत दुखणे|ಎದೆ ನೋವು/gi, ' chest pain ')
@@ -113,33 +115,30 @@ function profileMatches(profile, text) {
   return profile.terms.filter((term) => normalised.includes(normalise(term)));
 }
 
+function isContextualFollowUp(message) {
+  const text = normalise(message);
+  // History is useful for references, but must never turn a new topic into an
+  // answer about the first symptom in the conversation.
+  const hasExplicitTopic = SYMPTOM_PROFILES.some((profile) => profileMatches(profile, text).length > 0);
+  return !hasExplicitTopic && text.length <= 45 && /^(yes|no|it|this|that|they|them|what about|and|also|how|why|when|where|which|what symptoms|what should i do|is it|can i|should i)/.test(text);
+}
+
 function assessSymptoms(message, context = {}, history = []) {
-  // Previous user turns are used only for the active conversation, allowing
-  // answers such as “yes, and my back hurts” to refine earlier symptoms.
-  const historyText = Array.isArray(history)
-    ? history.filter((entry) => entry?.role === 'user').map((entry) => entry.content).join(' ')
+  const currentMessage = clinicalText(message);
+  const useContext = isContextualFollowUp(currentMessage);
+  const latestUserMessage = Array.isArray(history)
+    ? [...history].reverse().find((entry) => entry?.role === 'user')?.content
     : '';
-  const combined = clinicalText(`${context.symptoms || ''} ${historyText} ${message}`);
+  // Only the immediately preceding user turn can clarify a short reference.
+  // Do not aggregate all history: doing so made earlier keywords dominate new
+  // questions and caused CareGuide to repeat its first-topic response.
+  const relevantContext = useContext ? `${context.symptoms || ''} ${latestUserMessage || ''}` : '';
+  const combined = clinicalText(`${relevantContext} ${currentMessage}`);
   const matched = SYMPTOM_PROFILES.map((profile) => ({ profile, hits: profileMatches(profile, combined) }))
     .filter(({ hits }) => hits.length)
     .sort((a, b) => b.hits.length - a.hits.length);
   const primary = matched[0]?.profile || null;
-  return { combined, primary, matched };
-}
-
-function buildSymptomResponse(assessment, severity) {
-  const { primary, matched } = assessment;
-  if (!primary) {
-    return 'I can help you think through your symptoms, but I need a little more detail. What are you feeling, where is it, when did it start, and how severe is it? I can provide general information and help you find appropriate care, but I cannot diagnose or prescribe medicine.';
-  }
-  const combinedSystems = matched.slice(0, 2).map(({ profile }) => profile.system).join(' and ');
-  const possible = primary.possible.map((item) => `• ${item}`).join('\n');
-  const questions = primary.questions.map((item) => `• ${item}`).join('\n');
-  const urgency = severity === 'urgent'
-    ? `Because of the symptoms you mentioned, please arrange prompt medical evaluation. ${primary.specialty} or an appropriate emergency department can assess you.`
-    : `Seek urgent care now if symptoms become severe, rapidly worsen, or you develop breathing difficulty, fainting, confusion, uncontrolled bleeding, or other new red flags.`;
-  const understanding = primary.understanding || `I understand you may be describing a ${combinedSystems} concern. These symptoms can occur with several conditions; an examination may be needed to determine the cause.`;
-  return `${understanding}\n\nPossible causes include:\n${possible}\n\nTo understand this better:\n${questions}\n\nWhat you can do now:\n${primary.care}\n\nWhen to seek care:\n${urgency}\n\nI can also find a nearby hospital with ${primary.specialty} or appropriate general/emergency care.`;
+  return { combined, currentMessage, usedContext: useContext, primary, matched };
 }
 
 function hasUrgentCombination(assessment) {
@@ -277,98 +276,55 @@ async function getAppointments(userId) {
   return result.rows;
 }
 
-async function respond({ message, latitude, longitude, userId, context = {}, history = [] }) {
+async function respond({ message, latitude, longitude, context = {}, history = [] }) {
   const text = String(message || '').trim();
   const normalisedText = clinicalText(text);
   const assessment = assessSymptoms(normalisedText, context, history);
-  const directSpecialty = await resolveSpecialty(normalisedText);
-  const specialty = directSpecialty || (assessment.primary ? await resolveSpecialty(assessment.primary.specialty) : null);
-  const severity = EMERGENCY_PATTERN.test(assessment.combined) ? 'emergency' : (URGENT_PATTERN.test(assessment.combined) || hasUrgentCombination(assessment)) ? 'urgent' : assessment.primary ? 'moderate' : 'mild';
-  const intent = classifyIntent(normalisedText, context, specialty);
-  const wantsNearby = NEARBY_PATTERN.test(normalisedText);
-  const wantsAll = /show\s+all\s+hospitals?/i.test(normalisedText);
-  const comparison = /compare/i.test(normalisedText);
-  const wantsIcu = /\bicu\b|critical care/i.test(normalisedText);
-  const wantsBlood = /blood\s*bank/i.test(normalisedText);
-  const bloodGroup = normalisedText.match(/\b(?:a|b|ab|o)\s*[+-](?=\s|$)/i)?.[0]?.replace(/\s/g, '').toUpperCase();
-  const wantsAmbulance = /ambulance/i.test(normalisedText);
-  const wantsBeds = /available\s*beds?|beds?\s+available/i.test(normalisedText);
-  const wantsEmergency = /emergency|urgent|\bsos\b/i.test(normalisedText);
-  const wantsDoctor = /doctor|cardiologist|pediatrician|ophthalmologist|specialist/i.test(normalisedText);
-  const symptomHospitalRequest = severity === 'urgent' && assessment.primary !== null;
-  const hospitalRequest = SEARCH_PATTERN.test(normalisedText) || wantsAll || wantsNearby || specialty !== null || bloodGroup != null || symptomHospitalRequest;
-  const locationRequired = severity === 'emergency' || symptomHospitalRequest || (hospitalRequest && wantsNearby);
+  const suicidal = /self.?harm|suicid|kill myself|end my life|want to die/i.test(text);
+  const emergency = suicidal || EMERGENCY_PATTERN.test(normalisedText);
+  console.info(`[CareGuide] User message: ${text.slice(0, 300)}`);
 
-  if (locationRequired && !hasCoordinates(latitude, longitude)) {
-    const locationPrompt = bloodGroup
-      ? `I need your current location to find nearby hospitals with ${bloodGroup} blood availability. Please allow location access.`
-      : `I’d be happy to find${specialty ? ` a ${specialty}` : ''} hospital near you. I need your current location to calculate the distance. Please allow location access.`;
-    return { type: severity === 'emergency' ? 'emergency' : 'location_required', severity, requiresLocation: true, showSos: severity === 'emergency', response: severity === 'emergency' ? 'This could be an emergency. Please call 108 or 112 now if you are seriously unwell, and avoid driving yourself. I need your current location to find the nearest registered emergency hospital.' : locationPrompt };
+  // Immediate safety messages deliberately bypass model latency. They are not
+  // a fallback: they are a safety gate before any general health discussion.
+  if (emergency) {
+    const response = suicidal
+      ? 'I’m really sorry you’re going through this. Your safety matters right now. Please call 112 or 108, go to the nearest emergency department, or contact a trusted person who can stay with you. If you might act on these thoughts, move away from anything you could use to hurt yourself and do not stay alone. Are you in immediate danger right now?'
+      : 'This could be an emergency. Please call 112 or 108 or seek emergency care immediately. If possible, ask someone nearby to help and avoid driving yourself.';
+    return { intent: 'emergency', type: 'emergency', severity: 'emergency', showSos: true, actions: [{ type: 'EMERGENCY_SOS', label: 'Emergency SOS' }], response, context: {} };
   }
 
-  if (severity === 'emergency') {
-    // Ambulance inventory is shown on each result when present, but a request
-    // for an ambulance must not hide nearby emergency hospitals just because
-    // their ambulance registry has not been updated.
-    const hospitals = await searchHospitals({ latitude, longitude, specialty, emergency: true, icu: /chest|breathe|unconscious|stroke/i.test(assessment.combined), availableBeds: false, limit: 3 });
-    return { intent: 'EMERGENCY', type: 'emergency', severity, showSos: true, actions: [{ type: 'EMERGENCY_SOS', label: 'Emergency SOS' }], hospitals, response: `This could be an emergency. Please seek emergency care immediately and call 108 or 112 if you are severely unwell.\n\n${hospitalSummary(hospitals)}`, context: {} };
+  const ai = await generateCareGuideReply({
+    message: text,
+    history,
+    databaseContext: { priorSpecialty: context.specialty || null, detectedSymptoms: assessment.primary?.system || null },
+  });
+  const requestedDoctor = ai.needsDoctorRecommendation || /\b(which|what|recommend).{0,30}\bdoctor|\bdoctor|specialist\b/i.test(normalisedText);
+  const specialty = ai.specialization || assessment.primary?.specialty || (isContextualFollowUp(normalisedText) ? context.specialty : null);
+  let doctors = [];
+  let hospitals = [];
+  if (requestedDoctor && specialty) {
+    doctors = await searchDoctors({ latitude, longitude, specialty, limit: 5 });
+    hospitals = groupDoctorsByHospital(doctors);
+    console.info(`[CareGuide] Doctor lookup required: true; doctors found: ${doctors.length}`);
   }
-
-  if (intent === 'APPOINTMENT_HOW_TO') return {
-    intent, type: 'appointment', severity, actions: [{ type: 'BOOK_APPOINTMENT', label: 'Book Appointment' }, { type: 'VIEW_APPOINTMENTS', label: 'My Appointments' }],
-    response: 'You can book an appointment through the app:\n\n1. Choose a medical specialty.\n2. Select a hospital.\n3. Select a doctor.\n4. Choose an available date and time.\n5. Confirm the appointment.\n\nYou can start booking now.', context: { workflow: 'appointment' },
-  };
-  if (intent === 'APPOINTMENT_STATUS') {
-    const appointments = await getAppointments(userId);
-    const summary = appointments.length ? `You have ${appointments.length} upcoming appointment${appointments.length === 1 ? '' : 's'}:\n\n${appointments.map((a, index) => `${index + 1}. ${a.doctor_name || 'Doctor'} · ${a.specialization || 'General care'}\n${a.hospital_name}\n${String(a.appointment_date).slice(0, 10)} at ${String(a.appointment_time).slice(0, 5)} (${a.status})`).join('\n\n')}` : 'You do not have any upcoming appointments in the system.';
-    return { intent, type: 'appointment_status', severity, appointments, actions: [{ type: 'VIEW_APPOINTMENTS', label: 'My Appointments' }], response: summary, context: {} };
+  const wantsHospital = SEARCH_PATTERN.test(normalisedText) || NEARBY_PATTERN.test(normalisedText);
+  if (!hospitals.length && wantsHospital) {
+    hospitals = await searchHospitals({ latitude, longitude, specialty, emergency: false, limit: 5 });
   }
-  if (intent === 'APPOINTMENT_RESCHEDULE' || intent === 'APPOINTMENT_CANCEL') return {
-    intent, type: 'appointment_manage', severity, actions: [{ type: 'VIEW_APPOINTMENTS', label: 'My Appointments' }],
-    response: intent === 'APPOINTMENT_CANCEL' ? 'Open My Appointments, select the appointment you want to cancel, and confirm the cancellation.' : 'Open My Appointments, select the appointment you want to change, then choose a new available date and time.', context: { workflow: 'appointment' },
-  };
-  if (intent === 'APPOINTMENT_BOOK') {
-    if (!specialty && !context.specialty) return { intent, type: 'appointment', severity, actions: [{ type: 'BOOK_APPOINTMENT', label: 'Book Appointment' }], response: 'Sure. Which type of doctor would you like to see? For example: General Medicine, Cardiology, Orthopedics, Pediatrics, ENT, or Ophthalmology.', context: { workflow: 'appointment' } };
-    const selectedSpecialty = specialty || context.specialty;
-    const doctors = await searchDoctors({ latitude, longitude, specialty: selectedSpecialty });
-    const hospitals = groupDoctorsByHospital(doctors);
-    return { intent, type: 'appointment', severity, specialty: selectedSpecialty, hospitals, actions: [{ type: 'BOOK_APPOINTMENT', label: 'Book Appointment' }], response: doctors.length ? `I found ${doctors.length} available ${selectedSpecialty} doctor${doctors.length === 1 ? '' : 's'}. Select a doctor below to continue booking.` : `I could not find an available ${selectedSpecialty} doctor right now.`, context: { workflow: 'appointment', specialty: selectedSpecialty } };
-  }
-  if (intent === 'LAB_REPORT') return { intent, type: 'medical_record', severity, actions: [{ type: 'VIEW_HEALTH_RECORD', label: 'Health Records' }], response: 'You can add or upload a lab report from Health Records. Select the report type, enter its date and details, and save it. Only your authorized care team can access records under the app’s permission controls.', context: {} };
-  if (intent === 'HEALTH_RECORD') return { intent, type: 'medical_record', severity, actions: [{ type: 'VIEW_HEALTH_RECORD', label: 'Health Records' }], response: 'Your health records, medical history, allergies, medications, and profile details are managed in Health Records. You can review or update your own information there.', context: {} };
-  if (intent === 'PAYMENT') return { intent, type: 'payment', severity, response: 'For invoices, payment, or insurance questions, please check the relevant hospital or contact its billing desk. Coverage and charges are hospital- and policy-specific.', context: {} };
-  if (intent === 'GREETING') return { intent, type: 'greeting', severity, response: 'Hello — I’m CareGuide. I can help with hospitals, doctors, appointments, health information, emergency assistance, blood banks, and health records.', context: {} };
-  if (intent === 'HELP') return { intent, type: 'help', severity, response: 'I can help you find hospitals or doctors, book and manage appointments, check hospital resources, provide general health information, and start emergency SOS assistance. What would you like help with?', context: {} };
-
-  if (hospitalRequest && ['HOSPITAL_SEARCH', 'HOSPITAL_COMPARISON', 'DOCTOR_SEARCH', 'GENERAL_HEALTH'].includes(intent)) {
-    const city = wantsNearby ? null : cityFromMessage(normalisedText);
-    const sort = /cheap|lowest\s*cost/i.test(normalisedText) ? 'cost' : /highest\s*rated|best\s*rated/i.test(normalisedText) ? 'rating' : wantsBeds ? 'beds' : 'distance';
-    const hospitals = await searchHospitals({ latitude, longitude, specialty, city, emergency: wantsEmergency, icu: wantsIcu, bloodBank: wantsBlood || bloodGroup != null, bloodGroup, ambulance: wantsAmbulance, availableBeds: wantsBeds, sort, limit: comparison ? 4 : 5 });
-    if (intent === 'DOCTOR_SEARCH') {
-      const doctors = await searchDoctors({ latitude, longitude, specialty });
-      const doctorHospitals = groupDoctorsByHospital(doctors);
-      const label = specialty ? `${specialty} care` : 'available doctors';
-      const response = doctors.length ? `I found ${label} at ${doctorHospitals.length} hospital${doctorHospitals.length === 1 ? '' : 's'}. Each result below is live hospital and doctor data.` : `I could not find an available ${label} in the registered hospital directory.`;
-      return { intent, type: 'doctor_search', severity, hospitals: doctorHospitals, doctors, specialty, actions: [{ type: 'VIEW_HOSPITALS', label: 'View Hospitals' }], response, context: {} };
-    }
-    if (intent === 'GENERAL_HEALTH' && symptomHospitalRequest) {
-      return {
-        intent, type: 'urgent_symptom', severity, hospitals, specialty,
-        showSos: false,
-        actions: [{ type: 'VIEW_HOSPITALS', label: 'View Hospitals' }],
-        response: `${buildSymptomResponse(assessment, severity)}\n\nNearby suitable care:\n${hospitalSummary(hospitals)}`,
-        context: { symptoms: assessment.combined.slice(-800), specialty: specialty || assessment.primary?.specialty || null, system: assessment.primary?.system || null },
-      };
-    }
-    return { intent, type: comparison ? 'comparison' : 'hospital_search', severity, hospitals, specialty, actions: [{ type: 'VIEW_HOSPITALS', label: 'View Hospitals' }], response: hospitalSummary(hospitals, { comparison }), context: {} };
-  }
-
+  const actions = [];
+  if (hospitals.length) actions.push({ type: 'VIEW_HOSPITALS', label: 'View Hospitals' });
+  if (doctors.length) actions.push({ type: 'BOOK_APPOINTMENT', label: 'Book Appointment' });
   return {
-    intent: 'GENERAL_HEALTH', type: 'health', severity, specialty,
-    response: buildSymptomResponse(assessment, severity),
-    actions: assessment.primary ? [{ type: 'VIEW_HOSPITALS', label: 'Find suitable hospitals' }] : [],
-    context: { symptoms: assessment.combined.slice(-800), specialty: specialty || assessment.primary?.specialty || null, system: assessment.primary?.system || null },
+    intent: ai.intent,
+    type: ai.topic,
+    severity: assessment.primary ? 'moderate' : 'mild',
+    specialty,
+    doctors,
+    hospitals,
+    actions,
+    response: ai.response,
+    context: { symptoms: assessment.currentMessage.slice(-800), specialty: specialty || null, system: assessment.primary?.system || null },
   };
 }
 
-module.exports = { respond, searchHospitals, searchDoctors, normalizePatientMessage: clinicalText };
+module.exports = { respond, searchHospitals, searchDoctors, normalizePatientMessage: clinicalText, assessSymptoms };

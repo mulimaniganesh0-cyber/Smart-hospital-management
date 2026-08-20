@@ -13,16 +13,23 @@ class ChatbotService {
     required double? longitude,
     required String language,
   }) async {
+    // Capture the current text at send time, so every request carries the
+    // latest turn rather than a stale controller or history value.
+    final currentMessage = message.trim();
+    if (currentMessage.isEmpty) throw ArgumentError.value(message, 'message');
     final result = await ApiService.queryChatbot({
-      'message': message,
+      'message': currentMessage,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
       'language': language,
-      'history': _history,
+      'conversationHistory': _history,
       'context': _context,
     });
     final data = result['data'];
     if (result['success'] != true || data is! Map || data['response'] == null) {
+      if (result['error'] == 'AI_SERVICE_UNAVAILABLE') {
+        throw Exception('The AI assistant is temporarily unavailable. Please try again.');
+      }
       throw Exception(result['message'] ?? 'CareGuide request failed');
     }
     final hospitals = (data['hospitals'] as List? ?? const [])
@@ -37,7 +44,7 @@ class ChatbotService {
       actions: (data['actions'] as List? ?? const []).whereType<Map>().map((item) => CareGuideAction.fromJson(Map<String, dynamic>.from(item))).toList(),
     );
     _context = data['context'] is Map ? Map<String, dynamic>.from(data['context']) : {};
-    _remember(message, reply.text);
+    _remember(currentMessage, reply.text);
     return reply;
   }
 
