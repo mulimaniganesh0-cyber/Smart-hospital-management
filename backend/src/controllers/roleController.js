@@ -1,6 +1,15 @@
 // src/controllers/roleController.js
 const { pool } = require('../config/database');
 
+const FALLBACK_ROLES = [
+  { id: 'doctor', name: 'doctor', description: 'Hospital doctor access' },
+  { id: 'nurse', name: 'nurse', description: 'Hospital nursing access' },
+  { id: 'frontdesk', name: 'frontdesk', description: 'Front desk and scheduling access' },
+  { id: 'billing', name: 'billing', description: 'Billing and records access' },
+  { id: 'hospital_admin', name: 'hospital_admin', description: 'Hospital admin access' },
+  { id: 'super_admin', name: 'super_admin', description: 'System administrator access' },
+];
+
 // ==================== GET ALL ROLES ====================
 exports.getRoles = async (req, res) => {
   try {
@@ -13,6 +22,12 @@ exports.getRoles = async (req, res) => {
       data: result.rows,
     });
   } catch (error) {
+    if (error?.code === '42P01') {
+      return res.json({
+        success: true,
+        data: FALLBACK_ROLES,
+      });
+    }
     console.error('Get roles error:', error);
     res.status(500).json({ 
       success: false, 

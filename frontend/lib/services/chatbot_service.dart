@@ -32,7 +32,15 @@ class ChatbotService {
       }
       throw Exception(result['message'] ?? 'CareGuide request failed');
     }
-    final hospitals = (data['hospitals'] as List? ?? const [])
+    // A general LLM response must never render an incidental hospital payload.
+    // Cards are reserved for the single structured database-result path.
+    final responseType = '${data['type'] ?? 'llm'}';
+    final canRenderHospitalCards = responseType == 'hospital_results' ||
+        responseType == 'doctor_results' ||
+        responseType == 'symptom_hospital_recommendation';
+    final hospitals = (canRenderHospitalCards
+            ? data['hospitals'] as List? ?? const []
+            : const [])
         .whereType<Map>()
         .map((item) => _toRecommendation(Map<String, dynamic>.from(item)))
         .toList();
@@ -59,8 +67,8 @@ class ChatbotService {
     int asInt(dynamic value) => value is num ? value.toInt() : int.tryParse('$value') ?? 0;
     double asDouble(dynamic value) => value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
     return HospitalRecommendation(
-      id: asInt(hospital['id']), name: '${hospital['name'] ?? 'Hospital'}',
-      address: '${hospital['address'] ?? hospital['city'] ?? 'Address unavailable'}',
+      id: asInt(hospital['id']), name: '${hospital['display_name'] ?? hospital['name'] ?? 'Hospital'}',
+      address: '${hospital['display_address'] ?? hospital['address'] ?? hospital['city'] ?? 'Address unavailable'}',
       latitude: asDouble(hospital['latitude']), longitude: asDouble(hospital['longitude']),
       distance: asDouble(hospital['distance']), rating: asDouble(hospital['rating']),
       specialty: (hospital['specialties'] as List?)?.join(', ') ?? 'General care',

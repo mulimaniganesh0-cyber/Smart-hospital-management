@@ -184,6 +184,10 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 5000;
 
+if (!process.env.JWT_SECRET || String(process.env.JWT_SECRET).trim().length < 32) {
+  throw new Error('JWT_SECRET must be set to a value at least 32 characters long before starting the server');
+}
+
 // Function to ensure database schema is correct
 const ensureDatabaseSchema = async () => {
   try {
@@ -314,13 +318,59 @@ const startServer = async () => {
   if (isDbConnected) {
     await ensureDatabaseSchema();
     await ensureMedicalSchema(pool);
-    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS hospital_id INTEGER REFERENCES hospitals(id) ON DELETE SET NULL`);
+    await pool.query(`ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS role VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS hospital_role VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS permissions TEXT[] NOT NULL DEFAULT '{}'::text[],
+      ADD COLUMN IF NOT EXISTS hospital_id INTEGER REFERENCES hospitals(id) ON DELETE SET NULL`);
+    // Upgrade the legacy user_type check constraint so older databases accept staff.
+    await pool.query(`DO $$
+    DECLARE constraint_name text;
+    BEGIN
+      FOR constraint_name IN
+        SELECT c.conname
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE t.relname = 'users' AND n.nspname = current_schema()
+          AND c.contype = 'c' AND pg_get_constraintdef(c.oid) ILIKE '%user_type%'
+      LOOP
+        EXECUTE format('ALTER TABLE users DROP CONSTRAINT %I', constraint_name);
+      END LOOP;
+      ALTER TABLE users ADD CONSTRAINT users_user_type_check
+        CHECK (user_type IN ('patient', 'hospital', 'admin', 'staff'));
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS roles (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(100) UNIQUE NOT NULL,
+      description TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS staff_activity_log (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      hospital_id INTEGER REFERENCES hospitals(id) ON DELETE CASCADE,
+      action VARCHAR(100) NOT NULL,
+      details JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await pool.query(`INSERT INTO roles (name, description) VALUES
+      ('doctor', 'Hospital doctor access'),
+      ('nurse', 'Hospital nursing access'),
+      ('frontdesk', 'Front desk and scheduling access'),
+      ('billing', 'Billing and records access'),
+      ('hospital_admin', 'Hospital admin access'),
+      ('super_admin', 'System administrator access')
+      ON CONFLICT (name) DO NOTHING`);
     await pool.query(`ALTER TABLE doctors ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
+    await pool.query(`ALTER TABLE doctors ADD COLUMN IF NOT EXISTS designation TEXT, ADD COLUMN IF NOT EXISTS department TEXT, ADD COLUMN IF NOT EXISTS experience_display TEXT, ADD COLUMN IF NOT EXISTS registration_number TEXT, ADD COLUMN IF NOT EXISTS availability TEXT, ADD COLUMN IF NOT EXISTS profile_image TEXT, ADD COLUMN IF NOT EXISTS bio TEXT, ADD COLUMN IF NOT EXISTS verification_status VARCHAR(80) DEFAULT 'HOSPITAL_CONFIRMATION_REQUIRED', ADD COLUMN IF NOT EXISTS source_url TEXT, ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_doctors_hospital_name_normalized ON doctors (hospital_id, lower(regexp_replace(name, '[^a-zA-Z0-9]', '', 'g')))`);
     // Older databases stored a doctor name only. The booking controller uses the
     // real doctor relationship, so upgrade those installations safely on startup.
     await pool.query(`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS doctor_id INTEGER REFERENCES doctors(id) ON DELETE SET NULL`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_appointments_doctor_schedule ON appointments (doctor_id, appointment_date, appointment_time)`);
-    await pool.query(`ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS area VARCHAR(100), ADD COLUMN IF NOT EXISTS country VARCHAR(100), ADD COLUMN IF NOT EXISTS hospital_type VARCHAR(100), ADD COLUMN IF NOT EXISTS departments TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS specialties TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS services TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS emergency_available BOOLEAN NOT NULL DEFAULT FALSE`);
+    await pool.query(`ALTER TABLE hospitals ADD COLUMN IF NOT EXISTS area VARCHAR(100), ADD COLUMN IF NOT EXISTS country VARCHAR(100), ADD COLUMN IF NOT EXISTS hospital_type VARCHAR(100), ADD COLUMN IF NOT EXISTS departments TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS specialties TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS services TEXT[] NOT NULL DEFAULT '{}', ADD COLUMN IF NOT EXISTS emergency_available BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS directory_visible BOOLEAN NOT NULL DEFAULT FALSE`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_hospitals_coordinates ON hospitals(latitude, longitude) WHERE latitude IS NOT NULL AND longitude IS NOT NULL`);
     await pool.query(`UPDATE users u SET hospital_id = d.hospital_id FROM doctors d WHERE d.user_id = u.id AND u.hospital_id IS NULL`);
   }

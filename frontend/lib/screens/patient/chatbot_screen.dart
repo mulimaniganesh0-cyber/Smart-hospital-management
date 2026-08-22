@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/chat_model.dart';
 import '../../services/chatbot_service.dart';
 import '../../services/location_service.dart';
+import '../../services/careguide_localizations.dart';
 import 'patient_emergency_request.dart';
 import 'patient_nearby_hospitals.dart';
 import 'patient_bookings.dart';
@@ -21,12 +22,6 @@ class ChatbotScreen extends StatefulWidget {
 class _ChatbotScreenState extends State<ChatbotScreen> {
   static const _brand = Color(0xFF0A4D68);
   static const _accent = Color(0xFF088395);
-  static const _suggestions = [
-    'Find nearby hospitals',
-    'How do I book an appointment?',
-    'I need an ambulance',
-    'Check blood availability',
-  ];
 
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
@@ -34,22 +29,23 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final List<ChatMessage> _messages = [];
 
   Position? _position;
+  _LocationState _locationState = _LocationState.idle;
+  String? _locationError;
   bool _isLoading = false;
   String _language = 'English';
+  CareGuideStrings get _strings => CareGuideStrings(_language);
+  List<String> get _suggestions => [_strings.t('nearby'), _strings.t('bookHelp'), _strings.t('ambulance'), _strings.t('blood')];
 
   @override
   void initState() {
     super.initState();
     _messages.add(
       ChatMessage(
-        text: 'Hello! I am CareGuide, your hospital resource assistant. '
-            'I can help you find nearby care, understand services, and '
-            'navigate urgent requests.',
+        text: _strings.t('welcome'),
         isUser: false,
       ),
     );
-    // Ask only when the user requests nearby care or taps the location banner.
-    // This keeps location permission purposeful and avoids assuming a location.
+    _initializeLocationState();
   }
 
   @override
@@ -59,10 +55,67 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     super.dispose();
   }
 
-  Future<void> _loadLocation() async {
-    final position = await LocationService.getCurrentLocation();
-    if (!context.mounted) return;
-    setState(() => _position = position);
+  Future<Position?> _loadLocation() async {
+    setState(() {
+      _locationState = _LocationState.loading;
+      _locationError = null;
+    });
+    debugPrint('[Location] Getting current position...');
+    try {
+      final position = await LocationService.getFreshPatientLocation();
+      debugPrint('[Location] Latitude: ${position.latitude}; Longitude: ${position.longitude}');
+      if (!mounted) return position;
+      setState(() {
+        _position = position;
+        _locationState = _LocationState.active;
+      });
+      return position;
+    } on PatientLocationException catch (error) {
+      debugPrint('[Location] Unable to obtain location: ${error.message}');
+      if (!mounted) return null;
+      final message = error.message.toLowerCase();
+      setState(() {
+        _position = null;
+        _locationError = error.message;
+        _locationState = message.contains('permanently')
+            ? _LocationState.permanentlyDenied
+            : message.contains('services') || message.contains('gps')
+                ? _LocationState.serviceDisabled
+                : message.contains('permission')
+                    ? _LocationState.permissionDenied
+                    : _LocationState.error;
+      });
+      return null;
+    }
+  }
+
+  Future<void> _initializeLocationState() async {
+    debugPrint('[Location] Checking CareGuide location state...');
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    final permission = await Geolocator.checkPermission();
+    if (!mounted) return;
+    if (!serviceEnabled) {
+      setState(() => _locationState = _LocationState.serviceDisabled);
+    } else if (permission == LocationPermission.deniedForever) {
+      setState(() => _locationState = _LocationState.permanentlyDenied);
+    } else if (permission == LocationPermission.denied) {
+      setState(() => _locationState = _LocationState.permissionDenied);
+    } else {
+      // Permission was already granted, so this does not show a new prompt.
+      await _loadLocation();
+    }
+  }
+
+  Future<void> _handleLocationAction() async {
+    if (_locationState == _LocationState.permanentlyDenied) {
+      await Geolocator.openAppSettings();
+      return;
+    }
+    if (_locationState == _LocationState.serviceDisabled) {
+      await Geolocator.openLocationSettings();
+      return;
+    }
+    await _loadLocation();
   }
 
   Future<void> _send([String? suggestion]) async {
@@ -81,17 +134,11 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       // location for nearby/emergency requests.
       Position? requestPosition = _position;
       final needsLiveLocation = RegExp(
-        r'nearby|near me|closest|nearest|emergency|ambulance|sos',
+        r'near\s*(me|by|my|here)|nearby|closest|nearest|around me|ನನ್ನ\s*ಹತ್ತಿರ|ಹತ್ತಿರದ\s*ಆಸ್ಪತ್ರ|ಸುತ್ತಮುತ್ತ\s*ಆಸ್ಪತ್ರ|ಆಸ್ಪತ್ರೆ\s*ಬೇಕ|मेरे\s*(पास|नजदीक|आसपास)|नजदीकी\s*अस्पताल|पास\s*के\s*अस्पताल|emergency|ambulance|sos',
         caseSensitive: false,
       ).hasMatch(text);
       if (needsLiveLocation) {
-        try {
-          requestPosition = await LocationService.getFreshPatientLocation();
-          if (mounted) setState(() => _position = requestPosition);
-        } on PatientLocationException {
-          requestPosition = null;
-          if (mounted) setState(() => _position = null);
-        }
+        requestPosition = await _loadLocation();
       }
       final response = await _assistant.sendMessage(
         message: text,
@@ -107,8 +154,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     } catch (error) {
       if (!context.mounted) return;
       final text = error.toString().contains('AI assistant is temporarily unavailable')
-          ? 'The AI assistant is temporarily unavailable. Please try again.'
-          : 'I could not complete that request. Please try again.';
+          ? _strings.t('unavailable')
+          : _strings.t('failed');
       setState(() {
         _messages.add(
           ChatMessage(
@@ -141,7 +188,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         ..clear()
         ..add(
           ChatMessage(
-            text: 'New conversation started. How can I help?',
+            text: _strings.t('newStarted'),
             isUser: false,
           ),
         );
@@ -150,28 +197,24 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hasLocation = _position != null;
     return Scaffold(
       backgroundColor: const Color(0xFFF6F8FA),
       appBar: AppBar(
         elevation: 0,
         titleSpacing: 0,
-        title: const Row(
+        title: Row(
           children: [
-            CircleAvatar(
+            const CircleAvatar(
               radius: 18,
               backgroundColor: Colors.white24,
-              child:
-                  Icon(Icons.health_and_safety_outlined, color: Colors.white),
+              child: Icon(Icons.health_and_safety_outlined, color: Colors.white),
             ),
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('CareGuide',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-                Text('Hospital resource assistant',
-                    style: TextStyle(fontSize: 11)),
+                const Text('CareGuide', style: TextStyle(fontWeight: FontWeight.w700)),
+                Text(_strings.t('assistant'), style: const TextStyle(fontSize: 11)),
               ],
             ),
           ],
@@ -183,14 +226,14 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         ),
         actions: [
           IconButton(
-            tooltip: 'New conversation',
+            tooltip: _strings.t('newChat'),
             onPressed: _startNewConversation,
             icon: const Icon(Icons.refresh_rounded),
           ),
           PopupMenuButton<String>(
-            tooltip: 'Language',
+            tooltip: _strings.t('language'),
             icon: const Icon(Icons.language_rounded),
-            onSelected: (value) => setState(() => _language = value),
+            onSelected: (value) => setState(() { _language = value; _assistant.resetConversation(); }),
             itemBuilder: (context) => LocationService.getSupportedLanguages()
                 .map(
                   (language) => CheckedPopupMenuItem(
@@ -207,7 +250,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         top: false,
         child: Column(
           children: [
-            _LocationBanner(hasLocation: hasLocation, onEnable: _loadLocation),
+            _LocationBanner(state: _locationState, error: _locationError, onAction: _handleLocationAction, onRefresh: _loadLocation, strings: _strings),
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
@@ -215,7 +258,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                 itemCount: _messages.length + (_isLoading ? 1 : 0),
                 itemBuilder: (context, index) {
                   if (index == _messages.length) {
-                    return const _TypingIndicator();
+                    return _TypingIndicator(strings: _strings);
                   }
                   return _MessageBubble(
                     message: _messages[index],
@@ -229,16 +272,18 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                         : null,
                     onSos: _messages[index].showSos ? _openSos : null,
                     onAction: _handleAction,
+                    strings: _strings,
                   );
                 },
               ),
             ),
             if (_messages.length <= 2 && !_isLoading)
-              _SuggestionBar(onSelect: _send),
+              _SuggestionBar(onSelect: _send, suggestions: _suggestions),
             _Composer(
               controller: _controller,
               enabled: !_isLoading,
               onSend: _send,
+              strings: _strings,
             ),
           ],
         ),
@@ -258,7 +303,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           hospital: hospital,
           onDirections: () => _openDirections(hospital),
           onCall: () => _callHospital(hospital),
-          onBook: _openDirectory),
+          onBook: _openDirectory, strings: _strings),
     );
   }
 
@@ -328,16 +373,36 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   }
 }
 
-class _LocationBanner extends StatelessWidget {
-  const _LocationBanner({required this.hasLocation, required this.onEnable});
+enum _LocationState { idle, loading, active, serviceDisabled, permissionDenied, permanentlyDenied, error }
 
-  final bool hasLocation;
-  final VoidCallback onEnable;
+class _LocationBanner extends StatelessWidget {
+  const _LocationBanner({required this.state, required this.error, required this.onAction, required this.onRefresh, required this.strings});
+
+  final _LocationState state;
+  final String? error;
+  final VoidCallback onAction;
+  final VoidCallback onRefresh;
+  final CareGuideStrings strings;
 
   @override
   Widget build(BuildContext context) {
-    final color =
-        hasLocation ? const Color(0xFF18794E) : const Color(0xFF9A6700);
+    final active = state == _LocationState.active;
+    final loading = state == _LocationState.loading;
+    final color = active ? const Color(0xFF18794E) : state == _LocationState.error ? Colors.red.shade700 : const Color(0xFF9A6700);
+    final message = switch (state) {
+      _LocationState.active => strings.t('locationOn'),
+      _LocationState.loading => strings.t('locationLoading'),
+      _LocationState.serviceDisabled => strings.t('locationDisabled'),
+      _LocationState.permissionDenied => strings.t('locationPermission'),
+      _LocationState.permanentlyDenied => strings.t('locationPermanent'),
+      _LocationState.error => error ?? strings.t('locationError'),
+      _LocationState.idle => strings.t('locationOff'),
+    };
+    final actionLabel = state == _LocationState.permanentlyDenied
+        ? strings.t('openSettings')
+        : state == _LocationState.serviceDisabled
+            ? strings.t('openSettings')
+            : strings.t('enable');
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -348,23 +413,25 @@ class _LocationBanner extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-              hasLocation
+              active
                   ? Icons.location_on_outlined
-                  : Icons.location_off_outlined,
+                  : loading ? Icons.location_searching_outlined : Icons.location_off_outlined,
               color: color,
               size: 19),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              hasLocation
-                  ? 'Location is active for nearby recommendations'
-                  : 'Enable location for nearby recommendations',
+              message,
               style: TextStyle(
                   fontSize: 12, color: color, fontWeight: FontWeight.w600),
             ),
           ),
-          if (!hasLocation)
-            TextButton(onPressed: onEnable, child: const Text('Enable')),
+          if (loading)
+            const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+          else ...[
+            IconButton(tooltip: strings.t('refreshLocation'), onPressed: onRefresh, icon: const Icon(Icons.refresh_rounded)),
+            if (!active) TextButton(onPressed: onAction, child: Text(actionLabel)),
+          ],
         ],
       ),
     );
@@ -378,7 +445,7 @@ class _MessageBubble extends StatelessWidget {
       required this.onHospitalTap,
       this.onLocation,
       this.onSos,
-      required this.onAction});
+      required this.onAction, required this.strings});
 
   final ChatMessage message;
   final VoidCallback? onRecommendationTap;
@@ -386,6 +453,7 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback? onLocation;
   final VoidCallback? onSos;
   final ValueChanged<CareGuideAction> onAction;
+  final CareGuideStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -441,7 +509,7 @@ class _MessageBubble extends StatelessWidget {
                         onPressed: onRecommendationTap,
                         icon:
                             const Icon(Icons.local_hospital_outlined, size: 17),
-                        label: const Text('View hospital details'),
+                        label: Text(strings.t('viewHospital')),
                       ),
                     ],
                     if (onLocation != null) ...[
@@ -449,7 +517,8 @@ class _MessageBubble extends StatelessWidget {
                       FilledButton.icon(
                           onPressed: onLocation,
                           icon: const Icon(Icons.my_location),
-                          label: const Text('Use my location')),
+                          label: Text(strings.t('useLocation')),
+                      ),
                     ],
                     if (onSos != null) ...[
                       const SizedBox(height: 8),
@@ -458,14 +527,14 @@ class _MessageBubble extends StatelessWidget {
                           style: FilledButton.styleFrom(
                               backgroundColor: Colors.red),
                           icon: const Icon(Icons.sos),
-                          label: const Text('Emergency SOS')),
+                          label: Text(strings.t('sos'))),
                     ],
                     if (message.hospitals.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       ...message.hospitals.map((hospital) => _ChatHospitalCard(
                         hospital: hospital,
                         onDetails: () => onHospitalTap(hospital),
-                        onBook: () => onAction(const CareGuideAction(type: 'BOOK_APPOINTMENT', label: 'Book Appointment')),
+                        onBook: () => onAction(CareGuideAction(type: 'BOOK_APPOINTMENT', label: strings.t('book'))), strings: strings,
                       )),
                     ],
                     if (message.actions.isNotEmpty) ...[
@@ -501,10 +570,11 @@ class _MessageBubble extends StatelessWidget {
 }
 
 class _ChatHospitalCard extends StatelessWidget {
-  const _ChatHospitalCard({required this.hospital, required this.onDetails, required this.onBook});
+  const _ChatHospitalCard({required this.hospital, required this.onDetails, required this.onBook, required this.strings});
   final HospitalRecommendation hospital;
   final VoidCallback onDetails;
   final VoidCallback onBook;
+  final CareGuideStrings strings;
   @override
   Widget build(BuildContext context) => Card(
     margin: const EdgeInsets.only(top: 8),
@@ -518,32 +588,34 @@ class _ChatHospitalCard extends StatelessWidget {
         child: Text('${doctor.name}\n${doctor.specialization} · ${doctor.experienceYears} years${doctor.consultationFee == null ? '' : ' · ₹${doctor.consultationFee!.toStringAsFixed(0)}'}\nAvailable appointments: ${doctor.availableSlots}', style: const TextStyle(fontSize: 12)),
       )),
       const SizedBox(height: 6),
-      Wrap(spacing: 8, children: [OutlinedButton(onPressed: onDetails, child: const Text('View Hospital')), FilledButton(onPressed: onBook, child: const Text('Book Appointment'))]),
+      Wrap(spacing: 8, children: [OutlinedButton(onPressed: onDetails, child: Text(strings.t('view'))), FilledButton(onPressed: onBook, child: Text(strings.t('book')))]),
     ])),
   );
 }
 
 class _TypingIndicator extends StatelessWidget {
-  const _TypingIndicator();
+  const _TypingIndicator({required this.strings});
+  final CareGuideStrings strings;
 
   @override
-  Widget build(BuildContext context) => const Padding(
-        padding: EdgeInsets.only(left: 2, bottom: 16),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(left: 2, bottom: 16),
         child: Row(
           children: [
-            CircleAvatar(
+            const CircleAvatar(
                 radius: 17,
-                child: Icon(Icons.health_and_safety_outlined, size: 18)),
-            SizedBox(width: 8),
-            Text('CareGuide is thinkingâ€¦'),
+               child: Icon(Icons.health_and_safety_outlined, size: 18)),
+            const SizedBox(width: 8),
+            Text(strings.t('typing')),
           ],
         ),
       );
 }
 
 class _SuggestionBar extends StatelessWidget {
-  const _SuggestionBar({required this.onSelect});
+  const _SuggestionBar({required this.onSelect, required this.suggestions});
   final ValueChanged<String> onSelect;
+  final List<String> suggestions;
 
   @override
   Widget build(BuildContext context) => SizedBox(
@@ -551,11 +623,11 @@ class _SuggestionBar extends StatelessWidget {
         child: ListView.separated(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           scrollDirection: Axis.horizontal,
-          itemCount: _ChatbotScreenState._suggestions.length,
+          itemCount: suggestions.length,
           separatorBuilder: (_, __) => const SizedBox(width: 8),
           itemBuilder: (context, index) => ActionChip(
-            label: Text(_ChatbotScreenState._suggestions[index]),
-            onPressed: () => onSelect(_ChatbotScreenState._suggestions[index]),
+            label: Text(suggestions[index]),
+            onPressed: () => onSelect(suggestions[index]),
           ),
         ),
       );
@@ -563,10 +635,11 @@ class _SuggestionBar extends StatelessWidget {
 
 class _Composer extends StatelessWidget {
   const _Composer(
-      {required this.controller, required this.enabled, required this.onSend});
+      {required this.controller, required this.enabled, required this.onSend, required this.strings});
   final TextEditingController controller;
   final bool enabled;
   final VoidCallback onSend;
+  final CareGuideStrings strings;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -583,7 +656,7 @@ class _Composer extends StatelessWidget {
                 maxLines: 4,
                 onSubmitted: (_) => onSend(),
                 decoration: InputDecoration(
-                  hintText: 'Ask about care, appointments, or resources',
+                  hintText: strings.t('placeholder'),
                   filled: true,
                   fillColor: const Color(0xFFF1F5F7),
                   contentPadding:
@@ -611,11 +684,12 @@ class _HospitalSheet extends StatelessWidget {
       {required this.hospital,
       required this.onDirections,
       required this.onCall,
-      required this.onBook});
+      required this.onBook, required this.strings});
   final HospitalRecommendation hospital;
   final VoidCallback onDirections;
   final VoidCallback onCall;
   final VoidCallback onBook;
+  final CareGuideStrings strings;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -647,31 +721,31 @@ class _HospitalSheet extends StatelessWidget {
             const SizedBox(height: 20),
             Row(children: [
               _ResourceStat(
-                  label: 'Beds', value: hospital.availableBeds.toString()),
+                  label: strings.t('beds'), value: hospital.availableBeds.toString()),
               _ResourceStat(
                   label: 'ICU', value: hospital.availableIcu.toString()),
               _ResourceStat(
-                  label: 'Ventilators',
+                  label: strings.t('ventilators'),
                   value: hospital.availableVentilators.toString()),
             ]),
             const SizedBox(height: 16),
             Text(
-                '${hospital.distance.toStringAsFixed(1)} km away Â· ${hospital.phone}',
+                '${hospital.distance.toStringAsFixed(1)} ${strings.t('kmAway')} · ${hospital.phone}',
                 style: const TextStyle(color: Colors.blueGrey)),
             const SizedBox(height: 16),
             Wrap(spacing: 8, runSpacing: 8, children: [
               OutlinedButton.icon(
                   onPressed: onDirections,
                   icon: const Icon(Icons.directions),
-                  label: const Text('Directions')),
+                  label: Text(strings.t('directions'))),
               OutlinedButton.icon(
                   onPressed: onCall,
                   icon: const Icon(Icons.call),
-                  label: const Text('Call hospital')),
+                  label: Text(strings.t('call'))),
               FilledButton.icon(
                   onPressed: onBook,
                   icon: const Icon(Icons.calendar_month),
-                  label: const Text('Book appointment')),
+                  label: Text(strings.t('book'))),
             ]),
           ],
         ),

@@ -1,5 +1,6 @@
 const { pool } = require('../config/database');
-const { generateCareGuideReply } = require('./aiService');
+const { generateCareGuideReply } = require('./aiServiceOpenAI');
+const { language: validLanguage, text: localizedText, localizeDoctor, localizeHospital } = require('./careGuideLocalization');
 
 // Structured clinical guidance. These profiles provide safe triage and
 // education; they are intentionally not a diagnostic engine.
@@ -12,11 +13,11 @@ const SYMPTOM_PROFILES = [
   { system: 'urinary', specialty: 'Urology', terms: ['pain while urinating', 'burning urination', 'burns when i pee', 'pee hurts', 'frequent urination', 'blood in urine', 'flank pain', 'kidney pain', 'unable to urinate', 'urinary urgency'], possible: ['a urinary tract infection', 'urinary irritation', 'a kidney or bladder stone'], questions: ['Do you have fever or chills?', 'Any blood in urine, side/back pain, nausea, or vomiting?', 'Are you urinating more often or unable to urinate?'], care: 'Stay hydrated unless a clinician has told you to limit fluids.' },
   { system: 'endocrine/metabolic', specialty: 'General Medicine', terms: ['diabetes', 'blood sugar', 'excessive thirst', 'very thirsty', 'shaky', 'shakiness', 'heat intolerance', 'cold intolerance', 'thyroid'], possible: ['a blood-sugar change', 'dehydration', 'a thyroid or other metabolic issue'], questions: ['Do you have diabetes or another long-term condition?', 'Can you check your blood sugar if you normally monitor it?', 'Any sweating, confusion, fainting, vomiting, or severe weakness?'], care: 'Follow your existing clinician-approved diabetes or chronic-care plan; do not change prescription medication based on chat advice.' },
   { system: 'musculoskeletal', specialty: 'Orthopedics', terms: ['back pain', 'neck pain', 'knee pain', 'knee swollen', 'joint pain', 'shoulder pain', 'sprain', 'fracture', 'fell', 'hurt my leg', 'muscle pain'], possible: ['a strain or sprain', 'joint inflammation', 'an injury that may need imaging'], questions: ['Was there an injury or fall?', 'Is there swelling, deformity, numbness, weakness, or inability to move/put weight on it?', 'How severe is the pain?'], care: 'Rest the affected area and avoid forcing painful movement.' },
-  { system: 'skin/allergy', specialty: 'Dermatology', terms: ['rash', 'itchy', 'itching', 'hives', 'skin infection', 'redness', 'blister', 'burn', 'face swollen', 'swelling after eating'], possible: ['an allergy or irritation', 'a skin infection or inflammatory condition', 'another dermatologic condition'], questions: ['Did this start after a food, medicine, bite, or new product?', 'Is it spreading quickly, painful, blistering, or associated with fever?', 'Any lip/tongue swelling or breathing difficulty?'], care: 'Avoid any suspected trigger and avoid scratching the area.' },
+  { system: 'skin/allergy', specialty: 'Dermatology', terms: ['rash', 'itchy', 'itching', 'hives', 'skin problem', 'skin infection', 'hair loss', 'redness', 'blister', 'burn', 'face swollen', 'swelling after eating'], possible: ['an allergy or irritation', 'a skin infection or inflammatory condition', 'another dermatologic condition'], questions: ['Did this start after a food, medicine, bite, or new product?', 'Is it spreading quickly, painful, blistering, or associated with fever?', 'Any lip/tongue swelling or breathing difficulty?'], care: 'Avoid any suspected trigger and avoid scratching the area.' },
   { system: 'eye', specialty: 'Ophthalmology', terms: ['eye pain', 'eyes are red', 'red eye', 'blurred vision', 'cannot see', 'vision loss', 'eye discharge', 'light sensitivity', 'eye injury'], possible: ['an eye allergy or irritation', 'an eye infection', 'an eye condition that requires an examination'], questions: ['Is your vision affected or did it change suddenly?', 'Is the eye painful, red, light-sensitive, or producing discharge?', 'Was there an injury or chemical exposure?'], care: 'Do not rub an injured or painful eye, and avoid using someone else’s eye drops.' },
   { system: 'ear/nose/throat', specialty: 'ENT', terms: ['ear pain', 'hearing problem', 'ringing in ear', 'sore throat', 'difficulty swallowing', 'sinus', 'nasal congestion', 'nosebleed', 'voice problem'], possible: ['a viral illness', 'allergy or sinus irritation', 'an ear, nose, or throat infection'], questions: ['How long have you had symptoms?', 'Do you have fever, drainage, severe pain, or trouble swallowing/breathing?', 'Is hearing suddenly reduced?'], care: 'Drink fluids and avoid inserting anything into the ear.' },
   { system: 'dental', specialty: 'Dentistry', terms: ['tooth pain', 'toothache', 'gum pain', 'gum bleeding', 'dental swelling', 'mouth ulcer', 'jaw pain'], possible: ['tooth decay or gum inflammation', 'a dental infection', 'jaw or mouth irritation'], questions: ['Is there facial swelling, fever, or drainage?', 'Is swallowing or breathing difficult?', 'Did this follow an injury or a broken tooth?'], care: 'Arrange dental assessment; avoid placing aspirin directly on gums.' },
-  { system: 'reproductive', specialty: 'Gynecology & Obstetrics', terms: ['pregnant', 'pregnancy', 'menstrual pain', 'abnormal bleeding', 'pelvic pain', 'vaginal', 'menopause'], possible: ['a menstrual or hormonal cause', 'an infection or pelvic condition', 'a pregnancy-related condition that needs assessment'], questions: ['Could you be pregnant, and if so how far along?', 'Is there heavy bleeding, severe one-sided pain, fever, or fainting?', 'When did the symptoms begin?'], care: 'For pregnancy-related symptoms, seek professional advice promptly rather than self-treating.' },
+  { system: 'reproductive', specialty: 'Gynecology & Obstetrics', terms: ['pregnant', 'pregnancy', 'menstrual pain', 'irregular period', 'irregular periods', 'abnormal bleeding', 'pelvic pain', 'vaginal', 'menopause'], possible: ['a menstrual or hormonal cause', 'an infection or pelvic condition', 'a pregnancy-related condition that needs assessment'], questions: ['Could you be pregnant, and if so how far along?', 'Is there heavy bleeding, severe one-sided pain, fever, or fainting?', 'When did the symptoms begin?'], care: 'For pregnancy-related symptoms, seek professional advice promptly rather than self-treating.' },
   { system: 'mental health', specialty: 'Psychiatry', terms: ['anxious', 'anxiety', 'panic', 'depressed', 'low mood', 'stressed', 'stress', 'cannot stay safe', 'self harm', 'suicidal'], understanding: 'I understand that you may be feeling anxious or stressed. These feelings can affect thoughts, sleep, concentration, and sometimes cause physical symptoms such as a racing heart or sweating.', possible: ['stress or anxiety', 'a mood-related condition', 'a concern that deserves confidential professional support'], questions: ['Are you safe right now?', 'Are you having thoughts of harming yourself or someone else?', 'How long have you felt this way, and do you have support nearby?'], care: 'Reach out to a trusted person and a qualified mental-health professional; you do not have to manage this alone.' },
   { system: 'infectious/pediatric', specialty: 'Pediatrics', terms: ['my child', 'my baby', 'child has fever', 'child fever', 'fever', 'flu', 'covid', 'dengue', 'malaria', 'typhoid'], understanding: 'I understand that you are reporting fever or infection-like symptoms. The cause depends on the symptom pattern, examination, and sometimes tests.', possible: ['a common viral illness', 'another infection requiring assessment', 'a condition whose cause depends on examination and tests'], questions: ['What is the temperature and how long has it lasted?', 'Any breathing trouble, dehydration, rash, repeated vomiting, or unusual sleepiness?', 'If this is a child, what is their age?'], care: 'Rest, fluids, and monitoring may help mild illness. Children with concerning symptoms should be assessed promptly.' },
 ];
@@ -25,6 +26,7 @@ const EMERGENCY_PATTERN = /severe\s+(chest|abdominal|stomach)\s+pain|chest.*(cru
 const URGENT_PATTERN = /severe\s+eye\s+pain|persistent\s+vomit|high\s+fever|worsening|serious\s+injury|blood\s+in\s+(urine|stool)|unable\s+to\s+urinate|pregnan.*(pain|bleed)|urgent/i;
 const NEARBY_PATTERN = /near\s*(me|by|my|here)|nearby|nearest|closest|around\s+me|my\s+location/i;
 const SEARCH_PATTERN = /hospital|doctor|specialist|cardiologist|pediatrician|ophthalm|orthopedic|orthopaed|\bent\b|icu|blood\s*bank|ambulance|available\s*beds?|find|show\s+all|compare|cheapest|highest\s+rated/i;
+const MULTILINGUAL_NEARBY_PATTERN = /near\s*(me|by|my|here)|nearby|nearest|closest|around\s+me|my\s+location|ನನ್ನ\s*ಹತ್ತಿರ|ಹತ್ತಿರದ\s*ಆಸ್ಪತ್ರ|ಸುತ್ತಮುತ್ತ\s*ಆಸ್ಪತ್ರ|ಆಸ್ಪತ್ರೆ\s*ಬೇಕ|मेरे\s*(पास|नजदीक|आसपास)|नजदीकी\s*अस्पताल|पास\s*के\s*अस्पताल/i;
 
 const SPECIALTY_HINTS = {
   Ophthalmology: ['eye', 'eyes', 'vision', 'ophthalm'],
@@ -34,6 +36,25 @@ const SPECIALTY_HINTS = {
   Pediatrics: ['child', 'children', 'baby', 'pediatric', 'paediatric'],
   'Gynecology & Obstetrics': ['pregnan', 'maternity', 'women', 'gynec', 'obstetric'],
   Neurology: ['brain', 'nerve', 'neurolog'],
+  Urology: ['urology', 'urologist', 'urinary', 'kidney stone'],
+  Dermatology: ['dermatology', 'dermatologist', 'skin'],
+  'General Medicine': ['general medicine', 'physician'],
+};
+
+// Real directory data contains descriptive specialization names rather than a
+// single controlled vocabulary. These aliases make the database lookup broad
+// enough to find genuine equivalent records without ever fabricating one.
+const SPECIALTY_DATABASE_TERMS = {
+  Orthopedics: ['orthoped', 'ortho', 'trauma'],
+  Urology: ['urolog', 'genito urinary', 'genito-urinary'],
+  Dermatology: ['dermatolog', 'skin'],
+  Pediatrics: ['pediatr', 'paediatr', 'child specialist'],
+  'Gynecology & Obstetrics': ['gynecolog', 'gynaecolog', 'obstetric', 'obg', 'obgyn'],
+  Cardiology: ['cardiolog', 'cardiopulmonary'],
+  Neurology: ['neurolog', 'neurosurg', 'neuro surgeon'],
+  Pulmonology: ['pulmonolog', 'respiratory'],
+  Gastroenterology: ['gastroenterolog', 'digestive'],
+  'General Medicine': ['general medicine', 'general practice', 'physician'],
 };
 
 function asBoolean(value) { return value === true || value === 'true'; }
@@ -123,6 +144,14 @@ function isContextualFollowUp(message) {
   return !hasExplicitTopic && text.length <= 45 && /^(yes|no|it|this|that|they|them|what about|and|also|how|why|when|where|which|what symptoms|what should i do|is it|can i|should i)/.test(text);
 }
 
+function languageRequestedInMessage(message) {
+  const text = String(message || '').toLowerCase();
+  if (/ಕನ್ನಡದಲ್ಲಿ|kannada/.test(text)) return 'kn';
+  if (/हिंदी|हिन्दी|hindi/.test(text)) return 'hi';
+  if (/english|ಇಂಗ್ಲಿಷ್|अंग्रेजी/.test(text)) return 'en';
+  return null;
+}
+
 function assessSymptoms(message, context = {}, history = []) {
   const currentMessage = clinicalText(message);
   const useContext = isContextualFollowUp(currentMessage);
@@ -152,7 +181,7 @@ function hasUrgentCombination(assessment) {
 }
 
 async function resolveSpecialty(message) {
-  const specialties = await pool.query(`SELECT DISTINCT specialty FROM hospitals h CROSS JOIN LATERAL unnest(COALESCE(h.specialties, '{}')) specialty WHERE h.is_verified = true`);
+  const specialties = await pool.query(`SELECT DISTINCT specialty FROM hospitals h CROSS JOIN LATERAL unnest(COALESCE(h.specialties, '{}')) specialty WHERE h.is_verified = true OR h.directory_visible = true`);
   const available = specialties.rows.map((row) => row.specialty).filter(Boolean);
   const text = normalise(message);
   // Prefer unambiguous clinical language over substring matches.  In
@@ -182,15 +211,16 @@ function cityFromMessage(message) {
   return city || null;
 }
 
-async function searchHospitals({ latitude, longitude, specialty, city, emergency, icu, bloodBank, bloodGroup, ambulance, availableBeds, sort = 'distance', limit = 5 }) {
+async function searchHospitals({ latitude, longitude, specialty, city, emergency, icu, bloodBank, bloodGroup, ambulance, availableBeds, radius, sort = 'distance', limit = 5 }) {
   const nearby = hasCoordinates(latitude, longitude);
   const params = [];
   const add = (value) => { params.push(value); return `$${params.length}`; };
   const lat = nearby ? add(Number(latitude)) : null;
   const lng = nearby ? add(Number(longitude)) : null;
   const distance = nearby ? `(6371 * acos(LEAST(1.0, GREATEST(-1.0, cos(radians(${lat})) * cos(radians(h.latitude)) * cos(radians(h.longitude) - radians(${lng})) + sin(radians(${lat})) * sin(radians(h.latitude))))))` : 'NULL';
-  const filters = ['h.is_verified = true'];
+  const filters = ['(h.is_verified = true OR h.directory_visible = true)'];
   if (nearby) filters.push('h.latitude IS NOT NULL AND h.longitude IS NOT NULL');
+  if (nearby && Number.isFinite(Number(radius)) && Number(radius) > 0) filters.push(`${distance} <= ${add(Number(radius))}`);
   if (specialty) filters.push(`${add(specialty)} = ANY(h.specialties)`);
   if (city) filters.push(`h.city ILIKE ${add(`%${city}%`)}`);
   if (emergency) filters.push('h.emergency_available = true');
@@ -199,13 +229,13 @@ async function searchHospitals({ latitude, longitude, specialty, city, emergency
   if (bloodBank) filters.push(`EXISTS (SELECT 1 FROM blood_bank bb WHERE bb.hospital_id = h.id AND bb.units_available > 0${bloodGroup ? ` AND bb.blood_group = ${add(bloodGroup)}` : ''})`);
   if (ambulance) filters.push('EXISTS (SELECT 1 FROM ambulances a WHERE a.hospital_id = h.id AND a.is_available = true)');
   const order = sort === 'cost' ? 'consultation_cost ASC NULLS LAST, distance ASC NULLS LAST' : sort === 'rating' ? 'h.google_rating DESC NULLS LAST, distance ASC NULLS LAST' : sort === 'beds' ? 'available_beds DESC, distance ASC NULLS LAST' : 'distance ASC NULLS LAST, h.google_rating DESC NULLS LAST';
-  const query = `SELECT h.id, h.name, h.address, h.city, h.phone, h.latitude, h.longitude, h.google_rating, h.google_review_count, h.google_place_id, h.google_maps_url, h.rating_verified, h.rating_last_updated, h.specialties, h.emergency_available,
+  const query = `SELECT h.id, h.name, h.address, h.city, h.phone, h.email, h.latitude, h.longitude, h.google_rating, h.google_review_count, h.google_place_id, h.google_maps_url, h.rating_verified, h.rating_last_updated, h.specialties, h.emergency_available,
     COALESCE(hr.general_beds_available, 0) available_beds, COALESCE(hr.icu_beds_available, 0) available_icu,
     COALESCE(hr.ventilators_available, 0) available_ventilators, COALESCE((SELECT SUM(bb.units_available) FROM blood_bank bb WHERE bb.hospital_id=h.id${bloodGroup ? ` AND bb.blood_group = ${add(bloodGroup)}` : ''}), 0) blood_units,
     COALESCE((SELECT COUNT(*) FROM doctors d WHERE d.hospital_id=h.id AND d.availability_status=true), 0) doctor_count,
     (SELECT MIN(d.consultation_fee) FROM doctors d WHERE d.hospital_id=h.id AND d.availability_status=true) consultation_cost,
     EXISTS (SELECT 1 FROM ambulances a WHERE a.hospital_id=h.id AND a.is_available=true) ambulance_available, ${distance} distance
-    FROM hospitals h LEFT JOIN hospital_resources hr ON hr.hospital_id=h.id WHERE ${filters.join(' AND ')} ORDER BY ${order} LIMIT ${add(Math.min(Math.max(Number(limit) || 5, 1), 20))}`;
+    FROM hospitals h LEFT JOIN hospital_resources hr ON hr.hospital_id=h.id WHERE ${filters.join(' AND ')} ORDER BY ${order} LIMIT ${add(Math.min(Math.max(Number(limit) || 5, 1), 50))}`;
   const result = await pool.query(query, params);
   return result.rows.map((row) => ({ ...row, google_rating: row.rating_verified ? Number(row.google_rating) : null, google_review_count: row.rating_verified ? Number(row.google_review_count) : null, distance: row.distance == null ? null : Number(row.distance), available_beds: Number(row.available_beds), available_icu: Number(row.available_icu), available_ventilators: Number(row.available_ventilators), blood_units: Number(row.blood_units), doctor_count: Number(row.doctor_count), consultation_cost: row.consultation_cost == null ? null : Number(row.consultation_cost) }));
 }
@@ -217,10 +247,15 @@ async function searchDoctors({ latitude, longitude, specialty, limit = 20 }) {
   const lat = nearby ? add(Number(latitude)) : null;
   const lng = nearby ? add(Number(longitude)) : null;
   const distance = nearby ? `(6371 * acos(LEAST(1.0, GREATEST(-1.0, cos(radians(${lat})) * cos(radians(h.latitude)) * cos(radians(h.longitude) - radians(${lng})) + sin(radians(${lat})) * sin(radians(h.latitude))))))` : 'NULL';
-  const filters = ['h.is_verified = true', 'd.availability_status = true'];
+  const filters = ['(h.is_verified = true OR h.directory_visible = true)'];
   if (nearby) filters.push('h.latitude IS NOT NULL AND h.longitude IS NOT NULL');
-  if (specialty) filters.push(`(d.specialization ILIKE ${add(`%${specialty}%`)} OR ${add(specialty)} = ANY(h.specialties))`);
-  const result = await pool.query(`SELECT d.id, d.name, d.specialization, d.qualification, d.experience_years, d.consultation_fee, d.phone,
+  if (specialty) {
+    const terms = [...new Set([specialty, ...(SPECIALTY_DATABASE_TERMS[specialty] || [])])];
+    const doctorMatches = terms.map((term) => `d.specialization ILIKE ${add(`%${term}%`)}`);
+    const hospitalMatches = terms.map((term) => `array_to_string(COALESCE(h.specialties, '{}'), ' ') ILIKE ${add(`%${term}%`)}`);
+    filters.push(`(${doctorMatches.join(' OR ')} OR ${hospitalMatches.join(' OR ')})`);
+  }
+  const result = await pool.query(`SELECT d.id, d.name, d.specialization, d.designation, d.department, d.qualification, d.experience_years, d.experience_display, d.availability, d.availability_status, d.verification_status, d.consultation_fee, d.phone,
     h.id hospital_id, h.name hospital_name, h.address, h.city, h.latitude, h.longitude, h.emergency_available, h.google_rating, h.google_review_count, h.rating_verified, ${distance} distance,
     (SELECT COUNT(*) FROM doctor_available_slots s WHERE s.doctor_id=d.id AND s.is_available=true AND s.slot_date >= CURRENT_DATE
       AND NOT EXISTS (SELECT 1 FROM appointments a WHERE a.doctor_id=s.doctor_id AND a.appointment_date=s.slot_date AND a.appointment_time=s.slot_time AND a.status NOT IN ('cancelled','rejected','completed'))) available_slots
@@ -233,7 +268,7 @@ function groupDoctorsByHospital(doctors) {
   const grouped = new Map();
   for (const doctor of doctors) {
     if (!grouped.has(doctor.hospital_id)) grouped.set(doctor.hospital_id, { id: doctor.hospital_id, name: doctor.hospital_name, address: doctor.address, city: doctor.city, latitude: doctor.latitude == null ? null : Number(doctor.latitude), longitude: doctor.longitude == null ? null : Number(doctor.longitude), emergency_available: doctor.emergency_available, rating_verified: doctor.rating_verified, google_rating: doctor.rating_verified ? Number(doctor.google_rating) : null, google_review_count: doctor.rating_verified ? Number(doctor.google_review_count) : null, distance: doctor.distance, doctors: [] });
-    grouped.get(doctor.hospital_id).doctors.push({ id: doctor.id, name: doctor.name, specialization: doctor.specialization, qualification: doctor.qualification, experience_years: doctor.experience_years, consultation_fee: doctor.consultation_fee, available_slots: doctor.available_slots, phone: doctor.phone });
+    grouped.get(doctor.hospital_id).doctors.push({ id: doctor.id, name: doctor.name, specialization: doctor.specialization, designation: doctor.designation, qualification: doctor.qualification, experience_years: doctor.experience_years, experience_display: doctor.experience_display, availability: doctor.availability, availability_status: doctor.availability_status, consultation_fee: doctor.consultation_fee, available_slots: doctor.available_slots, phone: doctor.phone });
   }
   return [...grouped.values()];
 }
@@ -245,6 +280,17 @@ function hospitalSummary(hospitals, { comparison = false } = {}) {
 }
 
 function classifyIntent(text, context = {}, specialty = null) {
+  const shortReference = /^(where|which one|who|this one|that one|details|more|there|here|why|how)\??$/i.test(String(text || '').trim());
+  if (shortReference) {
+    if (['NEARBY_HOSPITALS', 'HOSPITAL_SEARCH', 'HOSPITAL_COMPARISON'].includes(context?.lastIntent)) return 'NEARBY_HOSPITALS';
+    if (['NEARBY_DOCTORS', 'DOCTOR_SEARCH', 'DOCTOR_RECOMMENDATION'].includes(context?.lastIntent)) return 'NEARBY_DOCTORS';
+    return 'AMBIGUOUS';
+  }
+  // Questions asking for definitions or general health education are not a
+  // request for a real provider merely because they mention a specialty.
+  const educational = /^(what\s+(is|are)|what\s+causes?|what\s+symptoms|why\s+does|difference\s+between|how\s+does)/i.test(text);
+  const explicitDirectoryRequest = /hospital\s+(near|in|at)|nearby\s+hospital|nearest\s+hospital|show\s+.*hospital|doctors?\s+(at|in|near)|book\s+(an\s+)?appointment/i.test(text);
+  if (educational && !explicitDirectoryRequest) return 'GENERAL_HEALTH';
   // Emergency is intentionally handled before this router.
   if (/\b(reschedule|change).*(appointment|visit)|appointment.*\b(reschedule|change)/i.test(text)) return 'APPOINTMENT_RESCHEDULE';
   if (/\b(cancel|delete).*(appointment|visit)|appointment.*\bcancel/i.test(text)) return 'APPOINTMENT_CANCEL';
@@ -259,12 +305,50 @@ function classifyIntent(text, context = {}, specialty = null) {
   // Continue an appointment workflow for a specialty, hospital preference, or
   // short confirmation, unless one of the explicit topic intents above won.
   if (context?.workflow === 'appointment' && (specialty || /^(it|that one|yes|nearest|closest|tomorrow|today|\d{1,2}(:\d{2})?\s*(am|pm)?)\b/i.test(text))) return 'APPOINTMENT_BOOK';
-  if (/\b(doctor|doctors|specialist|cardiologist|pediatrician|ophthalmologist|\bent\b)\b/i.test(text)) return 'DOCTOR_SEARCH';
+  if (MULTILINGUAL_NEARBY_PATTERN.test(text)) return specialty || context?.specialty ? 'NEARBY_DOCTORS' : 'NEARBY_HOSPITALS';
+  if (/\b(doctor|doctors|specialist|cardiologist|pediatrician|ophthalmologist|urologist|dermatologist|\bent\b)\b/i.test(text)) return 'DOCTOR_SEARCH';
   if (/\b(?:a|b|ab|o)\s*[+-](?=\s|$)\s*blood\b/i.test(text)) return 'HOSPITAL_SEARCH';
   if (/compare/i.test(text)) return 'HOSPITAL_COMPARISON';
   if (/hospital|nearby|nearest|closest|\bicu\b|blood\s*bank|ambulance|available\s*beds?|find\s+(an?|the)|show\s+all/i.test(text)) return 'HOSPITAL_SEARCH';
-  if (specialty) return 'DOCTOR_SEARCH';
   return 'GENERAL_HEALTH';
+}
+
+function specialtyFromMessage(message, fallback = null) {
+  const text = normalise(message);
+  for (const [specialty, hints] of Object.entries(SPECIALTY_HINTS)) {
+    if (hints.some((hint) => {
+      const phrase = normalise(hint).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`(^|\\s)${phrase}(?=\\s|$)`).test(text);
+    })) return specialty;
+  }
+  return fallback;
+}
+
+function databaseReply({ intent, response, hospitals = [], doctors = [], specialty, language, context = {}, requiresLocation = false }) {
+  const actions = [];
+  if (hospitals.length) actions.push({ type: 'VIEW_HOSPITALS', label: localizedText[language].hospitals });
+  if (doctors.length) actions.push({ type: 'BOOK_APPOINTMENT', label: localizedText[language].book });
+  return {
+    intent,
+    type: intent === 'SYMPTOM_HOSPITAL_RECOMMENDATION' ? 'symptom_hospital_recommendation' : doctors.length ? 'doctor_results' : hospitals.length ? 'hospital_results' : 'database',
+    severity: 'mild',
+    specialty: specialty || null,
+    requiresLocation,
+    doctors: doctors.map((doctor) => localizeDoctor(doctor, language)),
+    hospitals: hospitals.map((hospital) => localizeHospital(hospital, language)),
+    actions,
+    response,
+    context: { ...context, specialty: specialty || null, language, lastIntent: intent },
+  };
+}
+
+function symptomRecommendationText(language, specialty) {
+  const labels = {
+    en: `Based on your symptoms, a ${specialty || 'relevant'} specialist may be appropriate. Here are matching doctors and hospitals from the directory.`,
+    kn: `ನಿಮ್ಮ ಲಕ್ಷಣಗಳ ಆಧಾರದಲ್ಲಿ ${specialty || 'ಸೂಕ್ತ'} ತಜ್ಞರು ಸೂಕ್ತರಾಗಿರಬಹುದು. ಡೈರೆಕ್ಟರಿಯಲ್ಲಿರುವ ಹೊಂದಾಣಿಕೆಯ ವೈದ್ಯರು ಮತ್ತು ಆಸ್ಪತ್ರೆಗಳು ಇಲ್ಲಿವೆ.`,
+    hi: `आपके लक्षणों के आधार पर ${specialty || 'उपयुक्त'} विशेषज्ञ उचित हो सकते हैं। निर्देशिका में मिलते-जुलते डॉक्टर और अस्पताल यहां हैं।`,
+  };
+  return labels[language] || labels.en;
 }
 
 async function getAppointments(userId) {
@@ -276,7 +360,8 @@ async function getAppointments(userId) {
   return result.rows;
 }
 
-async function respond({ message, latitude, longitude, context = {}, history = [] }) {
+async function respond({ message, latitude, longitude, language, context = {}, history = [] }) {
+  const requestedLanguage = languageRequestedInMessage(message) || validLanguage(language || context.language);
   const text = String(message || '').trim();
   const normalisedText = clinicalText(text);
   const assessment = assessSymptoms(normalisedText, context, history);
@@ -289,42 +374,85 @@ async function respond({ message, latitude, longitude, context = {}, history = [
   if (emergency) {
     const response = suicidal
       ? 'I’m really sorry you’re going through this. Your safety matters right now. Please call 112 or 108, go to the nearest emergency department, or contact a trusted person who can stay with you. If you might act on these thoughts, move away from anything you could use to hurt yourself and do not stay alone. Are you in immediate danger right now?'
-      : 'This could be an emergency. Please call 112 or 108 or seek emergency care immediately. If possible, ask someone nearby to help and avoid driving yourself.';
-    return { intent: 'emergency', type: 'emergency', severity: 'emergency', showSos: true, actions: [{ type: 'EMERGENCY_SOS', label: 'Emergency SOS' }], response, context: {} };
+      : localizedText[requestedLanguage].emergency;
+    return { intent: 'emergency', type: 'emergency', severity: 'emergency', showSos: true, actions: [{ type: 'EMERGENCY_SOS', label: localizedText[requestedLanguage].sos }], response, context: { language: requestedLanguage } };
+  }
+
+  // Decide whether to retrieve records *before* invoking the model.  The
+  // database remains the source of truth for every real hospital or doctor.
+  const specialty = specialtyFromMessage(normalisedText,
+    assessment.primary?.specialty || (isContextualFollowUp(normalisedText) ? context.specialty : null));
+  let intent = classifyIntent(text, context, specialty);
+  // Symptoms plus a treatment/hospital request must be routed to matching
+  // doctors and their hospitals, never to an unfiltered directory search.
+  if (intent === 'HOSPITAL_SEARCH' && assessment.primary && specialty) {
+    intent = 'SYMPTOM_HOSPITAL_RECOMMENDATION';
+  }
+  const nearbyIntent = intent === 'NEARBY_HOSPITALS' || intent === 'NEARBY_DOCTORS';
+  const doctorIntent = intent === 'DOCTOR_SEARCH' || intent === 'NEARBY_DOCTORS' || intent === 'SYMPTOM_HOSPITAL_RECOMMENDATION' || (intent === 'HOSPITAL_SEARCH' && Boolean(specialty));
+  const hospitalIntent = nearbyIntent || intent === 'HOSPITAL_SEARCH' || intent === 'HOSPITAL_COMPARISON' || intent === 'SYMPTOM_HOSPITAL_RECOMMENDATION';
+  const databaseContext = { intent, userLocation: hasCoordinates(latitude, longitude) ? { latitude: Number(latitude), longitude: Number(longitude) } : null };
+
+  if (intent === 'AMBIGUOUS') {
+    return {
+      intent,
+      type: 'llm',
+      severity: 'mild',
+      specialty: null,
+      doctors: [],
+      hospitals: [],
+      actions: [],
+      response: localizedText[requestedLanguage].clarification,
+      context: { language: requestedLanguage, lastIntent: intent },
+    };
+  }
+
+  if (nearbyIntent && !hasCoordinates(latitude, longitude)) {
+    return databaseReply({ intent, response: localizedText[requestedLanguage].locationRequired, specialty, language: requestedLanguage, requiresLocation: true, context: databaseContext });
+  }
+
+  if (doctorIntent || hospitalIntent) {
+    try {
+      let doctors = [];
+      let hospitals = [];
+      if (doctorIntent && specialty) {
+        doctors = await searchDoctors({ latitude, longitude, specialty, limit: nearbyIntent ? 20 : 10 });
+        hospitals = groupDoctorsByHospital(doctors);
+      } else if (hospitalIntent) {
+        hospitals = await searchHospitals({ latitude, longitude, specialty, radius: nearbyIntent ? 20 : null, limit: nearbyIntent ? 50 : 10 });
+      }
+      databaseContext.hospitals = hospitals;
+      databaseContext.doctors = doctors;
+      console.info(`[CareGuide] ${intent} database lookup: ${hospitals.length} hospitals, ${doctors.length} doctors`);
+      const response = intent === 'SYMPTOM_HOSPITAL_RECOMMENDATION'
+        ? symptomRecommendationText(requestedLanguage, specialty)
+        : doctorIntent
+          ? localizedText[requestedLanguage].nearbyDoctors
+        : nearbyIntent ? localizedText[requestedLanguage].nearbyHospitals : localizedText[requestedLanguage].hospitalsFound;
+      return databaseReply({ intent, response, hospitals, doctors, specialty, language: requestedLanguage, context: { ...databaseContext, symptoms: assessment.currentMessage.slice(-800), system: assessment.primary?.system || null } });
+    } catch (error) {
+      console.error(`[CareGuide] ${intent} database lookup failed:`, error);
+      return databaseReply({ intent, response: localizedText[requestedLanguage].directoryUnavailable, specialty, language: requestedLanguage, context: databaseContext });
+    }
   }
 
   const ai = await generateCareGuideReply({
     message: text,
     history,
-    databaseContext: { priorSpecialty: context.specialty || null, detectedSymptoms: assessment.primary?.system || null },
+    language: requestedLanguage,
+    databaseContext: { ...databaseContext, priorSpecialty: context.specialty || null, detectedSymptoms: assessment.primary?.system || null },
   });
-  const requestedDoctor = ai.needsDoctorRecommendation || /\b(which|what|recommend).{0,30}\bdoctor|\bdoctor|specialist\b/i.test(normalisedText);
-  const specialty = ai.specialization || assessment.primary?.specialty || (isContextualFollowUp(normalisedText) ? context.specialty : null);
-  let doctors = [];
-  let hospitals = [];
-  if (requestedDoctor && specialty) {
-    doctors = await searchDoctors({ latitude, longitude, specialty, limit: 5 });
-    hospitals = groupDoctorsByHospital(doctors);
-    console.info(`[CareGuide] Doctor lookup required: true; doctors found: ${doctors.length}`);
-  }
-  const wantsHospital = SEARCH_PATTERN.test(normalisedText) || NEARBY_PATTERN.test(normalisedText);
-  if (!hospitals.length && wantsHospital) {
-    hospitals = await searchHospitals({ latitude, longitude, specialty, emergency: false, limit: 5 });
-  }
-  const actions = [];
-  if (hospitals.length) actions.push({ type: 'VIEW_HOSPITALS', label: 'View Hospitals' });
-  if (doctors.length) actions.push({ type: 'BOOK_APPOINTMENT', label: 'Book Appointment' });
   return {
     intent: ai.intent,
-    type: ai.topic,
+    type: 'llm',
     severity: assessment.primary ? 'moderate' : 'mild',
     specialty,
-    doctors,
-    hospitals,
-    actions,
+    doctors: [],
+    hospitals: [],
+    actions: [],
     response: ai.response,
-    context: { symptoms: assessment.currentMessage.slice(-800), specialty: specialty || null, system: assessment.primary?.system || null },
+    context: { symptoms: assessment.currentMessage.slice(-800), specialty: specialty || null, system: assessment.primary?.system || null, language: requestedLanguage, lastIntent: ai.intent },
   };
 }
 
-module.exports = { respond, searchHospitals, searchDoctors, normalizePatientMessage: clinicalText, assessSymptoms };
+module.exports = { respond, searchHospitals, searchDoctors, classifyIntent, normalizePatientMessage: clinicalText, assessSymptoms };

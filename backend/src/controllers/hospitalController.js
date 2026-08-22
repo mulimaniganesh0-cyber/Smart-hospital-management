@@ -258,7 +258,7 @@ exports.getNearbyHospitals = async (req, res) => {
         (SELECT COUNT(*) FROM appointments a WHERE a.hospital_id = h.id AND a.status = 'pending' AND a.appointment_date = CURRENT_DATE) * 15 as waiting_time
       FROM hospitals h
       LEFT JOIN hospital_resources hr ON h.id = hr.hospital_id
-      WHERE h.is_verified = true AND h.latitude IS NOT NULL AND h.longitude IS NOT NULL AND ${haversineFormula} <= $3
+      WHERE (h.is_verified = true OR h.directory_visible = true) AND h.latitude IS NOT NULL AND h.longitude IS NOT NULL AND ${haversineFormula} <= $3
         AND ($4::text IS NULL OR $4 = ANY(h.specialties))
         AND ($5::boolean IS NOT TRUE OR h.emergency_available = true)
         AND ($6::boolean IS NOT TRUE OR COALESCE(hr.icu_beds_available, 0) > 0)
@@ -369,7 +369,7 @@ exports.getAllHospitals = async (req, res) => {
         COALESCE(hr.updated_at, h.created_at) as last_updated
       FROM hospitals h
       LEFT JOIN hospital_resources hr ON h.id = hr.hospital_id
-      WHERE h.is_verified = true
+      WHERE (h.is_verified = true OR h.directory_visible = true)
     `;
     
     const params = [];
@@ -734,13 +734,14 @@ exports.getHospitalDoctors = async (req, res) => {
     const { hospitalId } = req.params;
     
     const result = await pool.query(
-      `SELECT id, name, specialization as designation, 
-              qualification, experience_years, 
-              availability_status as is_available,
-              phone, email
-       FROM doctors 
-       WHERE hospital_id = $1 AND availability_status = true
-       ORDER BY name`,
+      `SELECT d.id, d.name, d.specialization, d.designation, d.department,
+              qualification, experience_years, experience_display, availability,
+              availability_status, verification_status, profile_image, bio,
+              phone
+       FROM doctors d
+       JOIN hospitals h ON h.id = d.hospital_id
+       WHERE d.hospital_id = $1 AND (h.is_verified = true OR h.directory_visible = true)
+       ORDER BY d.name`,
       [hospitalId]
     );
     
@@ -912,9 +913,9 @@ exports.getHospitalDetails = async (req, res) => {
              COALESCE(hr.icu_beds_total, 0) icu_beds,
              COALESCE(hr.icu_beds_available, 0) available_icu
       FROM hospitals h LEFT JOIN hospital_resources hr ON hr.hospital_id = h.id
-      WHERE h.id = $1 AND h.is_verified = true`, [hospitalId]);
+      WHERE h.id = $1 AND (h.is_verified = true OR h.directory_visible = true)`, [hospitalId]);
     if (!result.rowCount) return res.status(404).json({ success: false, message: 'Hospital not found' });
-    const doctors = await pool.query(`SELECT id, name, specialization, qualification, experience_years, consultation_fee, phone FROM doctors WHERE hospital_id = $1 AND availability_status = true ORDER BY name`, [hospitalId]);
+    const doctors = await pool.query(`SELECT id, name, specialization, designation, department, qualification, experience_years, experience_display, availability, availability_status, verification_status, profile_image, bio, consultation_fee, phone FROM doctors WHERE hospital_id = $1 AND availability_status = true ORDER BY name`, [hospitalId]);
     res.json({ success: true, data: { ...result.rows[0], doctors: doctors.rows } });
   } catch (error) {
     console.error('Get hospital details error:', error);

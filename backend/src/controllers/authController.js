@@ -25,8 +25,8 @@ exports.register = async (req, res) => {
       });
     }
 
-    // Administrative accounts are provisioned by an administrator only.
-    // Never trust a role supplied by a public registration form.
+    // Only the frontend-authenticated registration flow may create patient or hospital accounts.
+    // Administrative and staff accounts are provisioned server-side by authorized hospital admins.
     if (!['patient', 'hospital'].includes(user_type)) {
       return res.status(400).json({
         success: false,

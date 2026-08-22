@@ -32,19 +32,23 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL 
   .filter(Boolean);
 
 // ==================== CORS CONFIGURATION ====================
-// First, set up CORS with the cors package
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) {
       return callback(null, true);
     }
-    
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Origin is not allowed by CORS'));
+
+    // Local development without a configured allowlist should still work.
+    if (process.env.NODE_ENV !== 'production' && allowedOrigins.length === 0) {
+      return callback(null, true);
     }
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    callback(new Error('Origin is not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
@@ -129,8 +133,6 @@ app.use('/api/careguide', chatbotRoutes);
 app.use('/api/medical', medicalRoutes);
 app.use('/api/doctors', doctorRoutes);
 app.use('/api', reviewRoutes);
-// Backward-compatible public API paths. Their handlers still require authentication.
-app.use('/api', medicalRoutes);
 
 
 // Health check endpoint

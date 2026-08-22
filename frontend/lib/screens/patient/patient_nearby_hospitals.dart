@@ -697,6 +697,11 @@ class HospitalDetailScreen extends StatelessWidget {
                   : [const Text('Not available')],
             ),
             const SizedBox(height: 20),
+
+            // This directory is intentionally loaded from the shared backend
+            // doctor records; CareGuide and appointment booking use the same IDs.
+            _HospitalDoctorsSection(hospital: hospital),
+            const SizedBox(height: 20),
             
             // Last Updated
             Text(
@@ -813,13 +818,71 @@ class HospitalDetailScreen extends StatelessWidget {
   }
 }
 
+class _HospitalDoctorsSection extends StatelessWidget {
+  const _HospitalDoctorsSection({required this.hospital});
+  final Hospital hospital;
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
+    future: ApiService.getHospitalDoctors(hospital.id),
+    builder: (context, snapshot) {
+      if (snapshot.connectionState != ConnectionState.done) {
+        return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
+      }
+      final data = snapshot.data;
+      final doctors = data?['data'] is List ? List<Map<String, dynamic>>.from((data!['data'] as List).whereType<Map>().map((item) => Map<String, dynamic>.from(item))) : <Map<String, dynamic>>[];
+      if (doctors.isEmpty) return const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Doctors', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), SizedBox(height: 8), Text('Doctor information is not currently provided.')]);
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Doctors at ${hospital.name}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        ...doctors.map((doctor) => Card(child: ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+          title: Text(doctor['name']?.toString() ?? 'Doctor'),
+          subtitle: Text([doctor['designation'], doctor['specialization'], doctor['qualification'], doctor['experience_display']].where((value) => value != null && value.toString().isNotEmpty).join('\n')),
+          isThreeLine: true,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DoctorProfileScreen(hospital: hospital, doctor: doctor))),
+          trailing: const Icon(Icons.chevron_right),
+        ))),
+      ]);
+    },
+  );
+}
+
+class DoctorProfileScreen extends StatelessWidget {
+  const DoctorProfileScreen({super.key, required this.hospital, required this.doctor});
+  final Hospital hospital;
+  final Map<String, dynamic> doctor;
+
+  @override
+  Widget build(BuildContext context) {
+    final available = doctor['availability_status'] == true;
+    final fields = <MapEntry<String, dynamic>>[
+      MapEntry('Qualification', doctor['qualification']), MapEntry('Designation', doctor['designation']),
+      MapEntry('Specialization', doctor['specialization']), MapEntry('Department', doctor['department']),
+      MapEntry('Experience', doctor['experience_display'] ?? (doctor['experience_years'] == null ? null : '${doctor['experience_years']} years')),
+      MapEntry('Availability', doctor['availability'] ?? (available ? 'Available' : 'Not currently provided')),
+      MapEntry('Verification', doctor['verification_status']),
+    ];
+    return Scaffold(appBar: AppBar(title: const Text('Doctor Profile')), body: ListView(padding: const EdgeInsets.all(16), children: [
+      Center(child: CircleAvatar(radius: 40, backgroundImage: doctor['profile_image'] == null ? null : NetworkImage(doctor['profile_image'].toString()), child: doctor['profile_image'] == null ? const Icon(Icons.person, size: 40) : null)),
+      const SizedBox(height: 12), Center(child: Text(doctor['name']?.toString() ?? 'Doctor', style: Theme.of(context).textTheme.titleLarge)), const SizedBox(height: 18),
+      ...fields.where((entry) => entry.value != null && entry.value.toString().isNotEmpty).map((entry) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Text('${entry.key}: ${entry.value}'))),
+      if (doctor['bio'] != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(doctor['bio'].toString())),
+      const Divider(height: 30), Text(hospital.name, style: const TextStyle(fontWeight: FontWeight.bold)), Text(hospital.address), const SizedBox(height: 18),
+      SizedBox(width: double.infinity, child: ElevatedButton(onPressed: available ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => BookingScreen(hospital: hospital, initialDoctorId: doctor['id'] as int?))) : null, child: Text(available ? 'Book Appointment' : 'Availability not currently provided'))),
+    ]));
+  }
+}
+
 // ==================== BOOKING SCREEN ====================
 class BookingScreen extends StatefulWidget {
   final Hospital hospital;
+  final int? initialDoctorId;
 
   const BookingScreen({
     super.key,
     required this.hospital,
+    this.initialDoctorId,
   });
 
   @override
@@ -864,7 +927,10 @@ class _BookingScreenState extends State<BookingScreen> {
 
         // Set initial selection
         if (_doctors.isNotEmpty) {
-          _selectedDoctorId = _doctors[0]['id'].toString();
+          final requestedId = widget.initialDoctorId?.toString();
+          _selectedDoctorId = _doctors.any((doctor) => doctor['id'].toString() == requestedId)
+              ? requestedId
+              : _doctors[0]['id'].toString();
         }
       }
     } catch (e) {

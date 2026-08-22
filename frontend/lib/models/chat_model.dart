@@ -156,7 +156,7 @@ class DoctorRecommendation {
   Map<String, dynamic> toJson() => {'id': id, 'name': name, 'specialization': specialization, 'experience_years': experienceYears, 'consultation_fee': consultationFee, 'available_slots': availableSlots};
   factory DoctorRecommendation.fromJson(Map<String, dynamic> json) => DoctorRecommendation(
     id: json['id'] is num ? (json['id'] as num).toInt() : int.tryParse('${json['id']}') ?? 0,
-    name: '${json['name'] ?? 'Doctor'}', specialization: '${json['specialization'] ?? 'General care'}',
+    name: '${json['display_name'] ?? json['name'] ?? 'Doctor'}', specialization: '${json['display_specialization'] ?? json['specialization'] ?? 'General care'}',
     experienceYears: json['experience_years'] is num ? (json['experience_years'] as num).toInt() : int.tryParse('${json['experience_years']}') ?? 0,
     consultationFee: json['consultation_fee'] is num ? (json['consultation_fee'] as num).toDouble() : double.tryParse('${json['consultation_fee'] ?? ''}'),
     availableSlots: json['available_slots'] is num ? (json['available_slots'] as num).toInt() : int.tryParse('${json['available_slots']}') ?? 0,

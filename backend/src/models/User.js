@@ -15,7 +15,7 @@ class User {
 
   static async findByEmail(email) {
     const result = await pool.query(
-      'SELECT id, name, email, phone, password_hash, user_type, is_verified, created_at FROM users WHERE email = $1',
+      'SELECT id, name, email, phone, password_hash, user_type, role, hospital_role, permissions, hospital_id, is_verified, created_at FROM users WHERE email = $1',
       [email]
     );
     return result.rows[0];
@@ -23,7 +23,7 @@ class User {
 
   static async findById(id) {
     const result = await pool.query(
-      'SELECT id, name, email, phone, user_type, is_verified, created_at FROM users WHERE id = $1',
+      'SELECT id, name, email, phone, user_type, role, hospital_role, permissions, hospital_id, is_verified, created_at FROM users WHERE id = $1',
       [id]
     );
     return result.rows[0];

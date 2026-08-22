@@ -2,8 +2,26 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
-if (!process.env.DB_PASSWORD) {
-  throw new Error('DB_PASSWORD must be set');
+const requiredEnv = ['DB_PASSWORD'];
+const missingEnv = requiredEnv.filter((key) => !process.env[key] || !String(process.env[key]).trim());
+
+if (missingEnv.length > 0) {
+  throw new Error(`Missing required environment variable(s): ${missingEnv.join(', ')}`);
+}
+
+if (!process.env.JWT_SECRET || String(process.env.JWT_SECRET).trim().length < 32) {
+  throw new Error('JWT_SECRET must be set to a value at least 32 characters long');
+}
+
+if (process.env.NODE_ENV === 'production') {
+  const origins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (origins.length === 0) {
+    throw new Error('ALLOWED_ORIGINS or FRONTEND_URL must be set in production');
+  }
 }
 
 const pool = new Pool({

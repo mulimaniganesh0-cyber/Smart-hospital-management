@@ -12,7 +12,10 @@ const createTables = async () => {
       email VARCHAR(255) UNIQUE NOT NULL,
       phone VARCHAR(20),
       password_hash VARCHAR(255) NOT NULL,
-      user_type VARCHAR(50) CHECK (user_type IN ('patient', 'hospital', 'admin')) NOT NULL,
+      user_type VARCHAR(50) CHECK (user_type IN ('patient', 'hospital', 'admin', 'staff')) NOT NULL,
+      role VARCHAR(50) DEFAULT NULL,
+      hospital_role VARCHAR(50) DEFAULT NULL,
+      permissions TEXT[] DEFAULT '{}',
       is_verified BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -25,14 +28,22 @@ const createTables = async () => {
       name VARCHAR(255) NOT NULL,
       registration_number VARCHAR(100) UNIQUE NOT NULL,
       address TEXT NOT NULL,
+      area VARCHAR(255),
       city VARCHAR(100),
       state VARCHAR(100),
+      country VARCHAR(100),
       pincode VARCHAR(10),
+      hospital_type VARCHAR(100),
+      departments TEXT[] DEFAULT '{}',
+      specialties TEXT[] DEFAULT '{}',
+      services TEXT[] DEFAULT '{}',
+      emergency_available BOOLEAN DEFAULT FALSE,
       phone VARCHAR(20),
       email VARCHAR(255),
       latitude DECIMAL(10, 8),
       longitude DECIMAL(11, 8),
       is_verified BOOLEAN DEFAULT FALSE,
+      directory_visible BOOLEAN DEFAULT FALSE,
       verification_status VARCHAR(50) DEFAULT 'pending',
       rating DECIMAL(3, 2) DEFAULT 0,
       total_reviews INTEGER DEFAULT 0,
@@ -50,7 +61,7 @@ const createTables = async () => {
     // Hospital Resources table
     `CREATE TABLE IF NOT EXISTS hospital_resources (
       id SERIAL PRIMARY KEY,
-      hospital_id INTEGER REFERENCES hospitals(id) ON DELETE CASCADE,
+      hospital_id INTEGER NOT NULL REFERENCES hospitals(id) ON DELETE CASCADE,
       general_beds_total INTEGER DEFAULT 0,
       general_beds_available INTEGER DEFAULT 0,
       icu_beds_total INTEGER DEFAULT 0,
@@ -59,7 +70,8 @@ const createTables = async () => {
       ventilators_available INTEGER DEFAULT 0,
       oxygen_supported_beds_total INTEGER DEFAULT 0,
       oxygen_supported_beds_available INTEGER DEFAULT 0,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(hospital_id)
     )`,
 
     // Patients table
@@ -79,23 +91,34 @@ const createTables = async () => {
     // Doctors table
     `CREATE TABLE IF NOT EXISTS doctors (
       id SERIAL PRIMARY KEY,
-      hospital_id INTEGER REFERENCES hospitals(id) ON DELETE CASCADE,
+      hospital_id INTEGER NOT NULL REFERENCES hospitals(id) ON DELETE CASCADE,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       name VARCHAR(255) NOT NULL,
       specialization VARCHAR(255),
+      designation TEXT,
+      department TEXT,
       qualification TEXT,
       experience_years INTEGER,
+      experience_display TEXT,
+      registration_number TEXT,
+      availability TEXT,
       availability_status BOOLEAN DEFAULT TRUE,
       consultation_fee DECIMAL(10, 2),
       phone VARCHAR(20),
       email VARCHAR(255),
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      profile_image TEXT,
+      bio TEXT,
+      verification_status VARCHAR(80) DEFAULT 'HOSPITAL_CONFIRMATION_REQUIRED',
+      source_url TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
 
     // Appointments table
     `CREATE TABLE IF NOT EXISTS appointments (
       id SERIAL PRIMARY KEY,
       patient_id INTEGER REFERENCES patients(id) ON DELETE CASCADE,
-      hospital_id INTEGER REFERENCES hospitals(id) ON DELETE CASCADE,
+      hospital_id INTEGER NOT NULL REFERENCES hospitals(id) ON DELETE CASCADE,
       doctor_id INTEGER REFERENCES doctors(id),
       appointment_date DATE NOT NULL,
       appointment_time TIME NOT NULL,
@@ -196,6 +219,22 @@ const createTables = async () => {
       type VARCHAR(50),
       is_read BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS roles (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(100) UNIQUE NOT NULL,
+      description TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS staff_activity_log (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      hospital_id INTEGER REFERENCES hospitals(id) ON DELETE CASCADE,
+      action VARCHAR(100) NOT NULL,
+      details JSONB DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`
   ];
 
@@ -205,6 +244,26 @@ const createTables = async () => {
     for (const query of queries) {
       await pool.query(query);
     }
+
+    await pool.query(`
+      ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT NULL,
+      ADD COLUMN IF NOT EXISTS hospital_id INTEGER REFERENCES hospitals(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS hospital_role VARCHAR(50) DEFAULT NULL,
+      ADD COLUMN IF NOT EXISTS permissions TEXT[] DEFAULT '{}'::text[]
+    `);
+
+    await pool.query(`
+      INSERT INTO roles (name, description)
+      VALUES
+        ('doctor', 'Hospital doctor access'),
+        ('nurse', 'Hospital nursing access'),
+        ('frontdesk', 'Front desk and scheduling access'),
+        ('billing', 'Billing and records access'),
+        ('hospital_admin', 'Hospital admin access'),
+        ('super_admin', 'System administrator access')
+      ON CONFLICT (name) DO NOTHING
+    `);
     
     console.log('✅ All tables created successfully');
     
@@ -220,10 +279,10 @@ const createTables = async () => {
     for (const email of adminEmails) {
       const trimmedEmail = email.trim();
       await pool.query(
-        `INSERT INTO users (name, email, password_hash, user_type, is_verified)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO users (name, email, password_hash, user_type, role, is_verified)
+         VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (email) DO NOTHING`,
-        ['System Admin', trimmedEmail, hashedPassword, 'admin', true]
+        ['System Admin', trimmedEmail, hashedPassword, 'admin', 'super_admin', true]
       );
     }
     

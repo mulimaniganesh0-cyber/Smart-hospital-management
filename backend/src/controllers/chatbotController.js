@@ -1,15 +1,15 @@
 const { respond, searchHospitals } = require('../services/careGuideService');
-const { AiServiceError } = require('../services/aiService');
+const { AiServiceError } = require('../services/aiServiceOpenAI');
 
 // CareGuide is tool-first: hospital facts come from live PostgreSQL records
 // before the conversational response is assembled.
 exports.queryChatbot = async (req, res) => {
   try {
-    const { message, latitude, longitude, context, history, conversationHistory } = req.body;
+    const { message, latitude, longitude, context, history, conversationHistory, language } = req.body;
     if (!String(message || '').trim()) {
       return res.status(400).json({ success: false, message: 'Message is required' });
     }
-    const data = await respond({ message, latitude, longitude, userId: req.user?.id, context, history: conversationHistory || history });
+    const data = await respond({ message, latitude, longitude, userId: req.user?.id, language, context, history: conversationHistory || history });
     res.json({ success: true, data });
   } catch (error) {
     console.error('CareGuide query error:', error);

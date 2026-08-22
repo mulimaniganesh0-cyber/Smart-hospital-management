@@ -56,33 +56,86 @@ async function postJson(url, options) {
 }
 
 async function generateCareGuideReply({ message, history, databaseContext, language = 'en' }) {
-  const provider = (process.env.CHATBOT_PROVIDER || 'ollama').toLowerCase();
+  const provider = 'openai';
   const messages = [
     { role: 'system', content: CAREGUIDE_SYSTEM_PROMPT },
     ...historyForModel(history),
     { role: 'user', content: `Selected communication language: ${language}\nCurrent user message:\n${message}\n\nVerified application context (may be empty):\n${JSON.stringify(databaseContext || {})}` },
   ];
-  console.info(`[CareGuide] AI provider: ${provider}; history messages: ${messages.length - 2}`);
-  console.info('[CareGuide] Sending request to AI...');
 
-  let content;
-  if (provider === 'openai') {
-    if (!process.env.OPENAI_API_KEY) throw new AiServiceError('OPENAI_API_KEY is not configured.');
-    const json = await postJson('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', messages, response_format: { type: 'json_object' } }),
-    });
-    content = json.choices?.[0]?.message?.content;
-  } else if (provider === 'ollama') {
-    const baseUrl = (process.env.OLLAMA_BASE_URL || 'http://127.0.0.1:11434').replace(/\/$/, '');
-    const json = await postJson(`${baseUrl}/api/chat`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: process.env.OLLAMA_MODEL || 'llama3.2:3b', messages, stream: false, format: 'json' }),
-    });
-    content = json.message?.content;
-  } else {
-    throw new AiServiceError(`Unsupported CHATBOT_PROVIDER: ${provider}`);
+  console.info(`[CareGuide] AI provider: ${provider}; history messages: ${messages.length - 2}`);
+  console.info('[CareGuide] Sending request to OpenAI...');
+
+  if (!process.env.OPENAI_API_KEY) throw new AiServiceError('OPENAI_API_KEY is not configured.');
+
+  const OPENAI_BASE = (process.env.OPENAI_API_BASE || 'https://api.openai.com/v1').replace(/\/$/, '');
+  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  const temperature = Number(process.env.OPENAI_TEMPERATURE || 0.2);
+  const maxTokens = Number(process.env.OPENAI_MAX_TOKENS || 1200);
+  const enableModeration = String(process.env.OPENAI_ENABLE_MODERATION || 'false').toLowerCase() === 'true';
+
+  // Optional moderation
+  if (enableModeration) {
+    try {
+      const mod = await postJson(`${OPENAI_BASE}/moderations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+        body: JSON.stringify({ model: 'omni-moderation-latest', input: message }),
+      });
+      if (Array.isArray(mod.results) && mod.results[0]?.flagged) {
+        throw new AiServiceError('User input flagged by moderation.');
+      }
+    } catch (err) {
+      console.warn('[CareGuide] Moderation check failed, continuing:', err?.message || err);
+    }
+  }
+
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const maxAttempts = Number(process.env.OPENAI_MAX_RETRIES || 3);
+  let attempt = 0;
+  let lastErr = null;
+  let content = null;
+
+  while (attempt < maxAttempts) {
+    try {
+      const payload = {
+        model,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+        n: 1
+      };
+
+      const json = await postJson(`${OPENAI_BASE}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (json.usage) {
+        console.info(`[CareGuide] OpenAI usage: prompt_tokens=${json.usage.prompt_tokens}, completion_tokens=${json.usage.completion_tokens}, total_tokens=${json.usage.total_tokens}`);
+      }
+
+      content = json.choices?.[0]?.message?.content;
+      break;
+    } catch (err) {
+      lastErr = err;
+      attempt++;
+      const status = err && err.message && err.message.match(/HTTP (\d{3})/)?.[1];
+      if (status && Number(status) >= 400 && Number(status) < 500 && Number(status) !== 429) {
+        throw err;
+      }
+      const backoffMs = Math.min(1000 * Math.pow(2, attempt), 20000);
+      console.warn(`[CareGuide] OpenAI request failed (attempt ${attempt}/${maxAttempts}): ${err}. Retrying in ${backoffMs}ms`);
+      await sleep(backoffMs);
+    }
+  }
+
+  if (!content && lastErr) {
+    throw new AiServiceError('AI provider returned an error after retries', lastErr);
   }
 
   try {
