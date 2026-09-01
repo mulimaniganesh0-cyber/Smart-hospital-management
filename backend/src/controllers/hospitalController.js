@@ -702,7 +702,9 @@ exports.deleteHospitalStaff = async (req, res) => {
     const hospitalId = hospitalResult.rows[0].id;
     
     const result = await pool.query(
-      'DELETE FROM doctors WHERE id = $1 AND hospital_id = $2 RETURNING *',
+      `UPDATE doctors SET is_active = false, availability_status = false,
+         updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1 AND hospital_id = $2 RETURNING *`,
       [staffId, hospitalId]
     );
     
@@ -715,7 +717,7 @@ exports.deleteHospitalStaff = async (req, res) => {
     
     res.json({
       success: true,
-      message: 'Staff removed successfully',
+      message: 'Doctor deactivated successfully',
     });
   } catch (error) {
     console.error('Delete staff error:', error);
@@ -734,19 +736,24 @@ exports.getHospitalDoctors = async (req, res) => {
     const { hospitalId } = req.params;
     
     const result = await pool.query(
-      `SELECT d.id, d.name, d.specialization, d.designation, d.department,
+      `SELECT h.id AS hospital_id, h.name AS hospital_name,
+              d.id, d.name, d.specialization, d.designation, d.department,
               qualification, experience_years, experience_display, availability,
               availability_status, verification_status, profile_image, bio,
               phone
        FROM doctors d
        JOIN hospitals h ON h.id = d.hospital_id
-       WHERE d.hospital_id = $1 AND (h.is_verified = true OR h.directory_visible = true)
+       WHERE d.hospital_id = $1 AND d.availability_status = true AND COALESCE(d.is_active, true) = true
+         AND (h.is_verified = true OR h.directory_visible = true)
        ORDER BY d.name`,
       [hospitalId]
     );
     
     res.json({
       success: true,
+      hospital: result.rows.length ? { id: Number(hospitalId), name: result.rows[0].hospital_name || null } : { id: Number(hospitalId), name: null },
+      doctors: result.rows,
+      // data is retained for existing Flutter clients.
       data: result.rows,
     });
   } catch (error) {

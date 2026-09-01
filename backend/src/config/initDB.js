@@ -42,6 +42,8 @@ const createTables = async () => {
       email VARCHAR(255),
       latitude DECIMAL(10, 8),
       longitude DECIMAL(11, 8),
+      entrance_latitude DECIMAL(10, 8),
+      entrance_longitude DECIMAL(11, 8),
       is_verified BOOLEAN DEFAULT FALSE,
       directory_visible BOOLEAN DEFAULT FALSE,
       verification_status VARCHAR(50) DEFAULT 'pending',
@@ -103,6 +105,9 @@ const createTables = async () => {
       registration_number TEXT,
       availability TEXT,
       availability_status BOOLEAN DEFAULT TRUE,
+      -- is_active controls whether a directory doctor can be shown or booked.
+      -- availability_status is retained for compatibility with existing clients.
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
       consultation_fee DECIMAL(10, 2),
       phone VARCHAR(20),
       email VARCHAR(255),
@@ -244,6 +249,12 @@ const createTables = async () => {
     for (const query of queries) {
       await pool.query(query);
     }
+
+    // These ALTERs make initialization safe for databases created before the
+    // doctor-directory fields were introduced.
+    await pool.query(`ALTER TABLE doctors ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE`);
+    await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_doctors_hospital_normalized_name
+      ON doctors (hospital_id, lower(regexp_replace(name, '[^a-zA-Z0-9]', '', 'g')))`);
 
     await pool.query(`
       ALTER TABLE users

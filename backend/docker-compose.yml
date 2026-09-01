@@ -1,0 +1,33 @@
+version: '3.8'
+services:
+  db:
+    # PostgreSQL 15 with the pgvector extension. The existing named volume is
+    # retained; do not run `docker compose down -v`.
+    image: pgvector/pgvector:pg15
+    environment:
+      POSTGRES_DB: hospital_resource_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+
+  backend:
+    build: .
+    ports:
+      - '5000:5000'
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=hospital_resource_db
+      - JWT_SECRET=change-this-very-securely-and-rotate
+      - OPENAI_API_KEY=
+    depends_on:
+      - db
+
+volumes:
+  db_data:

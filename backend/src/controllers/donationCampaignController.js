@@ -1,5 +1,6 @@
 // src/controllers/donationCampaignController.js
 const { pool } = require('../config/database');
+const VALID_BLOOD_GROUPS = new Set(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']);
 
 // ==================== CREATE CAMPAIGN ====================
 exports.createCampaign = async (req, res) => {
@@ -239,6 +240,7 @@ exports.getCampaignDetails = async (req, res) => {
 
 // ==================== PATIENT REGISTER FOR CAMPAIGN ====================
 exports.registerForCampaign = async (req, res) => {
+  const client = await pool.connect();
   try {
     const userId = req.user.id;
     const { 
@@ -254,12 +256,14 @@ exports.registerForCampaign = async (req, res) => {
     } = req.body;
 
     // Check if campaign exists and is active
-    const campaignResult = await pool.query(
-      'SELECT id, status FROM blood_donation_campaigns WHERE id = $1',
+    await client.query('BEGIN');
+    const campaignResult = await client.query(
+      'SELECT id, hospital_id, status, registered_donors, target_donors, maximum_donors, registration_deadline FROM blood_donation_campaigns WHERE id = $1 FOR UPDATE',
       [campaign_id]
     );
 
     if (campaignResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ 
         success: false, 
         message: 'Campaign not found' 
@@ -267,14 +271,25 @@ exports.registerForCampaign = async (req, res) => {
     }
 
     if (campaignResult.rows[0].status !== 'approved' && campaignResult.rows[0].status !== 'active') {
+      await client.query('ROLLBACK');
       return res.status(400).json({ 
         success: false, 
         message: 'This campaign is not accepting registrations' 
       });
     }
+    const campaign = campaignResult.rows[0];
+    if (campaign.registration_deadline && new Date(campaign.registration_deadline) < new Date()) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: 'The registration deadline has passed' });
+    }
+    const capacity = campaign.maximum_donors || campaign.target_donors;
+    if (capacity && Number(campaign.registered_donors || 0) >= Number(capacity)) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: 'Registration is full' });
+    }
 
     // Get patient id
-    const patientResult = await pool.query(
+    const patientResult = await client.query(
       'SELECT id FROM patients WHERE user_id = $1',
       [userId]
     );
@@ -285,7 +300,7 @@ exports.registerForCampaign = async (req, res) => {
     }
 
     // Check if already registered
-    const checkResult = await pool.query(
+    const checkResult = await client.query(
       'SELECT id, status FROM blood_donation_registrations WHERE campaign_id = $1 AND user_id = $2',
       [campaign_id, userId]
     );
@@ -293,32 +308,34 @@ exports.registerForCampaign = async (req, res) => {
     if (checkResult.rows.length > 0) {
       const existingStatus = checkResult.rows[0].status;
       if (existingStatus === 'registered' || existingStatus === 'checked_in' || existingStatus === 'donated') {
-        return res.status(400).json({
+        await client.query('ROLLBACK');
+        return res.status(409).json({
           success: false,
           message: `You are already ${existingStatus} for this campaign`
         });
       }
     }
 
-    const result = await pool.query(
+    const result = await client.query(
       `INSERT INTO blood_donation_registrations (
-        campaign_id, user_id, patient_id, donor_name, donor_phone, donor_email,
+        campaign_id, hospital_id, user_id, patient_id, donor_name, donor_phone, donor_email,
         blood_group, age, weight, last_donation_date, medical_conditions, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'registered')
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'registered')
       RETURNING *`,
       [
-        campaign_id, userId, patientId, donor_name, donor_phone, donor_email,
+        campaign_id, campaign.hospital_id, userId, patientId, donor_name, donor_phone, donor_email,
         blood_group, age, weight, last_donation_date, medical_conditions
       ]
     );
 
     // Update registered donors count
-    await pool.query(
+    await client.query(
       `UPDATE blood_donation_campaigns 
        SET registered_donors = registered_donors + 1 
        WHERE id = $1`,
       [campaign_id]
     );
+    await client.query('COMMIT');
 
     res.status(201).json({
       success: true,
@@ -326,13 +343,14 @@ exports.registerForCampaign = async (req, res) => {
       data: result.rows[0],
     });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Register for campaign error:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Server error', 
       error: error.message 
     });
-  }
+  } finally { client.release(); }
 };
 
 // ==================== GET USER REGISTRATIONS ====================
@@ -441,6 +459,12 @@ exports.recordDonation = async (req, res) => {
       notes
     } = req.body;
 
+    const units = Number(units_donated);
+    if (!VALID_BLOOD_GROUPS.has(blood_group) || !Number.isFinite(units) || units <= 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: 'Provide a valid blood group and a donation quantity greater than zero' });
+    }
+
     console.log('📝 Recording donation:', { registration_id, blood_group, units_donated });
 
     // Get hospital id
@@ -462,10 +486,10 @@ exports.recordDonation = async (req, res) => {
 
     // Get registration details
     const registrationResult = await client.query(
-      `SELECT r.*, c.campaign_id, c.hospital_id as campaign_hospital_id
+      `SELECT r.*, c.id AS campaign_id, c.hospital_id as campaign_hospital_id
        FROM blood_donation_registrations r
        JOIN blood_donation_campaigns c ON r.campaign_id = c.id
-       WHERE r.id = $1`,
+       WHERE r.id = $1 FOR UPDATE`,
       [registration_id]
     );
 
@@ -480,6 +504,11 @@ exports.recordDonation = async (req, res) => {
     const registration = registrationResult.rows[0];
     const campaignId = registration.campaign_id;
 
+    if (req.params.campaignId && Number(req.params.campaignId) !== Number(campaignId)) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ success: false, message: 'Registration does not belong to this campaign' });
+    }
+
     // Verify hospital matches
     if (registration.campaign_hospital_id !== hospitalId) {
       await client.query('ROLLBACK');
@@ -487,6 +516,15 @@ exports.recordDonation = async (req, res) => {
         success: false, 
         message: 'Unauthorized to record donation for this campaign' 
       });
+    }
+
+    const existingDonation = await client.query(
+      'SELECT id FROM blood_donation_records WHERE registration_id = $1 FOR UPDATE',
+      [registration_id]
+    );
+    if (existingDonation.rows.length > 0 || registration.donation_status === 'DONATED' || registration.status === 'donated') {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: 'Donation has already been recorded for this registration' });
     }
 
     // Generate batch number
@@ -508,7 +546,7 @@ exports.recordDonation = async (req, res) => {
       RETURNING *`,
       [
         registration_id, hospitalId, campaignId,
-        registration.donor_name, registration.donor_phone, blood_group, units_donated,
+        registration.donor_name, registration.donor_phone, blood_group, units,
         donationDateObj, donation_time || '00:00:00', batchNumber, expiryDate,
         collected_by, hemoglobin_level, blood_pressure, pulse_rate, temperature, notes
       ]
@@ -519,10 +557,11 @@ exports.recordDonation = async (req, res) => {
     // Update registration status
     await client.query(
       `UPDATE blood_donation_registrations 
-       SET status = 'donated', donation_time = CURRENT_TIMESTAMP, 
-           units_donated = $1, check_in_time = COALESCE(check_in_time, CURRENT_TIMESTAMP)
-       WHERE id = $2`,
-      [units_donated, registration_id]
+       SET status = 'donated', donation_status = 'DONATED', attendance_status = 'ATTENDED',
+           donation_time = CURRENT_TIMESTAMP, units_donated = $1,
+           check_in_time = COALESCE(check_in_time, CURRENT_TIMESTAMP), actual_donation_id = $2
+       WHERE id = $3`,
+      [units, recordResult.rows[0].id, registration_id]
     );
 
     // Update campaign total blood collected
@@ -530,7 +569,7 @@ exports.recordDonation = async (req, res) => {
       `UPDATE blood_donation_campaigns 
        SET total_blood_collected = total_blood_collected + $1
        WHERE id = $2`,
-      [units_donated, campaignId]
+      [units, campaignId]
     );
 
     // ========== ADD BLOOD TO HOSPITAL BLOOD BANK ==========
@@ -546,19 +585,16 @@ exports.recordDonation = async (req, res) => {
     let bloodResult;
     if (bloodCheck.rows.length > 0) {
       // Update existing blood group - ADD units
-      const currentUnits = bloodCheck.rows[0].units_available || 0;
-      const newUnits = currentUnits + units_donated;
-      
       bloodResult = await client.query(
         `UPDATE blood_bank 
-         SET units_available = $1,
+         SET units_available = COALESCE(units_available, 0) + $1,
              expiry_date = COALESCE($2, expiry_date),
              last_updated = CURRENT_TIMESTAMP
          WHERE hospital_id = $3 AND blood_group = $4
          RETURNING *`,
-        [newUnits, expiryDate, hospitalId, blood_group]
+        [units, expiryDate, hospitalId, blood_group]
       );
-      console.log(`✅ Updated blood bank: ${blood_group} now has ${newUnits} units (added ${units_donated})`);
+      console.log(`✅ Updated blood bank: ${blood_group} added ${units} units`);
     } else {
       // Insert new blood group
       bloodResult = await client.query(
@@ -568,9 +604,9 @@ exports.recordDonation = async (req, res) => {
           last_updated, minimum_threshold
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, 10)
         RETURNING *`,
-        [hospitalId, blood_group, units_donated, expiryDate, batchNumber, donationDateObj, registration.donor_name]
+        [hospitalId, blood_group, units, expiryDate, batchNumber, donationDateObj, registration.donor_name]
       );
-      console.log(`✅ Added new blood group: ${blood_group} with ${units_donated} units`);
+      console.log(`✅ Added new blood group: ${blood_group} with ${units} units`);
     }
 
     // Also add to donation history for tracking
@@ -580,7 +616,14 @@ exports.recordDonation = async (req, res) => {
         units_donated, donation_date, expiry_date, batch_number, status
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')`,
       [hospitalId, registration.donor_name, registration.donor_phone, 
-       blood_group, units_donated, donationDateObj, expiryDate, batchNumber]
+       blood_group, units, donationDateObj, expiryDate, batchNumber]
+    );
+
+    await client.query(
+      `INSERT INTO blood_inventory_transactions
+        (hospital_id, blood_bank_id, blood_group, transaction_type, units, reference_type, reference_id, donor_id, campaign_id, donation_id, created_by)
+       VALUES ($1, $2, $3, 'DONATION', $4, 'DONATION_CAMP', $5, $6, $7, $5, $8)`,
+      [hospitalId, bloodResult.rows[0].id, blood_group, units, recordResult.rows[0].id, registration.user_id, campaignId, userId]
     );
 
     await client.query('COMMIT');
@@ -593,7 +636,7 @@ exports.recordDonation = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: `Blood donation recorded successfully. ${units_donated} unit(s) of ${blood_group} added to blood bank.`,
+      message: `Blood donation recorded successfully. ${units} unit(s) of ${blood_group} added to blood bank.`,
       data: {
         donation: recordResult.rows[0],
         blood_bank: bloodResult.rows[0],

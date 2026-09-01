@@ -19,12 +19,20 @@ router.get('/all', hospitalController.getAllHospitals);
 // Main directory: every approved platform hospital. Location never filters it.
 router.get('/', hospitalController.getAllHospitals);
 router.get('/search', hospitalController.getAllHospitals);
+router.get('/cities', async (req, res) => {
+  try {
+    const { pool } = require('../config/database');
+    const result = await pool.query('SELECT DISTINCT city FROM hospitals WHERE city IS NOT NULL AND (is_verified = true OR directory_visible = true) ORDER BY city');
+    res.json({ success: true, data: result.rows.map(r => r.city) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
 router.get('/:hospitalId/resources', hospitalController.getHospitalResources);
 
 // Get hospital doctors (public - for patients to book)
 router.get('/:hospitalId/doctors', hospitalController.getHospitalDoctors);
 router.get('/:hospitalId', hospitalController.getHospitalDetails);
-
 // Protected routes (authentication required)
 router.put('/:hospitalId', protect, authorize('hospital'), hospitalController.updateHospitalLocation);
 

@@ -1,22 +1,56 @@
 const { respond, searchHospitals } = require('../services/careGuideService');
-const { AiServiceError } = require('../services/aiServiceOpenAI');
+const { pool } = require('../config/database');
+
+function objectOrEmpty(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function compactHistory(history) {
+  return Array.isArray(history)
+    ? history.filter((item) => item && typeof item.content === 'string' && ['user', 'assistant'].includes(item.role)).slice(-12)
+    : [];
+}
 
 // CareGuide is tool-first: hospital facts come from live PostgreSQL records
 // before the conversational response is assembled.
 exports.queryChatbot = async (req, res) => {
+  const startedAt = Date.now();
   try {
-    const { message, latitude, longitude, context, history, conversationHistory, language } = req.body;
+    const { message, latitude, longitude, context, history, conversationHistory, language, patientAge, conversationId } = req.body;
+    // Keep diagnostic logs correlatable without recording patient messages.
+    console.info(`[CHATBOT] Request received; requestId=${req.body.requestId || 'none'}; conversationId=${conversationId || 'none'}; hasLocation=${Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude))}; messageLength=${String(message || '').length}`);
     if (!String(message || '').trim()) {
       return res.status(400).json({ success: false, message: 'Message is required' });
     }
-    const data = await respond({ message, latitude, longitude, userId: req.user?.id, language, context, history: conversationHistory || history });
-    res.json({ success: true, data });
-  } catch (error) {
-    console.error('CareGuide query error:', error);
-    if (error instanceof AiServiceError || error?.code === 'AI_SERVICE_UNAVAILABLE') {
-      return res.status(503).json({ success: false, error: 'AI_SERVICE_UNAVAILABLE', message: 'The AI assistant is temporarily unavailable. Please try again.' });
+    let storedState = {};
+    if (conversationId) {
+      const existing = await pool.query('SELECT user_id, state FROM chatbot_conversations WHERE conversation_id = $1', [conversationId]);
+      if (existing.rows[0]) {
+        if (Number(existing.rows[0].user_id) !== Number(req.user?.id)) {
+          return res.status(403).json({ success: false, type: 'error', error: 'CONVERSATION_ACCESS_DENIED', message: 'This conversation is not available for the current user.' });
+        }
+        storedState = objectOrEmpty(existing.rows[0].state);
+      }
     }
-    res.status(500).json({ success: false, message: 'CareGuide could not complete that request right now.' });
+    const requestHistory = compactHistory(conversationHistory || history);
+    const effectiveContext = { ...objectOrEmpty(storedState.context), ...objectOrEmpty(context) };
+    const effectiveHistory = requestHistory.length ? requestHistory : compactHistory(storedState.history);
+    const data = await respond({ message, latitude, longitude, userId: req.user?.id, language, patientAge, conversationId, context: effectiveContext, history: effectiveHistory });
+    if (conversationId) {
+      const nextHistory = compactHistory([...effectiveHistory, { role: 'user', content: String(message).slice(0, 800) }, { role: 'assistant', content: String(data.response || '').slice(0, 1200) }]);
+      await pool.query(`INSERT INTO chatbot_conversations (conversation_id, user_id, state, updated_at)
+        VALUES ($1, $2, $3::jsonb, CURRENT_TIMESTAMP)
+        ON CONFLICT (conversation_id) DO UPDATE SET state = EXCLUDED.state, updated_at = CURRENT_TIMESTAMP`,
+      [conversationId, req.user?.id, JSON.stringify({ context: objectOrEmpty(data.context), history: nextHistory })]);
+    }
+    // Keep the legacy `data` envelope for Flutter while exposing a stable
+    // top-level contract for other clients and easier diagnostics.
+    res.json({ success: true, conversationId: conversationId || null, type: data.type, message: data.response, ...data, data, requestId: req.body.requestId || null });
+    console.info(`[CHATBOT] HTTP response: ${Date.now() - startedAt}ms`);
+  } catch (error) {
+    console.error(`[CHATBOT ERROR] requestId=${req.body?.requestId || 'none'}; ${error.stack || error.message || error}`);
+    const databaseError = /database|connect|postgres|relation|timeout/i.test(error.message || '');
+    res.status(databaseError ? 503 : 500).json({ success: false, error: databaseError ? 'DATABASE_ERROR' : 'CHATBOT_ERROR', message: databaseError ? 'Hospital information is temporarily unavailable. Please try again shortly.' : 'CareGuide could not complete that request right now.' });
   }
 };
 

@@ -341,13 +341,18 @@ exports.fulfillBloodRequest = async (req, res) => {
       
       // Update blood bank stock
       const bloodRequest = result.rows[0];
-      await client.query(
+      const stockResult = await client.query(
         `UPDATE blood_bank 
          SET units_available = units_available - $1,
              last_updated = CURRENT_TIMESTAMP
-         WHERE hospital_id = $2 AND blood_group = $3`,
+         WHERE hospital_id = $2 AND blood_group = $3
+           AND units_available >= $1
+         RETURNING units_available`,
         [bloodRequest.units_required, bloodRequest.hospital_id, bloodRequest.blood_group]
       );
+      if (stockResult.rows.length === 0) {
+        throw new Error('INSUFFICIENT_BLOOD_INVENTORY');
+      }
       
       await client.query('COMMIT');
       
@@ -364,10 +369,10 @@ exports.fulfillBloodRequest = async (req, res) => {
     }
   } catch (error) {
     console.error('Fulfill blood request error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error', 
-      error: error.message 
+    res.status(error.message === 'INSUFFICIENT_BLOOD_INVENTORY' ? 409 : 500).json({
+      success: false,
+      message: error.message === 'INSUFFICIENT_BLOOD_INVENTORY' ? 'Insufficient blood inventory to fulfill this request.' : 'Server error',
+      error: error.message
     });
   }
 };

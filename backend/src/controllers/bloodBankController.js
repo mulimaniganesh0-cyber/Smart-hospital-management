@@ -212,8 +212,6 @@ exports.updateBloodStock = async (req, res) => {
 
 // ==================== BLOOD EXPIRY MANAGEMENT ====================
 
-// src/controllers/bloodBankController.js - Replace the addBloodWithExpiry method
-
 exports.addBloodWithExpiry = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -310,7 +308,76 @@ exports.addBloodWithExpiry = async (req, res) => {
   }
 };
 
-// ==================== APPROVE / REJECT BLOOD REQUEST (HOSPITAL) ====================
+// ==================== BLOOD REQUEST MANAGEMENT (HOSPITAL & PATIENT) ====================
+
+exports.getHospitalBloodRequests = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const hospitalResult = await pool.query(
+      'SELECT id FROM hospitals WHERE user_id = $1',
+      [userId]
+    );
+
+    if (hospitalResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Hospital not found' 
+      });
+    }
+
+    const hospitalId = hospitalResult.rows[0].id;
+
+    const result = await pool.query(
+      `SELECT b.*, COALESCE(u.name, b.patient_name, 'Patient') as patient_name, u.phone as patient_phone
+       FROM blood_requests b
+       LEFT JOIN users u ON b.user_id = u.id
+       WHERE b.hospital_id = $1
+       ORDER BY b.request_date DESC
+       LIMIT 100`,
+      [hospitalId]
+    );
+
+    res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error('Get hospital blood requests error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
+exports.getMyBloodRequests = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const result = await pool.query(
+      `SELECT b.*, h.name as hospital_name, h.address as hospital_address_info, h.phone as hospital_phone
+       FROM blood_requests b
+       LEFT JOIN hospitals h ON b.hospital_id = h.id
+       WHERE b.user_id = $1
+       ORDER BY b.request_date DESC`,
+      [userId]
+    );
+
+    res.json({
+      success: true,
+      data: result.rows,
+    });
+  } catch (error) {
+    console.error('Get my blood requests error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
 
 exports.approveBloodRequest = async (req, res) => {
   try {
@@ -357,7 +424,7 @@ exports.approveBloodRequest = async (req, res) => {
 
     // Update status
     const result = await pool.query(
-      "UPDATE blood_requests SET status = 'approved', updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *",
+      "UPDATE blood_requests SET status = 'approved', fulfilled_date = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *",
       [requestId]
     );
 
@@ -367,6 +434,8 @@ exports.approveBloodRequest = async (req, res) => {
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
+
+exports.fulfillBloodRequest = exports.approveBloodRequest;
 
 exports.rejectBloodRequest = async (req, res) => {
   try {
@@ -383,7 +452,7 @@ exports.rejectBloodRequest = async (req, res) => {
     const hospitalId = hospitalResult.rows[0].id;
 
     const result = await pool.query(
-      "UPDATE blood_requests SET status = 'rejected', rejection_reason = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND hospital_id = $3 AND status = 'pending' RETURNING *",
+      "UPDATE blood_requests SET status = 'rejected', rejection_reason = $1, rejected_date = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND hospital_id = $3 AND status = 'pending' RETURNING *",
       [reason || 'No reason provided', requestId, hospitalId]
     );
 
@@ -711,7 +780,7 @@ exports.markAllNotificationsRead = async (req, res) => {
   }
 };
 
-// src/controllers/bloodBankController.js - Replace the useBloodUnits method
+// ==================== BLOOD USAGE ====================
 
 exports.useBloodUnits = async (req, res) => {
   try {
@@ -989,6 +1058,7 @@ exports.getDonationHistory = async (req, res) => {
     });
   }
 };
+
 exports.getBloodStockWithExpiry = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -1048,7 +1118,7 @@ exports.getBloodStockWithExpiry = async (req, res) => {
         SELECT 
           id, 
           blood_group, 
-          units_available,
+          units_available, 
           NULL as expiry_date, 
           NULL as batch_number, 
           NULL as donation_date, 
@@ -1093,9 +1163,9 @@ exports.getBloodStockWithExpiry = async (req, res) => {
     });
   }
 };
-// src/controllers/bloodBankController.js - Add debug endpoint
 
 // ==================== DEBUG: GET ALL BLOOD BANK ====================
+
 exports.debugGetAllBloodBank = async (req, res) => {
   try {
     const result = await pool.query(
@@ -1115,9 +1185,30 @@ exports.debugGetAllBloodBank = async (req, res) => {
     });
   }
 };
-// ==================== HELPER FUNCTIONS ====================
 
-// At the bottom of bloodBankController.js
+exports.deleteBloodStock = async (req, res) => {
+  try {
+    const hospitalResult = await pool.query(
+      'SELECT id FROM hospitals WHERE user_id = $1', [req.user.id]
+    );
+    if (hospitalResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Hospital not found' });
+    }
+    const result = await pool.query(
+      'DELETE FROM blood_bank WHERE hospital_id = $1 AND blood_group = $2 RETURNING id',
+      [hospitalResult.rows[0].id, req.params.bloodGroup]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Blood group not found' });
+    }
+    res.json({ success: true, message: 'Blood stock deleted successfully' });
+  } catch (error) {
+    console.error('Delete blood stock error:', error);
+    res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  }
+};
+
+// ==================== HELPER FUNCTIONS ====================
 
 const _getBloodSummary = (bloodStock) => {
   const summary = {
@@ -1163,26 +1254,4 @@ const _getBloodSummary = (bloodStock) => {
   });
 
   return summary;
-};
-
-exports.deleteBloodStock = async (req, res) => {
-  try {
-    const hospitalResult = await pool.query(
-      'SELECT id FROM hospitals WHERE user_id = $1', [req.user.id]
-    );
-    if (hospitalResult.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Hospital not found' });
-    }
-    const result = await pool.query(
-      'DELETE FROM blood_bank WHERE hospital_id = $1 AND blood_group = $2 RETURNING id',
-      [hospitalResult.rows[0].id, req.params.bloodGroup]
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Blood group not found' });
-    }
-    res.json({ success: true, message: 'Blood stock deleted successfully' });
-  } catch (error) {
-    console.error('Delete blood stock error:', error);
-    res.status(500).json({ success: false, message: 'Server error', error: error.message });
-  }
 };

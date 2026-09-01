@@ -34,13 +34,13 @@ class _TestConnectionScreenState extends State<TestConnectionScreen> with Single
     try {
       final result = await ApiService.getNearbyHospitals(28.6139, 77.2090);
       setState(() {
-        _status = 'âœ… Backend connection successful!\n\nFound ${result['count'] ?? 0} nearby hospitals.\n\nYou can now use the app with backend integration.';
+        _status = '✅ Backend connection successful!\n\nFound ${result['count'] ?? 0} nearby hospitals.\n\nYou can now use the app with backend integration.';
         _isLoading = false;
       });
       _animationController.stop();
     } catch (e) {
       setState(() {
-        _status = 'âŒ Connection failed: $e\n\nMake sure:\n1. Backend server is running on port 5000\n2. Database is connected\n3. No firewall blocking the connection';
+        _status = '❌ Connection failed: $e\n\nMake sure:\n1. Backend server is running on port 5000\n2. Database is connected\n3. No firewall blocking the connection';
         _isLoading = false;
       });
       _animationController.stop();

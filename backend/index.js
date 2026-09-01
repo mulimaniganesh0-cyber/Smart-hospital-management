@@ -21,7 +21,7 @@ const getLocalIPs = () => {
 
 const server = http.createServer(app);
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Start server only after database connection
 const startServer = async () => {
@@ -40,12 +40,10 @@ const startServer = async () => {
         process.exit(1);
     }
     
-    // Check Gemini API availability
-    if (process.env.GEMINI_API_KEY) {
-        console.log('🤖 Gemini AI service initialized');
-    } else {
-        console.warn('⚠️ GEMINI_API_KEY not set - chatbot will use fallback mode');
-    }
+    // `src/app` has already loaded backend/.env. Keep this legacy entry point
+    // diagnostic-only; CareGuide itself uses GeminiService for its real check.
+    console.info(`[Config] GEMINI_API_KEY configured: ${Boolean(String(process.env.GEMINI_API_KEY || '').trim())}`);
+    console.info(`[Config] GEMINI_MODEL: ${process.env.GEMINI_MODEL || '(not configured)'}`);
     
     server.listen(PORT, () => {
         console.log(`\n🚀 Server running on port ${PORT}`);
@@ -87,7 +85,7 @@ const startServer = async () => {
         console.log('   - 🔔 Real-time Notifications');
         console.log('   - 💳 Role-based Access Control');
         
-        if (process.env.GEMINI_API_KEY) {
+        if (String(process.env.GEMINI_API_KEY || '').trim()) {
             console.log('   - 🇮🇳 Multilingual support (Kannada, Hindi, Tamil, Telugu, etc.)');
         }
         console.log('');

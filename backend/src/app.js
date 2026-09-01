@@ -4,7 +4,18 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config();
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Always resolve the backend environment file relative to this module. This
+// keeps `node backend/server.js` (run from the repository root) and `npm run
+// dev` (run from backend/) on the same configuration.
+const envPath = path.resolve(__dirname, '../.env');
+const dotenvResult = dotenv.config({ path: envPath });
+process.env.CAREGUIDE_ENV_PATH = envPath;
+if (dotenvResult.error) {
+  console.warn(`[Config] Failed to load dotenv file at ${envPath}: ${dotenvResult.error.message}`);
+}
 
 const authRoutes = require('./routes/authRoutes');
 const hospitalRoutes = require('./routes/hospitalRoutes');
@@ -23,6 +34,8 @@ const medicalRoutes = require('./routes/medicalRoutes');
 const specialtyRoutes = require('./routes/specialtyRoutes');
 const doctorRoutes = require('./routes/doctorRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
+const { pool } = require('./config/database');
+const { getOllamaHealth } = require('./services/ollamaService');
 
 const app = express();
 
@@ -39,9 +52,11 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    // Local development without a configured allowlist should still work.
-    if (process.env.NODE_ENV !== 'production' && allowedOrigins.length === 0) {
-      return callback(null, true);
+    // Local development allows localhost and 127.0.0.1 on any port
+    if (process.env.NODE_ENV !== 'production') {
+      if (allowedOrigins.length === 0 || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
     }
 
     if (allowedOrigins.includes(origin)) {
@@ -136,9 +151,20 @@ app.use('/api', reviewRoutes);
 
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'OK',
+app.get('/api/health', async (req, res) => {
+  let database = false;
+  try {
+    await pool.query({ text: 'SELECT 1', query_timeout: 2_000 });
+    database = true;
+  } catch (error) {
+    console.warn(`[Health] database unavailable: ${error.message}`);
+  }
+  const ollama = await getOllamaHealth();
+  res.status(database ? 200 : 503).json({
+    status: database && ollama.available ? 'ok' : 'degraded',
+    database,
+    ollama: ollama.available,
+    ollamaModel: ollama.model,
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
     uptime: process.uptime(),

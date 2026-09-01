@@ -20,6 +20,17 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
     'All', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-',
   ];
 
+  /// Normalizes PostgreSQL numeric values, which may be encoded as strings.
+  int _parseInt(dynamic value, {int fallback = 0}) {
+    if (value == null) return fallback;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+
+    return int.tryParse(value.toString()) ??
+        double.tryParse(value.toString())?.toInt() ??
+        fallback;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -34,6 +45,7 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
 
     try {
       final response = await ApiService.getAllBloodBanks();
+      if (!mounted) return;
       
       if (response['success'] == true) {
         final allBanks = response['all_banks'] ?? [];
@@ -41,7 +53,7 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
         // Group by hospital
         final Map<int, Map<String, dynamic>> hospitalMap = {};
         for (var bank in allBanks) {
-          final hospitalId = bank['hospital_id'] as int;
+          final hospitalId = _parseInt(bank['hospital_id']);
           if (!hospitalMap.containsKey(hospitalId)) {
             hospitalMap[hospitalId] = {
               'id': hospitalId,
@@ -55,8 +67,8 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
           final bloodGroups = hospitalMap[hospitalId]!['blood_groups'] as List<Map<String, dynamic>>;
           bloodGroups.add({
             'blood_group': bank['blood_group'] ?? '',
-            'units_available': bank['units_available'] ?? 0,
-            'minimum_threshold': bank['minimum_threshold'] ?? 10,
+            'units_available': _parseInt(bank['units_available']),
+            'minimum_threshold': _parseInt(bank['minimum_threshold'], fallback: 10),
           });
         }
         
@@ -66,11 +78,14 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
         _errorMessage = response['message'] ?? 'Failed to load blood banks';
       }
     } catch (e) {
+      if (!mounted) return;
       _errorMessage = 'Network error: $e';
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -81,7 +96,7 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
       _filteredHospitals = _hospitals.where((hospital) {
         final bloodGroups = hospital['blood_groups'] as List<Map<String, dynamic>>;
         return bloodGroups.any((bg) => 
-          bg['blood_group'] == _selectedBloodGroup && (bg['units_available'] ?? 0) > 0
+          bg['blood_group'] == _selectedBloodGroup && _parseInt(bg['units_available']) > 0
         );
       }).toList();
     }
@@ -194,7 +209,7 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
   Widget _buildHospitalCard(Map<String, dynamic> hospital) {
     final bloodGroups = hospital['blood_groups'] as List<Map<String, dynamic>>;
     final totalUnits = bloodGroups.fold<int>(0, (sum, bg) {
-      final units = bg['units_available'] as int? ?? 0;
+      final units = _parseInt(bg['units_available']);
       return sum + units;
     });
     
@@ -255,8 +270,8 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
               spacing: 8,
               runSpacing: 8,
               children: bloodGroups.map((bg) {
-                final units = bg['units_available'] as int? ?? 0;
-                final minThreshold = bg['minimum_threshold'] as int? ?? 10;
+                final units = _parseInt(bg['units_available']);
+                final minThreshold = _parseInt(bg['minimum_threshold'], fallback: 10);
                 final isLow = units < minThreshold;
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

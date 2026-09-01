@@ -7,7 +7,12 @@ import 'patient_my_requests.dart';
 import 'patient_home_screen.dart';
 
 class PatientResourceRequest extends StatefulWidget {
-  const PatientResourceRequest({super.key});
+  const PatientResourceRequest({super.key, this.hospitalId, this.hospitalName, this.resourceType, this.bloodGroup, this.availableQuantity});
+  final int? hospitalId;
+  final String? hospitalName;
+  final String? resourceType;
+  final String? bloodGroup;
+  final int? availableQuantity;
 
   @override
   State<PatientResourceRequest> createState() => _PatientResourceRequestState();
@@ -55,8 +60,33 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
   @override
   void initState() {
     super.initState();
+    _selectedHospitalId = widget.hospitalId?.toString();
+    _selectedResourceType = _resourceLabel(widget.resourceType);
+    _selectedBloodGroup = widget.bloodGroup;
+    // Preserve the live, group-specific quantity supplied by the selected
+    // chatbot card. The hospital endpoint remains the source of truth and
+    // replaces this value when it returns current stock.
+    if (widget.bloodGroup != null && widget.availableQuantity != null) {
+      _bloodAvailability = {
+        widget.bloodGroup!: {
+          'available': widget.availableQuantity!,
+          'threshold': 0,
+        },
+      };
+    }
     _loadPatientData();
     _loadHospitals();
+  }
+
+  String? _resourceLabel(String? value) {
+    switch (value?.toLowerCase()) {
+      case 'blood': return 'Blood';
+      case 'icu_beds': return 'ICU Bed';
+      case 'oxygen_beds': return 'Oxygen Supported Bed';
+      case 'ventilators': return 'Ventilator';
+      case 'beds': case 'general_bed': return 'General Bed';
+      default: return null;
+    }
   }
 
   Future<void> _loadPatientData() async {
@@ -83,9 +113,11 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
         setState(() {
           _hospitals = List<Map<String, dynamic>>.from(response['data']);
           if (_hospitals.isNotEmpty) {
-            _selectedHospitalId = _hospitals[0]['id'].toString();
-            _hospitalAddress = _hospitals[0]['address'] ?? '';
-            _loadHospitalResources(_hospitals[0]['id']);
+            final selected = _hospitals.where((hospital) => hospital['id'].toString() == _selectedHospitalId).cast<Map<String, dynamic>>().toList();
+            final hospital = selected.isNotEmpty ? selected.first : _hospitals.first;
+            _selectedHospitalId = hospital['id'].toString();
+            _hospitalAddress = hospital['address'] ?? '';
+            _loadHospitalResources(hospital['id']);
           }
         });
       }
@@ -115,12 +147,19 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
       
       // Load blood availability
       final bloodResponse = await ApiService.getBloodAvailability(hospitalIdInt);
+      if (!mounted) return;
       if (bloodResponse['success'] && bloodResponse['data'] != null) {
-        final Map<String, Map<String, dynamic>> availability = {};
+        final Map<String, Map<String, dynamic>> availability = {
+          ..._bloodAvailability,
+        };
         for (var stock in bloodResponse['data']) {
           final group = stock['blood_group']?.toString() ?? '';
+          final rawUnits = stock['units_available'];
+          final units = rawUnits is num
+              ? rawUnits.toDouble()
+              : double.tryParse('${rawUnits ?? 0}') ?? 0;
           availability[group] = {
-            'available': stock['units_available'] ?? 0,
+            'available': units,
             'threshold': stock['minimum_threshold'] ?? 10,
           };
         }
@@ -132,6 +171,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
 
       // Load hospital resources
       final hospitalResponse = await ApiService.getHospitalResources(hospitalIdInt);
+      if (!mounted) return;
       debugPrint('Hospital resources response: $hospitalResponse');
       
       if (hospitalResponse['success'] && hospitalResponse['data'] != null) {
@@ -141,7 +181,9 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
             'general_beds': data['general_beds_available'] ?? 0,
             'icu_beds': data['icu_beds_available'] ?? 0,
             'ventilators': data['ventilators_available'] ?? 0,
-            'oxygen_beds': data['oxygen_supported_beds_available'] ?? 0,
+            // The public resource endpoint uses oxygen_beds_available while
+            // older hospital endpoints use oxygen_supported_beds_available.
+            'oxygen_beds': data['oxygen_beds_available'] ?? data['oxygen_supported_beds_available'] ?? 0,
           };
         });
         debugPrint('Hospital resources set: $_hospitalResources');
@@ -173,7 +215,8 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
 
   int _getBloodUnits(String bloodGroup) {
     final stock = _bloodAvailability[bloodGroup];
-    return stock?['available'] ?? 0;
+    final value = stock?['available'];
+    return value is num ? value.toInt() : int.tryParse('$value') ?? 0;
   }
 
   int _getResourceAvailability(String resourceType) {

@@ -29,6 +29,8 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
 
     try {
       final campaignsResponse = await ApiService.getAllCampaigns();
+      if (!mounted) return;
+
       if (campaignsResponse['success']) {
         setState(() {
           _campaigns = List<Map<String, dynamic>>.from(campaignsResponse['data']);
@@ -36,19 +38,25 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
       }
 
       final registrationsResponse = await ApiService.getMyRegistrations();
+      if (!mounted) return;
+
       if (registrationsResponse['success']) {
         setState(() {
           _myRegistrations = List<Map<String, dynamic>>.from(registrationsResponse['data']);
         });
       }
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         _errorMessage = 'Failed to load data: $e';
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -543,6 +551,8 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                       firstDate: DateTime.now().subtract(const Duration(days: 365)),
                       lastDate: DateTime.now(),
                     );
+                    if (!context.mounted) return;
+
                     if (date != null) {
                       setState(() => lastDonationDate = date);
                     }

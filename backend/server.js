@@ -1,4 +1,5 @@
 // server.js
+require('dotenv').config();
 const app = require('./src/app');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -8,6 +9,8 @@ const User = require('./src/models/User');
 const Hospital = require('./src/models/Hospital');
 const Patient = require('./src/models/Patient');
 const { ensureMedicalSchema } = require('./src/config/medicalSchema');
+const { ensureDonationCampaignSchema } = require('./src/config/donationCampaignSchema');
+const { getOllamaHealth } = require('./src/services/ollamaService');
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || '')
   .split(',')
@@ -182,7 +185,18 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
+// Keep the runtime fallback aligned with .env.example and the Flutter client.
+// A mismatched default made the CareGuide endpoint unreachable in local runs.
+const PORT = process.env.PORT || 5001;
+
+// Report configuration state without ever exposing credentials.
+console.info('[AI CONFIG]');
+console.info(`[Config] GEMINI_API_KEY configured: ${Boolean(String(process.env.GEMINI_API_KEY || '').trim())}`);
+console.info(`[Config] GEMINI_MODEL: ${process.env.GEMINI_MODEL || '(not configured)'}`);
+console.info(`[Config] OLLAMA_BASE_URL: ${process.env.OLLAMA_BASE_URL || '(not configured)'}`);
+console.info(`[Config] OLLAMA_MODEL: ${process.env.OLLAMA_MODEL || '(not configured)'}`);
+console.info(`[Config] process.cwd(): ${process.cwd()}`);
+console.info(`[Config] dotenv path: ${process.env.CAREGUIDE_ENV_PATH || '(not loaded)'}`);
 
 if (!process.env.JWT_SECRET || String(process.env.JWT_SECRET).trim().length < 32) {
   throw new Error('JWT_SECRET must be set to a value at least 32 characters long before starting the server');
@@ -309,6 +323,12 @@ const ensureDatabaseSchema = async () => {
 const startServer = async () => {
   console.log('🔍 Checking database connection...');
   const isDbConnected = await testConnection();
+
+  // Ollama is optional at startup: database-backed directory features remain
+  // available while local medical generation is temporarily offline.
+  const ollamaHealth = await getOllamaHealth();
+  if (ollamaHealth.available) console.info(`[OLLAMA] Ready: ${ollamaHealth.model}`);
+  else console.warn('[OLLAMA] Service unavailable; medical generation temporarily unavailable');
   
   if (!isDbConnected && process.env.NODE_ENV === 'production') {
     console.error('❌ Cannot start server: Database connection failed');
@@ -318,6 +338,7 @@ const startServer = async () => {
   if (isDbConnected) {
     await ensureDatabaseSchema();
     await ensureMedicalSchema(pool);
+    await ensureDonationCampaignSchema(pool);
     await pool.query(`ALTER TABLE users
       ADD COLUMN IF NOT EXISTS role VARCHAR(50),
       ADD COLUMN IF NOT EXISTS hospital_role VARCHAR(50),
@@ -374,14 +395,14 @@ const startServer = async () => {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_hospitals_coordinates ON hospitals(latitude, longitude) WHERE latitude IS NOT NULL AND longitude IS NOT NULL`);
     await pool.query(`UPDATE users u SET hospital_id = d.hospital_id FROM doctors d WHERE d.user_id = u.id AND u.hospital_id IS NULL`);
   }
-  
+
   server.listen(PORT, () => {
     console.log(`\n🚀 Server running on port ${PORT}`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`\n📡 Access URLs:`);
     console.log(`   Local: http://localhost:${PORT}`);
     console.log(`   Local: http://127.0.0.1:${PORT}`);
-    
+
     const ips = getLocalIPs();
     if (ips.length > 0) {
       console.log(`\n📡 Network Access:`);
@@ -389,17 +410,26 @@ const startServer = async () => {
         console.log(`   ${ip}: http://${ip}:${PORT}`);
       });
     }
-    
+
     console.log(`\n📡 Socket.IO:`);
     console.log(`   ws://localhost:${PORT}/socket.io/`);
     ips.forEach(ip => {
       console.log(`   ${ip}: ws://${ip}:${PORT}/socket.io/`);
     });
-    
+
     if (!isDbConnected) {
       console.warn('\n⚠️  Running without database connection (development mode)');
     } else {
       console.log('\n✅ Database connected');
+    }
+
+    if (process.env.NODE_ENV === 'production') {
+      if (process.env.DB_PASSWORD === 'db1234') {
+        console.warn('⚠️  SECURITY WARNING: Default development DB password in production!');
+      }
+      if (!process.env.JWT_SECRET || process.env.JWT_SECRET.includes('ChangeThisToYourOwn')) {
+        console.warn('⚠️  SECURITY WARNING: Default or weak JWT_SECRET detected in production!');
+      }
     }
     console.log('');
   });

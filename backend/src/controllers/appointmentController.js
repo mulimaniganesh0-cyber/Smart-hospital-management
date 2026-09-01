@@ -47,7 +47,9 @@ exports.createAppointment = async (req, res) => {
     const doctorResult = await pool.query(`
       SELECT d.id FROM doctors d
       JOIN hospitals h ON h.id = d.hospital_id
-      WHERE d.id = $1 AND d.hospital_id = $2 AND d.availability_status = true AND h.is_verified = true`,
+      WHERE d.id = $1 AND d.hospital_id = $2 AND d.availability_status = true
+        AND COALESCE(d.is_active, true) = true
+        AND (h.is_verified = true OR h.directory_visible = true)`,
       [doctorId, hospitalId]
     );
     if (doctorResult.rows.length === 0) {

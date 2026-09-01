@@ -3,10 +3,12 @@ const { pool } = require('../config/database');
 
 exports.listDoctors = async (req, res) => {
   try {
-    const { specialty, hospital_id, latitude, longitude, available, limit, search } = req.query;
-    let doctors = await searchDoctors({ specialty, latitude, longitude, limit });
-    if (hospital_id) doctors = doctors.filter((doctor) => doctor.hospital_id === Number(hospital_id));
-    if (search) { const term = String(search).toLowerCase(); doctors = doctors.filter((doctor) => [doctor.name, doctor.specialization, doctor.hospital_name, doctor.department, doctor.city].some((value) => String(value || '').toLowerCase().includes(term))); }
+    const { specialty, specialization, hospital_id, hospitalId, latitude, longitude, limit, search, q } = req.query;
+    let doctors = await searchDoctors({ specialty: specialization || specialty, latitude, longitude, limit });
+    const selectedHospitalId = hospitalId || hospital_id;
+    if (selectedHospitalId) doctors = doctors.filter((doctor) => doctor.hospital_id === Number(selectedHospitalId));
+    const term = search || q;
+    if (term) { const normalizedTerm = String(term).toLowerCase(); doctors = doctors.filter((doctor) => [doctor.name, doctor.specialization, doctor.hospital_name, doctor.department, doctor.city].some((value) => String(value || '').toLowerCase().includes(normalizedTerm))); }
     res.json({ success: true, count: doctors.length, data: doctors });
   } catch (error) {
     console.error('List doctors error:', error);
@@ -20,7 +22,7 @@ exports.getDoctor = async (req, res) => {
     if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ success: false, message: 'Valid doctor ID is required' });
     const result = await pool.query(`SELECT d.id, d.name, d.specialization, d.designation, d.department, d.qualification, d.experience_years, d.experience_display, d.availability, d.availability_status, d.verification_status, d.profile_image, d.bio, d.consultation_fee, d.phone,
       h.id hospital_id, h.name hospital_name, h.address hospital_address
-      FROM doctors d JOIN hospitals h ON h.id=d.hospital_id WHERE d.id=$1 AND (h.is_verified=true OR h.directory_visible=true)`, [id]);
+      FROM doctors d JOIN hospitals h ON h.id=d.hospital_id WHERE d.id=$1 AND d.availability_status=true AND COALESCE(d.is_active,true)=true AND (h.is_verified=true OR h.directory_visible=true)`, [id]);
     if (!result.rowCount) return res.status(404).json({ success: false, message: 'Doctor not found' });
     res.json({ success: true, data: result.rows[0] });
   } catch (error) { res.status(500).json({ success: false, message: 'Unable to load doctor' }); }

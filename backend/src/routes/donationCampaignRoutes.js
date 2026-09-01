@@ -20,6 +20,14 @@ router.get('/my-registrations', protect, campaignController.getUserRegistrations
 // ==================== DONATION RECORDING ====================
 router.post('/donation', protect, authorize('hospital'), campaignController.recordDonation);
 
+// REST-shaped aliases for the same existing handlers.  They do not accept a
+// hospital id from the client; ownership is still derived from the session.
+router.post('/:campaignId/register', protect, (req, res, next) => {
+  req.body.campaign_id = Number(req.params.campaignId);
+  return campaignController.registerForCampaign(req, res, next);
+});
+router.post('/:campaignId/donations', protect, authorize('hospital'), campaignController.recordDonation);
+
 // ==================== ADMIN ROUTES ====================
 router.get('/admin/stats', protect, authorize('admin'), campaignController.getAdminCampaignStats);
 router.put('/:campaignId/approve', protect, authorize('admin'), campaignController.approveCampaign);

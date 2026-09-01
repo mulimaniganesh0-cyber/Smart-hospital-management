@@ -74,12 +74,14 @@ async function generateCareGuideReply({ message, history, databaseContext, langu
   const maxTokens = Number(process.env.OPENAI_MAX_TOKENS || 1200);
   const enableModeration = String(process.env.OPENAI_ENABLE_MODERATION || 'false').toLowerCase() === 'true';
 
+  const authHeader = `Bearer ${process.env.OPENAI_API_KEY}`;
+
   // Optional moderation
   if (enableModeration) {
     try {
       const mod = await postJson(`${OPENAI_BASE}/moderations`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+        headers: { 'Content-Type': 'application/json', Authorization: authHeader },
         body: JSON.stringify({ model: 'omni-moderation-latest', input: message }),
       });
       if (Array.isArray(mod.results) && mod.results[0]?.flagged) {
@@ -110,7 +112,7 @@ async function generateCareGuideReply({ message, history, databaseContext, langu
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          Authorization: authHeader,
         },
         body: JSON.stringify(payload),
       });

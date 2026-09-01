@@ -3,14 +3,14 @@ require('dotenv').config();
 const { pool } = require('../config/database');
 
 const hospitals = [
-  ['Diyaa Multispeciality Hospital Chikodi', ['Diyaa Multispeciality Hospital'], [
-    ['Dr. Sanjeev A. Patil', 'Orthopedics', 'MS (Ortho)', 'Orthopedic Surgeon', null, 'A compassionate humanitarian dedicated to bringing state-of-the-art healthcare services to the doorstep of each and every needy person; best describes Dr. Sanjeev A. Patil of Diyaa Hospitals.'],
+  ['Diyaa Multispeciality Hospital', ['Diyaa Multispeciality Hospital Chikodi'], [
+    ['Dr. Sanjeev A. Patil', 'Orthopedic Surgeon', 'MS (Ortho)', null, null, 'A compassionate humanitarian dedicated to bringing state-of-the-art healthcare services to the doorstep of each and every needy person.'],
     ['Dr. Prashant Rathod', 'General Medicine', 'MBBS, MD'], ['Dr. Ramesh Malavalli', 'General Medicine', 'MBBS, MD'], ['Dr. Sandhya S. Patil', 'Obstetrics and Gynecology', 'MS (OBG)'],
-    ['Dr. Manjunath Kumbar', 'Orthopedics', 'MBBS, D.Ortho'], ['Dr. Nyruthya K. M.', 'Obstetrics and Gynecology', 'MBBS, MS'],
-    ['Dr. Sattar Khan', 'Neurosurgery', 'MBBS, MS, M.Ch', 'Neurosurgeon'], ['Dr. Shashikumar Hosagoudar', 'Orthopedics', 'MBBS, MS'],
+    ['Dr. Manjunath Kumbar', 'Orthopedics', 'MBBS, D.Ortho'], ['Dr. Nyruthya K M', 'Obstetrics and Gynecology', 'MBBS, MS'],
+    ['Dr. Sattar Khan', 'Neuro Surgeon', 'MBBS, MS, M.Ch'], ['Dr. Shashikumar Hosagoudar', 'Orthopedics', 'MBBS, MS'],
     ['Dr. Subhash N. Halbhavi', 'General Surgery', 'MBBS, MS, FIAGES'], ['Dr. T. D. Berlin', 'Physiotherapy', 'Bachelor of Physiotherapy'],
     ['Dr. Chetan J. Shikhare', 'Obstetrics and Gynecology', 'MBBS, DGO']]],
-  ['Sri Satya Sai Hospital', ['Sri Satya Sai Hospital Old Court Lane Chikodi'], [['Dr. Abhijit', 'Urology', 'MCh - Urology/Genito-Urinary Surgery, MBBS', 'Urologist']]],
+  ['Shri Satya Sai Hospital', ['Sri Satya Sai Hospital', 'Sri Satya Sai Hospital Old Court Lane Chikodi'], [['Dr. Abhijit', 'Urologist', 'MBBS, MCh - Urology/Genito-Urinary Surgery']]],
   ['MJ Hospital', ['MJ Hospital Chikodi'], [['Dr. R. S. Jamadar', 'Cardiopulmonary; Diabetology; General Practice', null, 'Primary Doctor / Specialist']]],
   ["Charati's Sadanand Omkar Trauma & Multispeciality Hospital", [], [['Dr. Ajit V. Charati', 'Trauma and Orthopedics', null, null, null, 'Bone and joint fracture care; accident and emergency trauma management.']]],
   ['Shree Padma Hospital', [], [['Dr. Padmaraj C. Patil', 'Orthopedics and Trauma Surgery', "MBBS, D'Ortho, MCh"], ['Dr. Padmaja (Seema) P. Patil', 'Gynaecology and Obstetrics', 'MBBS, DGO']]],
@@ -32,11 +32,30 @@ async function main() {
     ADD COLUMN IF NOT EXISTS bio TEXT,
     ADD COLUMN IF NOT EXISTS verification_status VARCHAR(80) DEFAULT 'HOSPITAL_CONFIRMATION_REQUIRED',
     ADD COLUMN IF NOT EXISTS source_url TEXT,
+    ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE,
     ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
   // Directory records may legitimately have no supplied address or registration
   // number.  Keep those facts NULL rather than manufacturing credentials.
   await pool.query(`ALTER TABLE hospitals ALTER COLUMN address DROP NOT NULL, ALTER COLUMN registration_number DROP NOT NULL, ADD COLUMN IF NOT EXISTS directory_visible BOOLEAN NOT NULL DEFAULT FALSE`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS idx_doctors_hospital_name_normalized ON doctors (hospital_id, lower(regexp_replace(name, '[^a-zA-Z0-9]', '', 'g')))`);
+  // Development fixture doctors must never be surfaced as real providers.
+  await pool.query(`UPDATE doctors SET is_active=false, availability_status=false
+    WHERE email LIKE '%@seed.invalid'`);
+  // Earlier directory imports could have inserted the same source doctor more
+  // than once. Preserve appointment history by moving it to the oldest record
+  // before removing only the duplicate rows.
+  const duplicates = await pool.query(`SELECT hospital_id,
+      lower(regexp_replace(name, '[^a-zA-Z0-9]', '', 'g')) normalized_name,
+      array_agg(id ORDER BY id) ids
+    FROM doctors GROUP BY hospital_id, lower(regexp_replace(name, '[^a-zA-Z0-9]', '', 'g'))
+    HAVING COUNT(*) > 1`);
+  for (const duplicate of duplicates.rows) {
+    const [keeper, ...redundant] = duplicate.ids.map(Number);
+    if (!redundant.length) continue;
+    await pool.query('UPDATE appointments SET doctor_id=$1 WHERE doctor_id = ANY($2::int[])', [keeper, redundant]);
+    await pool.query('DELETE FROM doctors WHERE id = ANY($1::int[])', [redundant]);
+  }
+  await pool.query(`DROP INDEX IF EXISTS idx_doctors_hospital_name_normalized`);
+  await pool.query(`CREATE UNIQUE INDEX idx_doctors_hospital_name_normalized ON doctors (hospital_id, lower(regexp_replace(name, '[^a-zA-Z0-9]', '', 'g')))`);
   let inserted = 0, updated = 0, missingHospitals = [];
   for (const [name, aliases, doctors] of hospitals) {
     const candidates = [name, ...aliases].map(norm);
@@ -69,9 +88,9 @@ async function main() {
       const existing = await pool.query(`SELECT id FROM doctors WHERE hospital_id=$1 AND lower(regexp_replace(name, '[^a-zA-Z0-9]', '', 'g'))=$2 LIMIT 1`, [hospital.id, norm(doctorName)]);
       const values = [specialization, qualification, designation, experienceYears, experienceDisplay, bio, doctorName, hospital.id];
       if (existing.rowCount) {
-        await pool.query(`UPDATE doctors SET specialization=COALESCE(specialization,$1), qualification=COALESCE(qualification,$2), designation=COALESCE(designation,$3), experience_years=COALESCE(experience_years,$4), experience_display=COALESCE(experience_display,$5), bio=COALESCE(bio,$6), verification_status=COALESCE(verification_status,'HOSPITAL_CONFIRMATION_REQUIRED'), updated_at=CURRENT_TIMESTAMP WHERE id=$7`, [...values.slice(0, 6), existing.rows[0].id]); updated++;
+        await pool.query(`UPDATE doctors SET name=$7, specialization=COALESCE($1,specialization), qualification=COALESCE($2,qualification), designation=COALESCE($3,designation), experience_years=COALESCE($4,experience_years), experience_display=COALESCE($5,experience_display), bio=COALESCE($6,bio), is_active=true, availability_status=true, verification_status=COALESCE(verification_status,'HOSPITAL_CONFIRMATION_REQUIRED'), updated_at=CURRENT_TIMESTAMP WHERE id=$8`, [...values.slice(0, 7), existing.rows[0].id]); updated++;
       } else {
-        await pool.query(`INSERT INTO doctors (hospital_id,name,specialization,qualification,designation,experience_years,experience_display,bio,availability_status,verification_status) VALUES ($8,$7,$1,$2,$3,$4,$5,$6,false,'HOSPITAL_CONFIRMATION_REQUIRED')`, values); inserted++;
+        await pool.query(`INSERT INTO doctors (hospital_id,name,specialization,qualification,designation,experience_years,experience_display,bio,is_active,availability_status,verification_status) VALUES ($8,$7,$1,$2,$3,$4,$5,$6,true,true,'HOSPITAL_CONFIRMATION_REQUIRED')`, values); inserted++;
       }
     }
   }

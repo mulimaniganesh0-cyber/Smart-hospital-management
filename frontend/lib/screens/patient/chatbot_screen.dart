@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/chat_model.dart';
+import '../../models/hospital_model.dart';
 import '../../services/chatbot_service.dart';
 import '../../services/location_service.dart';
 import '../../services/careguide_localizations.dart';
@@ -11,6 +12,7 @@ import 'patient_emergency_request.dart';
 import 'patient_nearby_hospitals.dart';
 import 'patient_bookings.dart';
 import 'health_record_screen.dart';
+import 'patient_resource_request.dart';
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({super.key});
@@ -34,7 +36,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   bool _isLoading = false;
   String _language = 'English';
   CareGuideStrings get _strings => CareGuideStrings(_language);
-  List<String> get _suggestions => [_strings.t('nearby'), _strings.t('bookHelp'), _strings.t('ambulance'), _strings.t('blood')];
+  List<String> get _suggestions => [
+        _strings.t('nearby'),
+        _strings.t('bookHelp'),
+        _strings.t('ambulance'),
+        _strings.t('blood')
+      ];
 
   @override
   void initState() {
@@ -60,10 +67,11 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       _locationState = _LocationState.loading;
       _locationError = null;
     });
-    debugPrint('[Location] Getting current position...');
+    debugPrint('[Location] Requesting best available location...');
     try {
-      final position = await LocationService.getFreshPatientLocation();
-      debugPrint('[Location] Latitude: ${position.latitude}; Longitude: ${position.longitude}');
+      final position = await LocationService.getBestAvailableLocation();
+      debugPrint(
+          '[Location] Location accepted; latitude=${position.latitude}; longitude=${position.longitude}; accuracy=${position.accuracy}m');
       if (!mounted) return position;
       setState(() {
         _position = position;
@@ -118,20 +126,22 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     await _loadLocation();
   }
 
-  Future<void> _send([String? suggestion]) async {
+  Future<void> _send(
+      [String? suggestion, int? patientAge, bool echoUser = true]) async {
     final text = (suggestion ?? _controller.text).trim();
     if (text.isEmpty || _isLoading) return;
 
     setState(() {
-      _messages.add(ChatMessage(text: text, isUser: true));
+      if (echoUser) _messages.add(ChatMessage(text: text, isUser: true));
       _controller.clear();
       _isLoading = true;
     });
     _scrollToBottom();
 
     try {
-      // CareGuide must not reuse a previous patient's or an old session's
-      // location for nearby/emergency requests.
+      debugPrint('[CHATBOT] Send started; messageLength=${text.length}');
+      // Location is only requested for local intents. The central service
+      // reuses a valid location from this CareGuide session when needed.
       Position? requestPosition = _position;
       final needsLiveLocation = RegExp(
         r'near\s*(me|by|my|here)|nearby|closest|nearest|around me|ನನ್ನ\s*ಹತ್ತಿರ|ಹತ್ತಿರದ\s*ಆಸ್ಪತ್ರ|ಸುತ್ತಮುತ್ತ\s*ಆಸ್ಪತ್ರ|ಆಸ್ಪತ್ರೆ\s*ಬೇಕ|मेरे\s*(पास|नजदीक|आसपास)|नजदीकी\s*अस्पताल|पास\s*के\s*अस्पताल|emergency|ambulance|sos',
@@ -145,17 +155,28 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         latitude: requestPosition?.latitude,
         longitude: requestPosition?.longitude,
         language: LocationService.getLanguageCode(_language),
+        patientAge: patientAge,
       );
       if (!context.mounted) return;
       setState(() {
         _messages.add(response);
         _isLoading = false;
       });
+      if (response.showAgeSelector) {
+        final age = await _showAgeSelector();
+        if (age != null && mounted) await _send(text, age, false);
+      }
     } catch (error) {
       if (!context.mounted) return;
-      final text = error.toString().contains('AI assistant is temporarily unavailable')
+      if (error.toString().contains('STALE_CHATBOT_RESPONSE')) return;
+      debugPrint('[CHATBOT ERROR] $error');
+      final errorText = error.toString();
+      final text = errorText.contains('AI assistant is temporarily unavailable')
           ? _strings.t('unavailable')
-          : _strings.t('failed');
+          : errorText.contains('Not authorized') ||
+                  errorText.contains('Unauthorized')
+              ? 'Your session has expired. Please sign in again.'
+              : _strings.t('failed');
       setState(() {
         _messages.add(
           ChatMessage(
@@ -207,14 +228,17 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             const CircleAvatar(
               radius: 18,
               backgroundColor: Colors.white24,
-              child: Icon(Icons.health_and_safety_outlined, color: Colors.white),
+              child:
+                  Icon(Icons.health_and_safety_outlined, color: Colors.white),
             ),
             const SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('CareGuide', style: TextStyle(fontWeight: FontWeight.w700)),
-                Text(_strings.t('assistant'), style: const TextStyle(fontSize: 11)),
+                const Text('CareGuide',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                Text(_strings.t('assistant'),
+                    style: const TextStyle(fontSize: 11)),
               ],
             ),
           ],
@@ -233,7 +257,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           PopupMenuButton<String>(
             tooltip: _strings.t('language'),
             icon: const Icon(Icons.language_rounded),
-            onSelected: (value) => setState(() { _language = value; _assistant.resetConversation(); }),
+            onSelected: (value) => setState(() {
+              _language = value;
+              _assistant.resetConversation();
+            }),
             itemBuilder: (context) => LocationService.getSupportedLanguages()
                 .map(
                   (language) => CheckedPopupMenuItem(
@@ -250,7 +277,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         top: false,
         child: Column(
           children: [
-            _LocationBanner(state: _locationState, error: _locationError, onAction: _handleLocationAction, onRefresh: _loadLocation, strings: _strings),
+            _LocationBanner(
+                state: _locationState,
+                error: _locationError,
+                onAction: _handleLocationAction,
+                onRefresh: _loadLocation,
+                strings: _strings),
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
@@ -265,13 +297,34 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                     onRecommendationTap:
                         _messages[index].hospitalRecommendation == null
                             ? null
-                            : () => _showRecommendation(_messages[index].hospitalRecommendation!),
+                            : () => _showRecommendation(
+                                _messages[index].hospitalRecommendation!),
                     onHospitalTap: (hospital) => _showRecommendation(hospital),
                     onLocation: _messages[index].requiresLocation
                         ? () => _retryWithLocation(_messages[index])
                         : null,
                     onSos: _messages[index].showSos ? _openSos : null,
                     onAction: _handleAction,
+                    onBookDoctor: _bookRecommendedDoctor,
+                    onBookHospital: _bookHospital,
+                    onRequestResource: (hospital) => _handleAction(
+                        CareGuideAction(
+                            type: hospital.bloodGroup?.isNotEmpty == true
+                                ? 'REQUEST_BLOOD'
+                                : 'REQUEST_BED',
+                            label: hospital.bloodGroup?.isNotEmpty == true
+                                ? 'Request Blood'
+                                : 'Request Bed',
+                            hospitalId: hospital.id,
+                            hospitalName: hospital.name,
+                            resourceType:
+                                hospital.bloodGroup?.isNotEmpty == true
+                                    ? 'blood'
+                                    : 'beds',
+                            bloodGroup: hospital.bloodGroup,
+                            available: hospital.availableBeds,
+                            availableUnits: hospital.bloodUnitsAvailable)),
+                    onDirections: _openDirections,
                     strings: _strings,
                   );
                 },
@@ -292,19 +345,13 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   }
 
   void _showRecommendation(HospitalRecommendation hospital) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    // Use the existing detail screen and the database hospital ID rather than
+    // a name-based lookup, which can be ambiguous and loses live resources.
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => HospitalDetailScreen(
+        hospital: _hospitalFromRecommendation(hospital),
       ),
-      builder: (context) => _HospitalSheet(
-          hospital: hospital,
-          onDirections: () => _openDirections(hospital),
-          onCall: () => _callHospital(hospital),
-          onBook: _openDirectory, strings: _strings),
-    );
+    ));
   }
 
   Future<void> _retryWithLocation(ChatMessage message) async {
@@ -327,32 +374,114 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   Future<void> _openDirections(HospitalRecommendation hospital) async {
     if (hospital.latitude == 0 && hospital.longitude == 0) return;
     try {
-      final position = await LocationService.getFreshPatientLocation();
+      final position = await LocationService.getBestAvailableLocation();
       if (!mounted) return;
       setState(() => _position = position);
-      debugPrint('PATIENT LIVE LOCATION latitude: ${position.latitude}, longitude: ${position.longitude}, accuracy: ${position.accuracy}, timestamp: ${position.timestamp}');
-      debugPrint('HOSPITAL DESTINATION hospital: ${hospital.name}, latitude: ${hospital.latitude}, longitude: ${hospital.longitude}');
+      debugPrint(
+          'PATIENT LIVE LOCATION latitude: ${position.latitude}, longitude: ${position.longitude}, accuracy: ${position.accuracy}, timestamp: ${position.timestamp}');
+      final entranceIsValid = hospital.entranceLatitude != null &&
+          hospital.entranceLongitude != null &&
+          hospital.entranceLatitude! >= -90 &&
+          hospital.entranceLatitude! <= 90 &&
+          hospital.entranceLongitude! >= -180 &&
+          hospital.entranceLongitude! <= 180;
+      final destinationLatitude =
+          entranceIsValid ? hospital.entranceLatitude! : hospital.latitude;
+      final destinationLongitude =
+          entranceIsValid ? hospital.entranceLongitude! : hospital.longitude;
+      debugPrint(
+          'HOSPITAL DESTINATION hospital: ${hospital.name}, latitude: $destinationLatitude, longitude: $destinationLongitude; using=${entranceIsValid ? 'main entrance' : 'hospital coordinates'}');
       final uri = Uri.https('www.google.com', '/maps/dir/', {
         'api': '1',
         'origin': '${position.latitude},${position.longitude}',
-        'destination': '${hospital.latitude},${hospital.longitude}',
+        'destination': '$destinationLatitude,$destinationLongitude',
         'travelmode': 'driving',
       });
-      if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unable to open Google Maps.')));
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
+          mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Unable to open Google Maps.')));
       }
     } on PatientLocationException catch (error) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      if (mounted)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
     }
   }
 
-  Future<void> _callHospital(HospitalRecommendation hospital) async {
-    if (hospital.phone.isEmpty) return;
-    await launchUrl(Uri(scheme: 'tel', path: hospital.phone));
+  Future<int?> _showAgeSelector() {
+    return showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: SizedBox(
+          height: 320,
+          child: Column(children: [
+            const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text("Select the patient's age",
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+            Expanded(
+                child: GridView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: 101,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 5,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 1.5),
+              itemBuilder: (context, index) => OutlinedButton(
+                  onPressed: () => Navigator.pop(context, index),
+                  child: Text('$index')),
+            )),
+          ]),
+        ),
+      ),
+    );
   }
 
   void _openDirectory() => Navigator.of(context)
       .push(MaterialPageRoute(builder: (_) => const PatientNearbyHospitals()));
+  void _bookRecommendedDoctor(
+      HospitalRecommendation recommendation, DoctorRecommendation doctor) {
+    final hospital = _hospitalFromRecommendation(recommendation);
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) =>
+            BookingScreen(hospital: hospital, initialDoctorId: doctor.id)));
+  }
+
+  Hospital _hospitalFromRecommendation(HospitalRecommendation recommendation) {
+    return Hospital(
+      id: recommendation.id,
+      name: recommendation.name,
+      address: recommendation.address,
+      city: '',
+      phone: recommendation.phone,
+      email: '',
+      isVerified: recommendation.isVerified,
+      totalBeds: 0,
+      availableBeds: recommendation.availableBeds,
+      icuBeds: 0,
+      availableIcu: recommendation.availableIcu,
+      ventilatorCount: 0,
+      availableVentilators: recommendation.availableVentilators,
+      oxygenBedsTotal: 0,
+      oxygenBedsAvailable: recommendation.availableOxygenBeds,
+      bloodUnits: recommendation.bloodUnitsAvailable ?? 0,
+      specialties: [recommendation.specialty],
+      emergencyServices: false,
+      distance: recommendation.distance.toString(),
+      lastUpdated: '',
+    );
+  }
+
+  void _bookHospital(HospitalRecommendation recommendation) {
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => BookingScreen(
+            hospital: _hospitalFromRecommendation(recommendation))));
+  }
+
   void _openSos() => Navigator.of(context)
       .push(MaterialPageRoute(builder: (_) => const PatientEmergencyRequest()));
 
@@ -360,23 +489,63 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     switch (action.type) {
       case 'EMERGENCY_SOS':
         _openSos();
+        return;
       case 'BOOK_APPOINTMENT':
       case 'VIEW_HOSPITALS':
         _openDirectory();
+        return;
+      case 'REQUEST_BED':
+      case 'REQUEST_BLOOD':
+        if (action.hospitalId == null) return;
+        Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => PatientResourceRequest(
+                  hospitalId: action.hospitalId,
+                  hospitalName: action.hospitalName,
+                  resourceType: action.type == 'REQUEST_BLOOD'
+                      ? 'blood'
+                      : action.resourceType,
+                  bloodGroup: action.bloodGroup,
+                  availableQuantity: action.availableUnits ?? action.available,
+                )));
+        return;
+      case 'VIEW_HOSPITAL':
+        if (action.hospitalId != null) _openDirectory();
+        return;
+      case 'DIRECTIONS':
+        // A structured action only carries an id; hospital cards use their
+        // entrance coordinates directly, so the action remains a safe
+        // directory fallback instead of guessing a destination.
+        _openDirectory();
+        return;
       case 'VIEW_APPOINTMENTS':
-        Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const PatientBookings()));
+        Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => const PatientBookings()));
+        return;
       case 'VIEW_HEALTH_RECORD':
         Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const HealthRecordScreen()));
+        return;
     }
   }
 }
 
-enum _LocationState { idle, loading, active, serviceDisabled, permissionDenied, permanentlyDenied, error }
+enum _LocationState {
+  idle,
+  loading,
+  active,
+  serviceDisabled,
+  permissionDenied,
+  permanentlyDenied,
+  error
+}
 
 class _LocationBanner extends StatelessWidget {
-  const _LocationBanner({required this.state, required this.error, required this.onAction, required this.onRefresh, required this.strings});
+  const _LocationBanner(
+      {required this.state,
+      required this.error,
+      required this.onAction,
+      required this.onRefresh,
+      required this.strings});
 
   final _LocationState state;
   final String? error;
@@ -388,7 +557,11 @@ class _LocationBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final active = state == _LocationState.active;
     final loading = state == _LocationState.loading;
-    final color = active ? const Color(0xFF18794E) : state == _LocationState.error ? Colors.red.shade700 : const Color(0xFF9A6700);
+    final color = active
+        ? const Color(0xFF18794E)
+        : state == _LocationState.error
+            ? Colors.red.shade700
+            : const Color(0xFF9A6700);
     final message = switch (state) {
       _LocationState.active => strings.t('locationOn'),
       _LocationState.loading => strings.t('locationLoading'),
@@ -415,7 +588,9 @@ class _LocationBanner extends StatelessWidget {
           Icon(
               active
                   ? Icons.location_on_outlined
-                  : loading ? Icons.location_searching_outlined : Icons.location_off_outlined,
+                  : loading
+                      ? Icons.location_searching_outlined
+                      : Icons.location_off_outlined,
               color: color,
               size: 19),
           const SizedBox(width: 8),
@@ -427,10 +602,17 @@ class _LocationBanner extends StatelessWidget {
             ),
           ),
           if (loading)
-            const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+            const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2))
           else ...[
-            IconButton(tooltip: strings.t('refreshLocation'), onPressed: onRefresh, icon: const Icon(Icons.refresh_rounded)),
-            if (!active) TextButton(onPressed: onAction, child: Text(actionLabel)),
+            IconButton(
+                tooltip: strings.t('refreshLocation'),
+                onPressed: onRefresh,
+                icon: const Icon(Icons.refresh_rounded)),
+            if (!active)
+              TextButton(onPressed: onAction, child: Text(actionLabel)),
           ],
         ],
       ),
@@ -445,7 +627,12 @@ class _MessageBubble extends StatelessWidget {
       required this.onHospitalTap,
       this.onLocation,
       this.onSos,
-      required this.onAction, required this.strings});
+      required this.onAction,
+      required this.onBookDoctor,
+      required this.onBookHospital,
+      required this.onRequestResource,
+      required this.onDirections,
+      required this.strings});
 
   final ChatMessage message;
   final VoidCallback? onRecommendationTap;
@@ -453,6 +640,11 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback? onLocation;
   final VoidCallback? onSos;
   final ValueChanged<CareGuideAction> onAction;
+  final void Function(HospitalRecommendation, DoctorRecommendation)
+      onBookDoctor;
+  final ValueChanged<HospitalRecommendation> onBookHospital;
+  final ValueChanged<HospitalRecommendation> onRequestResource;
+  final ValueChanged<HospitalRecommendation> onDirections;
   final CareGuideStrings strings;
 
   @override
@@ -503,7 +695,8 @@ class _MessageBubble extends StatelessWidget {
                             color:
                                 isUser ? Colors.white : const Color(0xFF1F2937),
                             height: 1.4)),
-                    if (onRecommendationTap != null && message.hospitals.length == 1) ...[
+                    if (onRecommendationTap != null &&
+                        message.hospitals.length == 1) ...[
                       const SizedBox(height: 10),
                       OutlinedButton.icon(
                         onPressed: onRecommendationTap,
@@ -515,9 +708,9 @@ class _MessageBubble extends StatelessWidget {
                     if (onLocation != null) ...[
                       const SizedBox(height: 8),
                       FilledButton.icon(
-                          onPressed: onLocation,
-                          icon: const Icon(Icons.my_location),
-                          label: Text(strings.t('useLocation')),
+                        onPressed: onLocation,
+                        icon: const Icon(Icons.my_location),
+                        label: Text(strings.t('useLocation')),
                       ),
                     ],
                     if (onSos != null) ...[
@@ -532,10 +725,18 @@ class _MessageBubble extends StatelessWidget {
                     if (message.hospitals.isNotEmpty) ...[
                       const SizedBox(height: 10),
                       ...message.hospitals.map((hospital) => _ChatHospitalCard(
-                        hospital: hospital,
-                        onDetails: () => onHospitalTap(hospital),
-                        onBook: () => onAction(CareGuideAction(type: 'BOOK_APPOINTMENT', label: strings.t('book'))), strings: strings,
-                      )),
+                            hospital: hospital,
+                            responseType: message.responseType,
+                            resourceType: message.resourceType,
+                            onDetails: () => onHospitalTap(hospital),
+                            onBookDoctor: (doctor) =>
+                                onBookDoctor(hospital, doctor),
+                            strings: strings,
+                            onBookHospital: () => onBookHospital(hospital),
+                            onRequestResource: () =>
+                                onAction(_requestActionFor(hospital)),
+                            onDirections: () => onDirections(hospital),
+                          )),
                     ],
                     if (message.actions.isNotEmpty) ...[
                       const SizedBox(height: 8),
@@ -543,7 +744,13 @@ class _MessageBubble extends StatelessWidget {
                         spacing: 8,
                         runSpacing: 6,
                         children: message.actions
-                            .where((action) => action.type != 'EMERGENCY_SOS')
+                            .where((action) => ![
+                                  'EMERGENCY_SOS',
+                                  'REQUEST_BLOOD',
+                                  'REQUEST_BED',
+                                  'VIEW_HOSPITAL',
+                                  'DIRECTIONS'
+                                ].contains(action.type))
                             .map((action) => OutlinedButton(
                                   onPressed: () => onAction(action),
                                   child: Text(action.label),
@@ -567,30 +774,153 @@ class _MessageBubble extends StatelessWidget {
       ),
     );
   }
+
+  CareGuideAction _requestActionFor(HospitalRecommendation hospital) {
+    for (final action in message.actions) {
+      if (action.hospitalId == hospital.id &&
+          (action.type == 'REQUEST_BLOOD' || action.type == 'REQUEST_BED')) {
+        return action;
+      }
+    }
+    final blood = message.responseType == 'blood_results';
+    return CareGuideAction(
+      type: blood ? 'REQUEST_BLOOD' : 'REQUEST_BED',
+      label: blood ? 'Request Blood' : 'Request Bed',
+      hospitalId: hospital.id,
+      hospitalName: hospital.name,
+      resourceType: blood ? 'blood' : (message.resourceType ?? 'beds'),
+      bloodGroup: blood ? hospital.bloodGroup : null,
+      available: hospital.availableBeds,
+      availableUnits: hospital.bloodUnitsAvailable,
+    );
+  }
 }
 
 class _ChatHospitalCard extends StatelessWidget {
-  const _ChatHospitalCard({required this.hospital, required this.onDetails, required this.onBook, required this.strings});
+  const _ChatHospitalCard(
+      {required this.hospital,
+      required this.responseType,
+      required this.resourceType,
+      required this.onDetails,
+      required this.onBookDoctor,
+      required this.onBookHospital,
+      required this.onRequestResource,
+      required this.onDirections,
+      required this.strings});
   final HospitalRecommendation hospital;
+  final String responseType;
+  final String? resourceType;
   final VoidCallback onDetails;
-  final VoidCallback onBook;
+  final ValueChanged<DoctorRecommendation> onBookDoctor;
+  final VoidCallback onBookHospital;
+  final VoidCallback onRequestResource;
+  final VoidCallback onDirections;
   final CareGuideStrings strings;
   @override
   Widget build(BuildContext context) => Card(
-    margin: const EdgeInsets.only(top: 8),
-    child: Padding(padding: const EdgeInsets.all(10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(hospital.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-      Text(hospital.distance > 0 ? '${hospital.distance.toStringAsFixed(1)} km away' : hospital.address, style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
-      if (hospital.ratingVerified && hospital.googleRating != null)
-        Text('Google ${hospital.googleRating!.toStringAsFixed(1)}${hospital.googleReviewCount == null ? '' : ' (${hospital.googleReviewCount} reviews)'}', style: const TextStyle(fontSize: 12)),
-      ...hospital.doctors.map((doctor) => Padding(
-        padding: const EdgeInsets.only(top: 7),
-        child: Text('${doctor.name}\n${doctor.specialization} · ${doctor.experienceYears} years${doctor.consultationFee == null ? '' : ' · ₹${doctor.consultationFee!.toStringAsFixed(0)}'}\nAvailable appointments: ${doctor.availableSlots}', style: const TextStyle(fontSize: 12)),
-      )),
-      const SizedBox(height: 6),
-      Wrap(spacing: 8, children: [OutlinedButton(onPressed: onDetails, child: Text(strings.t('view'))), FilledButton(onPressed: onBook, child: Text(strings.t('book')))]),
-    ])),
-  );
+        margin: const EdgeInsets.only(top: 8),
+        child: Padding(
+            padding: const EdgeInsets.all(10),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(hospital.name,
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                  hospital.distance > 0
+                      ? '${hospital.distance.toStringAsFixed(1)} km away'
+                      : hospital.address,
+                  style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
+              if (hospital.ratingVerified && hospital.googleRating != null)
+                Text(
+                    'Google ${hospital.googleRating!.toStringAsFixed(1)}${hospital.googleReviewCount == null ? '' : ' (${hospital.googleReviewCount} reviews)'}',
+                    style: const TextStyle(fontSize: 12)),
+              if (responseType == 'blood_results' &&
+                  hospital.bloodGroup != null &&
+                  hospital.bloodGroup!.isNotEmpty)
+                Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'Blood availability\n${hospital.bloodGroup} ${hospital.bloodGroup!.endsWith('+') ? 'Positive' : 'Negative'}\nAvailable: ${hospital.bloodUnitsAvailable ?? 0} units',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: hospital.bloodAvailable == true
+                              ? Colors.green.shade700
+                              : Colors.red.shade700,
+                          fontWeight: FontWeight.w700),
+                    )),
+              if (responseType == 'bed_results')
+                Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: _BedAvailabilitySummary(
+                        hospital: hospital, focusedResource: resourceType)),
+              ...hospital.doctors.map((doctor) => Padding(
+                    padding: const EdgeInsets.only(top: 7),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                              '${doctor.name}\n${doctor.specialization} · ${doctor.experienceYears} years${doctor.consultationFee == null ? '' : ' · ₹${doctor.consultationFee!.toStringAsFixed(0)}'}\nAvailable appointments: ${doctor.availableSlots}',
+                              style: const TextStyle(fontSize: 12)),
+                          TextButton(
+                              onPressed: () => onBookDoctor(doctor),
+                              child:
+                                  Text('${strings.t('book')} ${doctor.name}')),
+                        ]),
+                  )),
+              const SizedBox(height: 6),
+              Wrap(spacing: 8, runSpacing: 6, children: [
+                OutlinedButton(
+                    onPressed: onDetails, child: Text(strings.t('view'))),
+                if (responseType == 'blood_results' ||
+                    responseType == 'bed_results')
+                  FilledButton(
+                      onPressed: onRequestResource,
+                      child: Text(responseType == 'blood_results'
+                          ? 'Request Blood'
+                          : 'Request Bed')),
+                OutlinedButton.icon(
+                    onPressed: onDirections,
+                    icon: const Icon(Icons.directions, size: 16),
+                    label: const Text('Directions'))
+              ]),
+            ])),
+      );
+}
+class _BedAvailabilitySummary extends StatelessWidget {
+  const _BedAvailabilitySummary({required this.hospital, this.focusedResource});
+  final HospitalRecommendation hospital;
+  final String? focusedResource;
+
+  @override
+  Widget build(BuildContext context) {
+    final resources = <String, int>{
+      'General': hospital.availableBeds,
+      'ICU': hospital.availableIcu,
+      'Oxygen': hospital.availableOxygenBeds,
+      'Ventilator': hospital.availableVentilators,
+    };
+    final focused = switch (focusedResource) {
+      'icu_beds' => 'ICU',
+      'oxygen_beds' => 'Oxygen',
+      'ventilators' => 'Ventilator',
+      _ => null,
+    };
+    final shown = focused == null
+        ? resources.entries
+        : resources.entries.where((entry) => entry.key == focused);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('AVAILABLE RESOURCES',
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+      const SizedBox(height: 4),
+      Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          children: shown
+              .map((entry) => Text('${entry.key}: ${entry.value}',
+                  style: const TextStyle(fontSize: 12)))
+              .toList()),
+    ]);
+  }
 }
 
 class _TypingIndicator extends StatelessWidget {
@@ -604,7 +934,7 @@ class _TypingIndicator extends StatelessWidget {
           children: [
             const CircleAvatar(
                 radius: 17,
-               child: Icon(Icons.health_and_safety_outlined, size: 18)),
+                child: Icon(Icons.health_and_safety_outlined, size: 18)),
             const SizedBox(width: 8),
             Text(strings.t('typing')),
           ],
@@ -635,7 +965,10 @@ class _SuggestionBar extends StatelessWidget {
 
 class _Composer extends StatelessWidget {
   const _Composer(
-      {required this.controller, required this.enabled, required this.onSend, required this.strings});
+      {required this.controller,
+      required this.enabled,
+      required this.onSend,
+      required this.strings});
   final TextEditingController controller;
   final bool enabled;
   final VoidCallback onSend;
@@ -679,101 +1012,3 @@ class _Composer extends StatelessWidget {
       );
 }
 
-class _HospitalSheet extends StatelessWidget {
-  const _HospitalSheet(
-      {required this.hospital,
-      required this.onDirections,
-      required this.onCall,
-      required this.onBook, required this.strings});
-  final HospitalRecommendation hospital;
-  final VoidCallback onDirections;
-  final VoidCallback onCall;
-  final VoidCallback onBook;
-  final CareGuideStrings strings;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 4, 24, 30),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              const CircleAvatar(
-                  radius: 25,
-                  backgroundColor: Color(0xFFD9F0F3),
-                  child: Icon(Icons.local_hospital_outlined,
-                      color: Color(0xFF0A4D68))),
-              const SizedBox(width: 12),
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text(hospital.name,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.w700)),
-                    Text(hospital.address,
-                        style: const TextStyle(color: Colors.blueGrey)),
-                  ])),
-            ]),
-            const SizedBox(height: 20),
-            Row(children: [
-              _ResourceStat(
-                  label: strings.t('beds'), value: hospital.availableBeds.toString()),
-              _ResourceStat(
-                  label: 'ICU', value: hospital.availableIcu.toString()),
-              _ResourceStat(
-                  label: strings.t('ventilators'),
-                  value: hospital.availableVentilators.toString()),
-            ]),
-            const SizedBox(height: 16),
-            Text(
-                '${hospital.distance.toStringAsFixed(1)} ${strings.t('kmAway')} · ${hospital.phone}',
-                style: const TextStyle(color: Colors.blueGrey)),
-            const SizedBox(height: 16),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              OutlinedButton.icon(
-                  onPressed: onDirections,
-                  icon: const Icon(Icons.directions),
-                  label: Text(strings.t('directions'))),
-              OutlinedButton.icon(
-                  onPressed: onCall,
-                  icon: const Icon(Icons.call),
-                  label: Text(strings.t('call'))),
-              FilledButton.icon(
-                  onPressed: onBook,
-                  icon: const Icon(Icons.calendar_month),
-                  label: Text(strings.t('book'))),
-            ]),
-          ],
-        ),
-      );
-}
-
-class _ResourceStat extends StatelessWidget {
-  const _ResourceStat({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-        child: Container(
-          margin: const EdgeInsets.only(right: 8),
-          padding: const EdgeInsets.symmetric(vertical: 11),
-          decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F7),
-              borderRadius: BorderRadius.circular(12)),
-          child: Column(children: [
-            Text(value,
-                style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0A4D68))),
-            Text(label,
-                style: const TextStyle(fontSize: 11, color: Colors.blueGrey)),
-          ]),
-        ),
-      );
-}

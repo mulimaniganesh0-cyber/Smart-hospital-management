@@ -1,4 +1,5 @@
 // lib/services/api_service.dart
+// lib/services/api_service.dart
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -6,30 +7,47 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   // Override at build time, for example:
-  // --dart-define=API_BASE_URL=http://10.0.2.2:5000/api
-  static const String baseUrlValue = String.fromEnvironment(
+  // --dart-define=API_BASE_URL=http://10.0.2.2:5001/api
+  static const String _configuredBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:5000/api',
+    defaultValue: '',
   );
 
-  static const String socketUrl = String.fromEnvironment(
+  static const String _configuredSocketUrl = String.fromEnvironment(
     'SOCKET_URL',
-    defaultValue: 'http://localhost:5000',
+    defaultValue: '',
   );
 
-  static String get baseUrl => baseUrlValue;
+  // Android's localhost is the device/emulator, not this Windows machine.
+  // An explicit --dart-define always wins (and is required for physical phones).
+  static String get baseUrl {
+    if (_configuredBaseUrl.isNotEmpty) return _configuredBaseUrl;
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:5001/api';
+    }
+    return 'http://localhost:5001/api';
+  }
+
+  static String get socketUrl {
+    if (_configuredSocketUrl.isNotEmpty) return _configuredSocketUrl;
+    return baseUrl.replaceFirst(RegExp(r'/api$'), '');
+  }
 
   static Future<Map<String, String>> _getHeaders() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-    return {
+    final headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      'Authorization': 'Bearer $token',
     };
+    // Do not send the literal value "Bearer null". Authenticated endpoints
+    // will correctly return 401 when there is no signed-in user.
+    if (token?.isNotEmpty == true) headers['Authorization'] = 'Bearer $token';
+    return headers;
   }
 
   // ==================== MEDICAL RECORDS ====================
+
   static Future<Map<String, dynamic>> getMedicalOnboardingStatus() async {
     try {
       final response = await http.get(Uri.parse('$baseUrl/medical/onboarding-status'), headers: await _getHeaders());
@@ -656,14 +674,25 @@ class ApiService {
   static Future<Map<String, dynamic>> queryChatbot(
       Map<String, dynamic> query) async {
     try {
+      final endpoint = Uri.parse('$baseUrl/chatbot/query');
+      debugPrint('[CHATBOT REQUEST] POST $endpoint');
+      debugPrint('[CHATBOT REQUEST] messageLength=${'${query['message'] ?? ''}'.length}; hasToken=${(await SharedPreferences.getInstance()).getString('token')?.isNotEmpty == true}');
       final response = await http.post(
-        Uri.parse('$baseUrl/chatbot/query'),
+        endpoint,
         headers: await _getHeaders(),
         body: json.encode(query),
-      );
-      return json.decode(response.body);
-    } catch (e) {
-      return {'success': false, 'message': 'Network error: $e'};
+      ).timeout(const Duration(seconds: 50));
+      debugPrint('[CHATBOT] Response status: ${response.statusCode}');
+      debugPrint('[CHATBOT] Response body: ${response.body.length > 2000 ? '${response.body.substring(0, 2000)}…' : response.body}');
+      final decoded = json.decode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException('Chatbot response must be a JSON object.');
+      }
+      return decoded;
+    } catch (error, stackTrace) {
+      debugPrint('[FLUTTER PARSE ERROR] $error');
+      debugPrintStack(stackTrace: stackTrace);
+      return {'success': false, 'error': 'CHATBOT_NETWORK_OR_PARSE_ERROR', 'message': 'Network or response error: $error'};
     }
   }
 
@@ -1861,21 +1890,28 @@ class ApiService {
       debugPrint('Blood stock with expiry response: ${data['success']}');
 
       if (data['success'] == true && data['data'] != null) {
-        // Process the data to ensure proper format
-        final stock = data['data']
-            .map((item) => {
-                  ...item,
-                  'units': item['units'] ?? item['units_available'] ?? 0,
-                  'batch_number': item['batch_number'] ??
-                      'BATCH-${item['id']?.toString() ?? ''}',
-                })
-            .toList();
+        if (data['data'] is Map) {
+          return Map<String, dynamic>.from(data);
+        } else if (data['data'] is List) {
+          final stock = (data['data'] as List)
+              .map((item) => {
+                    ...Map<String, dynamic>.from(item as Map),
+                    'units': item['units'] ?? item['units_available'] ?? 0,
+                    'batch_number': item['batch_number'] ??
+                        'BATCH-${item['id']?.toString() ?? ''}',
+                  })
+              .toList();
 
-        return {
-          'success': true,
-          'data': stock,
-          'count': stock.length,
-        };
+          return {
+            'success': true,
+            'data': {
+              'blood_stock': stock,
+              'notifications': [],
+              'summary': {},
+            },
+            'count': stock.length,
+          };
+        }
       }
       return data;
     } catch (e) {
@@ -1883,7 +1919,6 @@ class ApiService {
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
-
   static Future<Map<String, dynamic>> addBloodStock({
     required String bloodGroup,
     required int units,

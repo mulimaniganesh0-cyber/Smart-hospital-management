@@ -201,7 +201,7 @@ class _LandingScreenState extends State<LandingScreen>
 
   Widget _buildHeader(bool isDesktop) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
@@ -241,29 +241,32 @@ class _LandingScreenState extends State<LandingScreen>
 
           // Quick links (Desktop only)
           if (isDesktop)
-            Row(
-              children: List.generate(_sections.length, (index) {
-                final isSelected = _currentPage.round() == index;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: TextButton(
-                    onPressed: () => _scrollToPage(index),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      foregroundColor:
-                          isSelected ? const Color(0xFF48CAE4) : Colors.white70,
-                    ),
-                    child: Text(
-                      _sections[index]['title'],
-                      style: GoogleFonts.poppins(
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(_sections.length, (index) {
+                  final isSelected = _currentPage.round() == index;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: TextButton(
+                      onPressed: () => _scrollToPage(index),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        foregroundColor:
+                            isSelected ? const Color(0xFF48CAE4) : Colors.white70,
+                      ),
+                      child: Text(
+                        _sections[index]['title'],
+                        style: GoogleFonts.poppins(
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
                       ),
                     ),
-                  ),
-                );
-              }),
+                  );
+                }),
+              ),
             ),
 
           // Access Portal CTA

@@ -1,6 +1,11 @@
 const { pool } = require('../config/database');
-const { generateCareGuideReply } = require('./aiServiceOpenAI');
-const { language: validLanguage, text: localizedText, localizeDoctor, localizeHospital } = require('./careGuideLocalization');
+const { analyzeUserIntent } = require('./medicalIntentService');
+const { OllamaServiceError } = require('./ollamaService');
+const { answerWithRAG, answerHospitalWithRAG } = require('./ragService');
+const { RagStoreError } = require('./ragVectorStore');
+const { EmbeddingServiceError } = require('./embeddingService');
+const { mapAgeToBand, findMedicalDatasetPolicy } = require('./medicalDatasetService');
+const { language: validLanguage, text: localizedText, empathyPrefixes, localizeDoctor, localizeHospital } = require('./careGuideLocalization');
 
 // Structured clinical guidance. These profiles provide safe triage and
 // education; they are intentionally not a diagnostic engine.
@@ -46,7 +51,9 @@ const SPECIALTY_HINTS = {
 // enough to find genuine equivalent records without ever fabricating one.
 const SPECIALTY_DATABASE_TERMS = {
   Orthopedics: ['orthoped', 'ortho', 'trauma'],
-  Urology: ['urolog', 'genito urinary', 'genito-urinary'],
+  // Do not use the partial term "urolog": it is also contained in
+  // "neurological" and would wrongly recommend neurologic-care providers.
+  Urology: ['urology', 'urologist', 'genito urinary', 'genito-urinary'],
   Dermatology: ['dermatolog', 'skin'],
   Pediatrics: ['pediatr', 'paediatr', 'child specialist'],
   'Gynecology & Obstetrics': ['gynecolog', 'gynaecolog', 'obstetric', 'obg', 'obgyn'],
@@ -57,8 +64,16 @@ const SPECIALTY_DATABASE_TERMS = {
   'General Medicine': ['general medicine', 'general practice', 'physician'],
 };
 
+const DEFAULT_HOSPITAL_LIMIT = Math.min(Math.max(Number.parseInt(process.env.DEFAULT_HOSPITAL_LIMIT || '5', 10) || 5, 1), 50);
+const HOSPITAL_LIMIT_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+
 function asBoolean(value) { return value === true || value === 'true'; }
-function hasCoordinates(latitude, longitude) { return Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude)) && !(Number(latitude) === 0 && Number(longitude) === 0); }
+function hasCoordinates(latitude, longitude) {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  return Number.isFinite(lat) && Number.isFinite(lng)
+    && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
 function normalise(value) { return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
 
 // Compact multilingual clinical aliases used before the structured matcher.
@@ -205,13 +220,18 @@ async function resolveSpecialty(message) {
 }
 
 function cityFromMessage(message) {
-  const match = message.match(/(?:in|at)\s+([a-z][a-z .-]{1,50})(?:\?|$)/i);
+  // Word boundaries prevent the "at" inside "What" from being treated as a
+  // location preposition.  Stop before common question clauses as well.
+  if (/\b(?:at|in)\s+.+?\s+hospital\b/i.test(String(message || ''))) return null;
+  const match = message.match(/\b(?:in|at)\b\s+([a-z][a-z .-]{1,50})(?:\?|$)/i);
   if (!match || NEARBY_PATTERN.test(message)) return null;
-  const city = match[1].trim().replace(/\b(hospital|nearby|please)\b.*$/i, '').trim();
+  // Trim natural-language clauses after the city, e.g. "in Chikkodi should
+  // I go". Keeping those words produced a valid parameter but no DB matches.
+  const city = match[1].trim().replace(/\b(hospital|nearby|please|has|have|with|that|which|should|could|would|can|do|does|is|are|where|who)\b.*$/i, '').trim();
   return city || null;
 }
 
-async function searchHospitals({ latitude, longitude, specialty, city, emergency, icu, bloodBank, bloodGroup, ambulance, availableBeds, radius, sort = 'distance', limit = 5 }) {
+async function searchHospitals({ latitude, longitude, specialty, city, hospitalName, emergency, icu, bloodBank, bloodGroup, ambulance, availableBeds, radius, sort = 'distance', limit = 5 }) {
   const nearby = hasCoordinates(latitude, longitude);
   const params = [];
   const add = (value) => { params.push(value); return `$${params.length}`; };
@@ -223,38 +243,70 @@ async function searchHospitals({ latitude, longitude, specialty, city, emergency
   if (nearby && Number.isFinite(Number(radius)) && Number(radius) > 0) filters.push(`${distance} <= ${add(Number(radius))}`);
   if (specialty) filters.push(`${add(specialty)} = ANY(h.specialties)`);
   if (city) filters.push(`h.city ILIKE ${add(`%${city}%`)}`);
+  if (hospitalName) filters.push(`h.name ILIKE ${add(`%${hospitalName}%`)}`);
   if (emergency) filters.push('h.emergency_available = true');
   if (icu) filters.push('COALESCE(hr.icu_beds_available, 0) > 0');
   if (availableBeds) filters.push('COALESCE(hr.general_beds_available, 0) > 0');
   if (bloodBank) filters.push(`EXISTS (SELECT 1 FROM blood_bank bb WHERE bb.hospital_id = h.id AND bb.units_available > 0${bloodGroup ? ` AND bb.blood_group = ${add(bloodGroup)}` : ''})`);
   if (ambulance) filters.push('EXISTS (SELECT 1 FROM ambulances a WHERE a.hospital_id = h.id AND a.is_available = true)');
-  const order = sort === 'cost' ? 'consultation_cost ASC NULLS LAST, distance ASC NULLS LAST' : sort === 'rating' ? 'h.google_rating DESC NULLS LAST, distance ASC NULLS LAST' : sort === 'beds' ? 'available_beds DESC, distance ASC NULLS LAST' : 'distance ASC NULLS LAST, h.google_rating DESC NULLS LAST';
-  const query = `SELECT h.id, h.name, h.address, h.city, h.phone, h.email, h.latitude, h.longitude, h.google_rating, h.google_review_count, h.google_place_id, h.google_maps_url, h.rating_verified, h.rating_last_updated, h.specialties, h.emergency_available,
-    COALESCE(hr.general_beds_available, 0) available_beds, COALESCE(hr.icu_beds_available, 0) available_icu,
-    COALESCE(hr.ventilators_available, 0) available_ventilators, COALESCE((SELECT SUM(bb.units_available) FROM blood_bank bb WHERE bb.hospital_id=h.id${bloodGroup ? ` AND bb.blood_group = ${add(bloodGroup)}` : ''}), 0) blood_units,
+  const order = bloodGroup ? 'blood_units DESC, distance ASC NULLS LAST' : sort === 'cost' ? 'consultation_cost ASC NULLS LAST, distance ASC NULLS LAST' : sort === 'rating' ? 'h.google_rating DESC NULLS LAST, distance ASC NULLS LAST' : sort === 'beds' ? 'available_beds DESC, distance ASC NULLS LAST' : 'distance ASC NULLS LAST, h.google_rating DESC NULLS LAST';
+  const query = `SELECT h.id, h.name, h.address, h.city, h.phone, h.email, h.latitude, h.longitude, h.entrance_latitude, h.entrance_longitude, h.google_rating, h.google_review_count, h.google_place_id, h.google_maps_url, h.rating_verified, h.rating_last_updated, h.specialties, h.emergency_available,
+    COALESCE(hr.general_beds_total, 0) total_beds, COALESCE(hr.general_beds_available, 0) available_beds,
+    COALESCE(hr.icu_beds_total, 0) total_icu, COALESCE(hr.icu_beds_available, 0) available_icu,
+    COALESCE(hr.ventilators_total, 0) total_ventilators, COALESCE(hr.ventilators_available, 0) available_ventilators,
+    COALESCE(hr.oxygen_supported_beds_total, 0) oxygen_beds_total, COALESCE(hr.oxygen_supported_beds_available, 0) oxygen_beds_available,
+    COALESCE((SELECT SUM(bb.units_available) FROM blood_bank bb WHERE bb.hospital_id=h.id${bloodGroup ? ` AND bb.blood_group = ${add(bloodGroup)}` : ''}), 0) blood_units,
     COALESCE((SELECT COUNT(*) FROM doctors d WHERE d.hospital_id=h.id AND d.availability_status=true), 0) doctor_count,
     (SELECT MIN(d.consultation_fee) FROM doctors d WHERE d.hospital_id=h.id AND d.availability_status=true) consultation_cost,
     EXISTS (SELECT 1 FROM ambulances a WHERE a.hospital_id=h.id AND a.is_available=true) ambulance_available, ${distance} distance
     FROM hospitals h LEFT JOIN hospital_resources hr ON hr.hospital_id=h.id WHERE ${filters.join(' AND ')} ORDER BY ${order} LIMIT ${add(Math.min(Math.max(Number(limit) || 5, 1), 50))}`;
   const result = await pool.query(query, params);
-  return result.rows.map((row) => ({ ...row, google_rating: row.rating_verified ? Number(row.google_rating) : null, google_review_count: row.rating_verified ? Number(row.google_review_count) : null, distance: row.distance == null ? null : Number(row.distance), available_beds: Number(row.available_beds), available_icu: Number(row.available_icu), available_ventilators: Number(row.available_ventilators), blood_units: Number(row.blood_units), doctor_count: Number(row.doctor_count), consultation_cost: row.consultation_cost == null ? null : Number(row.consultation_cost) }));
+  // `blood_units` is an aggregate only for ordinary hospital cards.  For a
+  // blood search expose an explicit, group-scoped object so Flutter never
+  // mistakes the number for another blood type.
+  if (bloodGroup) {
+    result.rows.forEach((row) => {
+      const units = Number(row.blood_units || 0);
+      row.blood = { group: bloodGroup, unitsAvailable: units, available: units > 0 };
+    });
+  }
+  return result.rows.map((row) => ({ ...row, entrance_latitude: row.entrance_latitude == null ? null : Number(row.entrance_latitude), entrance_longitude: row.entrance_longitude == null ? null : Number(row.entrance_longitude), google_rating: row.rating_verified ? Number(row.google_rating) : null, google_review_count: row.rating_verified ? Number(row.google_review_count) : null, distance: row.distance == null ? null : Number(row.distance), total_beds: Number(row.total_beds), available_beds: Number(row.available_beds), total_icu: Number(row.total_icu), available_icu: Number(row.available_icu), total_ventilators: Number(row.total_ventilators), available_ventilators: Number(row.available_ventilators), oxygen_beds_total: Number(row.oxygen_beds_total), oxygen_beds_available: Number(row.oxygen_beds_available), blood_units: Number(row.blood_units), doctor_count: Number(row.doctor_count), consultation_cost: row.consultation_cost == null ? null : Number(row.consultation_cost) }));
 }
 
-async function searchDoctors({ latitude, longitude, specialty, limit = 20 }) {
+function hospitalNameFromMessage(message) {
+  const match = String(message || '').match(/\b(?:at|in)\s+(.+?)\s+hospital\b/i);
+  return match ? match[1].trim() : null;
+}
+
+function extractBloodGroup(message) {
+  const match = String(message || '').match(/\b(AB|A|B|O)\s*(\+|-)(?:\s*ve)?(?=\s|$|[.,!?])|\b(AB|A|B|O)\s*(positive|negative|pos|neg)(?=\s|$|[.,!?])/i);
+  if (!match) return null;
+  const group = match[1] || match[3];
+  const marker = match[2] || match[4];
+  const sign = /^(\+|positive|pos)$/i.test(marker) ? '+' : '-';
+  return `${group.toUpperCase()}${sign}`;
+}
+
+async function searchDoctors({ latitude, longitude, specialty, city, hospitalName, limit = 20 }) {
   const nearby = hasCoordinates(latitude, longitude);
   const params = [];
   const add = (value) => { params.push(value); return `$${params.length}`; };
   const lat = nearby ? add(Number(latitude)) : null;
   const lng = nearby ? add(Number(longitude)) : null;
   const distance = nearby ? `(6371 * acos(LEAST(1.0, GREATEST(-1.0, cos(radians(${lat})) * cos(radians(h.latitude)) * cos(radians(h.longitude) - radians(${lng})) + sin(radians(${lat})) * sin(radians(h.latitude))))))` : 'NULL';
-  const filters = ['(h.is_verified = true OR h.directory_visible = true)'];
+  // This is the one database query used by CareGuide and the public doctor
+  // directory. Never return an inactive record as a recommendation.
+  const filters = ['(h.is_verified = true OR h.directory_visible = true)', 'd.availability_status = true', 'COALESCE(d.is_active, true) = true'];
   if (nearby) filters.push('h.latitude IS NOT NULL AND h.longitude IS NOT NULL');
   if (specialty) {
     const terms = [...new Set([specialty, ...(SPECIALTY_DATABASE_TERMS[specialty] || [])])];
     const doctorMatches = terms.map((term) => `d.specialization ILIKE ${add(`%${term}%`)}`);
-    const hospitalMatches = terms.map((term) => `array_to_string(COALESCE(h.specialties, '{}'), ' ') ILIKE ${add(`%${term}%`)}`);
-    filters.push(`(${doctorMatches.join(' OR ')} OR ${hospitalMatches.join(' OR ')})`);
+    // A hospital may offer a service without having a named doctor supplied
+    // for it. Do not turn that into a recommendation for every doctor there.
+    filters.push(`(${doctorMatches.join(' OR ')})`);
   }
+  if (city) filters.push(`h.city ILIKE ${add(`%${city}%`)}`);
+  if (hospitalName) filters.push(`h.name ILIKE ${add(`%${hospitalName}%`)}`);
   const result = await pool.query(`SELECT d.id, d.name, d.specialization, d.designation, d.department, d.qualification, d.experience_years, d.experience_display, d.availability, d.availability_status, d.verification_status, d.consultation_fee, d.phone,
     h.id hospital_id, h.name hospital_name, h.address, h.city, h.latitude, h.longitude, h.emergency_available, h.google_rating, h.google_review_count, h.rating_verified, ${distance} distance,
     (SELECT COUNT(*) FROM doctor_available_slots s WHERE s.doctor_id=d.id AND s.is_available=true AND s.slot_date >= CURRENT_DATE
@@ -268,7 +320,7 @@ function groupDoctorsByHospital(doctors) {
   const grouped = new Map();
   for (const doctor of doctors) {
     if (!grouped.has(doctor.hospital_id)) grouped.set(doctor.hospital_id, { id: doctor.hospital_id, name: doctor.hospital_name, address: doctor.address, city: doctor.city, latitude: doctor.latitude == null ? null : Number(doctor.latitude), longitude: doctor.longitude == null ? null : Number(doctor.longitude), emergency_available: doctor.emergency_available, rating_verified: doctor.rating_verified, google_rating: doctor.rating_verified ? Number(doctor.google_rating) : null, google_review_count: doctor.rating_verified ? Number(doctor.google_review_count) : null, distance: doctor.distance, doctors: [] });
-    grouped.get(doctor.hospital_id).doctors.push({ id: doctor.id, name: doctor.name, specialization: doctor.specialization, designation: doctor.designation, qualification: doctor.qualification, experience_years: doctor.experience_years, experience_display: doctor.experience_display, availability: doctor.availability, availability_status: doctor.availability_status, consultation_fee: doctor.consultation_fee, available_slots: doctor.available_slots, phone: doctor.phone });
+    grouped.get(doctor.hospital_id).doctors.push({ id: doctor.id, hospital_id: doctor.hospital_id, name: doctor.name, specialization: doctor.specialization, designation: doctor.designation, qualification: doctor.qualification, experience_years: doctor.experience_years, experience_display: doctor.experience_display, availability: doctor.availability, availability_status: doctor.availability_status, consultation_fee: doctor.consultation_fee, available_slots: doctor.available_slots, phone: doctor.phone });
   }
   return [...grouped.values()];
 }
@@ -277,6 +329,42 @@ function hospitalSummary(hospitals, { comparison = false } = {}) {
   if (!hospitals.length) return 'I could not find a matching registered hospital with the current filters.';
   const heading = comparison ? 'Nearby hospital comparison:' : 'I found these registered hospitals:';
   return `${heading}\n\n${hospitals.map((h, i) => `${i + 1}. ${h.name}\n📍 ${h.distance == null ? h.city || h.address || 'Location available in directory' : `${h.distance.toFixed(1)} km away`}\n${h.rating_verified ? `⭐ Google ${h.google_rating.toFixed(1)} (${h.google_review_count} reviews)` : 'Google rating unavailable'}\n🛏️ Beds: ${h.available_beds} · ICU: ${h.available_icu}\n🚑 Emergency: ${h.emergency_available ? 'Available' : 'Not listed'} · 🩸 ${h.blood_group || 'Blood'} units: ${h.blood_units}${h.consultation_cost == null ? '' : ` · Consultation from ₹${h.consultation_cost}`}`).join('\n\n')}\n\nGoogle ratings are shown for reference and may change on Google Maps. Availability is shown from the hospital system; please confirm with the hospital.`;
+}
+
+function hospitalSearchOptionsFromQuestion(message, routing, latitude, longitude) {
+  const text = String(message || '').toLowerCase();
+  const limit = extractHospitalLimit(text);
+  const bloodGroup = extractBloodGroup(message);
+  return {
+    latitude,
+    longitude,
+    specialty: routing.specialty || undefined,
+    city: cityFromMessage(message),
+    hospitalName: hospitalNameFromMessage(message) || undefined,
+    emergency: /emergency/.test(text),
+    icu: /\bicu\b/.test(text),
+    bloodBank: routing.needsBlood || Boolean(bloodGroup) || /blood\s*bank|blood\s+(?:available|units?)/.test(text),
+    bloodGroup: bloodGroup || undefined,
+    ambulance: /ambulance/.test(text),
+    availableBeds: /available\s*(?:general\s*)?beds?|beds?\s+available/.test(text),
+    radius: routing.needsLocation ? 20 : null,
+    sort: /lowest\s+(?:cost|price)|cheapest|least\s+expensive/.test(text) ? 'cost' : /(?:most|highest)\s+rated/.test(text) ? 'rating' : /most\s+(?:available\s+)?beds?/.test(text) ? 'beds' : 'distance',
+    // This is passed directly to the parameterized PostgreSQL LIMIT clause.
+    // Never retrieve a large list and expect Flutter or Ollama to trim it.
+    limit: limit ?? (/compare/.test(text) ? 10 : DEFAULT_HOSPITAL_LIMIT),
+  };
+}
+
+function extractHospitalLimit(message) {
+  const text = String(message || '').toLowerCase();
+  if (/\b(?:all|every)\s+(?:available\s+)?hospitals?\b|\b(?:show|list)\s+all\b/.test(text)) return 50;
+  const number = '(\\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)';
+  const match = new RegExp(`\\b(?:only\\s+|top\\s+|first\\s+|give\\s+(?:me\\s+)?|show\\s+(?:me\\s+)?)?${number}\\s+(?:nearest\\s+|nearby\\s+)?(?:hospitals?|hospital)\\b`).exec(text)
+    || new RegExp(`\\b${number}\\s+(?:nearest\\s+|nearby\\s+)?hospitals?\\b`).exec(text);
+  if (!match) return null;
+  const raw = match[1];
+  const value = /^\d+$/.test(raw) ? Number(raw) : HOSPITAL_LIMIT_WORDS[raw];
+  return Number.isInteger(value) && value >= 1 && value <= 50 ? value : null;
 }
 
 function classifyIntent(text, context = {}, specialty = null) {
@@ -330,7 +418,7 @@ function databaseReply({ intent, response, hospitals = [], doctors = [], special
   if (doctors.length) actions.push({ type: 'BOOK_APPOINTMENT', label: localizedText[language].book });
   return {
     intent,
-    type: intent === 'SYMPTOM_HOSPITAL_RECOMMENDATION' ? 'symptom_hospital_recommendation' : doctors.length ? 'doctor_results' : hospitals.length ? 'hospital_results' : 'database',
+    type: doctors.length ? 'doctor_recommendation' : hospitals.length ? 'hospital_results' : 'database',
     severity: 'mild',
     specialty: specialty || null,
     requiresLocation,
@@ -342,11 +430,32 @@ function databaseReply({ intent, response, hospitals = [], doctors = [], special
   };
 }
 
-function symptomRecommendationText(language, specialty) {
+function detectPatientEmotion(text) {
+  const t = String(text || '').toLowerCase();
+  if (/scared|terrified|worried|nervous|panicking|afraid|frightened|anxious|anxiety|panic|stress|scare|horrified|डर|घबराहट|ಭಯ|ಆತಂಕ/i.test(t)) {
+    return 'ANXIOUS_SCARED';
+  }
+  if (/pain|hurts|hurting|unbearable|terrible pain|severe pain|killing me|agony|suffering|दर्द|तकलीफ|ನೋವು/i.test(t)) {
+    return 'IN_PAIN';
+  }
+  if (/confused|don't know|dont know|overwhelmed|lost|helpless|what should i do|what to do|गंभीर|समझ नहीं|ಗೊಂದಲ/i.test(t)) {
+    return 'CONFUSED_OVERWHELMED';
+  }
+  if (/sad|depressed|crying|hopeless|feeling down|upset|low mood|उदासीन|उदास|ಬೇಸರ/i.test(t)) {
+    return 'SAD_DISTRESSED';
+  }
+  if (/thank|thanks|relieved|better|appreciate|धन्यवाद|ಧನ್ಯವಾದ/i.test(t)) {
+    return 'GRATEFUL_RELIEVED';
+  }
+  return 'NEUTRAL_CALM';
+}
+
+function symptomRecommendationText(language, specialty, emotion = 'NEUTRAL_CALM') {
+  const prefix = (empathyPrefixes[emotion] && empathyPrefixes[emotion][language]) || '';
   const labels = {
-    en: `Based on your symptoms, a ${specialty || 'relevant'} specialist may be appropriate. Here are matching doctors and hospitals from the directory.`,
-    kn: `ನಿಮ್ಮ ಲಕ್ಷಣಗಳ ಆಧಾರದಲ್ಲಿ ${specialty || 'ಸೂಕ್ತ'} ತಜ್ಞರು ಸೂಕ್ತರಾಗಿರಬಹುದು. ಡೈರೆಕ್ಟರಿಯಲ್ಲಿರುವ ಹೊಂದಾಣಿಕೆಯ ವೈದ್ಯರು ಮತ್ತು ಆಸ್ಪತ್ರೆಗಳು ಇಲ್ಲಿವೆ.`,
-    hi: `आपके लक्षणों के आधार पर ${specialty || 'उपयुक्त'} विशेषज्ञ उचित हो सकते हैं। निर्देशिका में मिलते-जुलते डॉक्टर और अस्पताल यहां हैं।`,
+    en: `${prefix}Based on your symptoms, a ${specialty || 'relevant'} specialist may be appropriate. Here are matching doctors and hospitals from the directory.`,
+    kn: `${prefix}ನಿಮ್ಮ ಲಕ್ಷಣಗಳ ಆಧಾರದಲ್ಲಿ ${specialty || 'ಸೂಕ್ತ'} ತಜ್ಞರು ಸೂಕ್ತರಾಗಿರಬಹುದು. ಡೈರೆಕ್ಟರಿಯಲ್ಲಿರುವ ಹೊಂದಾಣಿಕೆಯ ವೈದ್ಯರು ಮತ್ತು ಆಸ್ಪತ್ರೆಗಳು ಇಲ್ಲಿವೆ.`,
+    hi: `${prefix}आपके लक्षणों के आधार पर ${specialty || 'उपयुक्त'} विशेषज्ञ उचित हो सकते हैं। निर्देशिका में मिलते-जुलते डॉक्टर और अस्पताल यहां हैं।`,
   };
   return labels[language] || labels.en;
 }
@@ -360,99 +469,194 @@ async function getAppointments(userId) {
   return result.rows;
 }
 
-async function respond({ message, latitude, longitude, language, context = {}, history = [] }) {
-  const requestedLanguage = languageRequestedInMessage(message) || validLanguage(language || context.language);
-  const text = String(message || '').trim();
-  const normalisedText = clinicalText(text);
-  const assessment = assessSymptoms(normalisedText, context, history);
-  const suicidal = /self.?harm|suicid|kill myself|end my life|want to die/i.test(text);
-  const emergency = suicidal || EMERGENCY_PATTERN.test(normalisedText);
-  console.info(`[CareGuide] User message: ${text.slice(0, 300)}`);
-
-  // Immediate safety messages deliberately bypass model latency. They are not
-  // a fallback: they are a safety gate before any general health discussion.
-  if (emergency) {
-    const response = suicidal
-      ? 'I’m really sorry you’re going through this. Your safety matters right now. Please call 112 or 108, go to the nearest emergency department, or contact a trusted person who can stay with you. If you might act on these thoughts, move away from anything you could use to hurt yourself and do not stay alone. Are you in immediate danger right now?'
-      : localizedText[requestedLanguage].emergency;
-    return { intent: 'emergency', type: 'emergency', severity: 'emergency', showSos: true, actions: [{ type: 'EMERGENCY_SOS', label: localizedText[requestedLanguage].sos }], response, context: { language: requestedLanguage } };
-  }
-
-  // Decide whether to retrieve records *before* invoking the model.  The
-  // database remains the source of truth for every real hospital or doctor.
-  const specialty = specialtyFromMessage(normalisedText,
-    assessment.primary?.specialty || (isContextualFollowUp(normalisedText) ? context.specialty : null));
-  let intent = classifyIntent(text, context, specialty);
-  // Symptoms plus a treatment/hospital request must be routed to matching
-  // doctors and their hospitals, never to an unfiltered directory search.
-  if (intent === 'HOSPITAL_SEARCH' && assessment.primary && specialty) {
-    intent = 'SYMPTOM_HOSPITAL_RECOMMENDATION';
-  }
-  const nearbyIntent = intent === 'NEARBY_HOSPITALS' || intent === 'NEARBY_DOCTORS';
-  const doctorIntent = intent === 'DOCTOR_SEARCH' || intent === 'NEARBY_DOCTORS' || intent === 'SYMPTOM_HOSPITAL_RECOMMENDATION' || (intent === 'HOSPITAL_SEARCH' && Boolean(specialty));
-  const hospitalIntent = nearbyIntent || intent === 'HOSPITAL_SEARCH' || intent === 'HOSPITAL_COMPARISON' || intent === 'SYMPTOM_HOSPITAL_RECOMMENDATION';
-  const databaseContext = { intent, userLocation: hasCoordinates(latitude, longitude) ? { latitude: Number(latitude), longitude: Number(longitude) } : null };
-
-  if (intent === 'AMBIGUOUS') {
-    return {
-      intent,
-      type: 'llm',
-      severity: 'mild',
-      specialty: null,
-      doctors: [],
-      hospitals: [],
-      actions: [],
-      response: localizedText[requestedLanguage].clarification,
-      context: { language: requestedLanguage, lastIntent: intent },
-    };
-  }
-
-  if (nearbyIntent && !hasCoordinates(latitude, longitude)) {
-    return databaseReply({ intent, response: localizedText[requestedLanguage].locationRequired, specialty, language: requestedLanguage, requiresLocation: true, context: databaseContext });
-  }
-
-  if (doctorIntent || hospitalIntent) {
-    try {
-      let doctors = [];
-      let hospitals = [];
-      if (doctorIntent && specialty) {
-        doctors = await searchDoctors({ latitude, longitude, specialty, limit: nearbyIntent ? 20 : 10 });
-        hospitals = groupDoctorsByHospital(doctors);
-      } else if (hospitalIntent) {
-        hospitals = await searchHospitals({ latitude, longitude, specialty, radius: nearbyIntent ? 20 : null, limit: nearbyIntent ? 50 : 10 });
-      }
-      databaseContext.hospitals = hospitals;
-      databaseContext.doctors = doctors;
-      console.info(`[CareGuide] ${intent} database lookup: ${hospitals.length} hospitals, ${doctors.length} doctors`);
-      const response = intent === 'SYMPTOM_HOSPITAL_RECOMMENDATION'
-        ? symptomRecommendationText(requestedLanguage, specialty)
-        : doctorIntent
-          ? localizedText[requestedLanguage].nearbyDoctors
-        : nearbyIntent ? localizedText[requestedLanguage].nearbyHospitals : localizedText[requestedLanguage].hospitalsFound;
-      return databaseReply({ intent, response, hospitals, doctors, specialty, language: requestedLanguage, context: { ...databaseContext, symptoms: assessment.currentMessage.slice(-800), system: assessment.primary?.system || null } });
-    } catch (error) {
-      console.error(`[CareGuide] ${intent} database lookup failed:`, error);
-      return databaseReply({ intent, response: localizedText[requestedLanguage].directoryUnavailable, specialty, language: requestedLanguage, context: databaseContext });
-    }
-  }
-
-  const ai = await generateCareGuideReply({
-    message: text,
-    history,
-    language: requestedLanguage,
-    databaseContext: { ...databaseContext, priorSpecialty: context.specialty || null, detectedSymptoms: assessment.primary?.system || null },
-  });
+function medicalStateReply({ text, requestedLanguage, context, flow, patientAge, ageBand, followUpQuestion, requiresAge = false }) {
   return {
-    intent: ai.intent,
-    type: 'llm',
-    severity: assessment.primary ? 'moderate' : 'mild',
-    specialty,
-    doctors: [],
-    hospitals: [],
-    actions: [],
-    response: ai.response,
-    context: { symptoms: assessment.currentMessage.slice(-800), specialty: specialty || null, system: assessment.primary?.system || null, language: requestedLanguage, lastIntent: ai.intent },
+    intent: flow.policy.intent,
+    // Keep the API response type explicit so Flutter can render the exact
+    // interaction requested without inferring it from optional flags.
+    type: requiresAge ? 'age_required' : followUpQuestion ? 'followup_required' : 'medical',
+    severity: flow.policy.urgency || 'needs_details',
+    response: text,
+    requiresAge,
+    showAgeSelector: requiresAge,
+    patientAge: patientAge ?? null,
+    ageBand: ageBand?.id || null,
+    showSos: false,
+    source: 'medical_dataset_rag',
+    doctors: [], hospitals: [], actions: [],
+    context: { ...context, language: requestedLanguage, symptoms: flow.policy.symptoms, specialty: null, lastIntent: flow.policy.intent, medicalConversation: { ...flow, patientAge: patientAge ?? flow.patientAge ?? null, ageBand: ageBand?.id || flow.ageBand || null, followUpIndex: followUpQuestion ? flow.followUpIndex + 1 : flow.followUpIndex } },
   };
 }
 
-module.exports = { respond, searchHospitals, searchDoctors, classifyIntent, normalizePatientMessage: clinicalText, assessSymptoms };
+function chatbotHospital(hospital, language) {
+  const localized = localizeHospital(hospital, language);
+  return {
+    ...localized,
+    hospitalId: Number(hospital.id),
+    bloodGroup: hospital.blood?.group || null,
+    bloodUnits: hospital.blood?.unitsAvailable ?? Number(hospital.blood_units || 0),
+  };
+}
+
+// Actions carry all navigation data.  Clients must never infer a request from
+// the text printed on a button, because that loses the selected hospital and
+// (for blood) the requested group.
+function hospitalActions(hospitals, routing, language, bloodGroup) {
+  return hospitals.flatMap((hospital) => {
+    const common = { hospitalId: Number(hospital.id), hospitalName: hospital.name };
+    const actions = [{ type: 'VIEW_HOSPITAL', label: 'View Hospital', ...common }, { type: 'DIRECTIONS', label: 'Directions', ...common }];
+    if (routing.needsBlood && bloodGroup) {
+      actions.splice(1, 0, { type: 'REQUEST_BLOOD', label: 'Request Blood', ...common, bloodGroup, availableUnits: Number(hospital.blood?.unitsAvailable ?? hospital.blood_units ?? 0) });
+    } else if (routing.needsResource) {
+      const resourceType = routing.resourceType || 'beds';
+      const availableByType = { icu_beds: hospital.available_icu, oxygen_beds: hospital.oxygen_beds_available, ventilators: hospital.available_ventilators, beds: hospital.available_beds };
+      actions.splice(1, 0, { type: 'REQUEST_BED', label: 'Request Bed', ...common, resourceType, available: Number(availableByType[resourceType] ?? hospital.available_beds ?? 0) });
+    }
+    return actions;
+  });
+}
+
+async function respond({ message, latitude, longitude, language, patientAge, conversationId, context = {}, history = [] }) {
+  const startedAt = Date.now();
+  const requestedLanguage = languageRequestedInMessage(message) || validLanguage(language || context.language);
+  const text = String(message || '').trim();
+  const normalisedText = clinicalText(text);
+  // This is a request-path probe and a real user-facing greeting. It must not
+  // depend on PostgreSQL, RAG, embeddings, or Ollama.
+  if (/^(?:h+i+|hello|hey|namaste)\b[!. ]*$/i.test(text)) {
+    return {
+      intent: 'GREETING', type: 'greeting', severity: 'mild', source: 'local',
+      response: 'Hello! I am CareGuide. I can help you with hospitals, doctors, medical information, appointments, and emergency resources.',
+      doctors: [], hospitals: [], actions: [],
+      context: { language: requestedLanguage, lastIntent: 'GREETING' },
+    };
+  }
+  const assessment = assessSymptoms(normalisedText, context, history);
+  const patientEmotion = detectPatientEmotion(text);
+  const suicidal = /self.?harm|suicid|kill myself|end my life|want to die/i.test(text);
+  const emergency = suicidal || EMERGENCY_PATTERN.test(normalisedText);
+  console.info(`[CareGuide] User message: ${text.slice(0, 300)} (Detected Emotion: ${patientEmotion})`);
+
+  let routing;
+  try { routing = await analyzeUserIntent({ message: text, context }); }
+  catch (error) { throw error; }
+
+  // Emergency care remains the safety priority, but it must not hide an
+  // explicit request for a hospital or doctor.  These directory calls never
+  // depend on Ollama or the medical RAG service.
+  if (emergency && (routing.needsHospital || routing.needsDoctor)) {
+    const response = suicidal
+      ? 'I’m really sorry you’re going through this. Your safety matters right now. Please call 112 or 108, go to the nearest emergency department, or contact a trusted person who can stay with you. If you might act on these thoughts, move away from anything you could use to hurt yourself and do not stay alone. Are you in immediate danger right now?'
+      : localizedText[requestedLanguage].emergency;
+    try {
+      const city = cityFromMessage(text);
+      const doctors = routing.needsDoctor ? await searchDoctors({ latitude, longitude, specialty: routing.specialty, city, hospitalName: hospitalNameFromMessage(text), limit: 20 }) : [];
+      const hospitals = routing.needsDoctor ? groupDoctorsByHospital(doctors) : await searchHospitals({ ...hospitalSearchOptionsFromQuestion(text, routing, latitude, longitude), city, emergency: true, limit: 20 });
+      console.info(`[CHATBOT] emergency directory response: ${Date.now() - startedAt}ms`);
+      return { intent: routing.needsDoctor ? 'EMERGENCY_DOCTOR_QUERY' : 'EMERGENCY_HOSPITAL_QUERY', type: routing.needsDoctor ? 'doctor_results' : 'hospital_results', severity: 'emergency', showSos: true, actions: [{ type: 'EMERGENCY_SOS', label: localizedText[requestedLanguage].sos }], response: `${response}\n\nI can also show the matching ${routing.needsDoctor ? 'doctors' : 'emergency hospitals'} below.`, doctors, hospitals: hospitals.map((hospital) => chatbotHospital(hospital, requestedLanguage)), source: 'postgresql', context: { language: requestedLanguage, lastIntent: routing.intent, emergencyDetected: true } };
+    } catch (error) {
+      console.error(`[Emergency] directory lookup failed: ${error.message}`);
+      return { intent: 'EMERGENCY_QUERY', type: 'emergency', severity: 'emergency', showSos: true, actions: [{ type: 'EMERGENCY_SOS', label: localizedText[requestedLanguage].sos }], response, hospitals: [], source: 'emergency_rules', errorCode: 'DATABASE_ERROR', context: { language: requestedLanguage, lastIntent: 'EMERGENCY_QUERY', emergencyDetected: true } };
+    }
+  }
+  if (emergency || routing.emergency) return { intent: 'EMERGENCY_QUERY', type: 'emergency', severity: 'emergency', showSos: true, doctors: [], hospitals: [], actions: [{ type: 'EMERGENCY_SOS', label: localizedText[requestedLanguage].sos }], response: localizedText[requestedLanguage].emergency, source: 'emergency_rules', context: { language: requestedLanguage, lastIntent: 'EMERGENCY_QUERY', emergencyDetected: true } };
+  // Location improves result ordering, but an unavailable indoor/browser fix
+  // must not turn a live blood or bed search into an empty response.
+  const locationUnavailable = routing.needsLocation && !hasCoordinates(latitude, longitude);
+  if (routing.needsBlood && !extractBloodGroup(text)) {
+    return {
+      intent: 'BLOOD_QUERY', type: 'blood_results', bloodGroup: null,
+      severity: 'mild', source: 'local', doctors: [], hospitals: [], actions: [],
+      response: 'Please tell me the blood group you need (for example, O+ or AB negative) so I can check live availability.',
+      context: { ...context, language: requestedLanguage, lastIntent: 'BLOOD_QUERY' },
+    };
+  }
+
+  // Dataset-guided conversation continues from the compact client context;
+  // no patient data is persisted in the RAG corpus or server logs.
+  let flow = context.medicalConversation;
+  if (flow && !routing.needsHospital && !routing.needsDoctor && !routing.needsAppointment) {
+    const exactAge = patientAge ?? flow.patientAge;
+    const ageBand = mapAgeToBand(exactAge);
+    if (flow.policy.patientAgeRequired && !ageBand) {
+      console.info('[MEDICAL RAG] Patient age required: yes');
+      return medicalStateReply({ text: "To give safer information, I need to know the patient's age.", requestedLanguage, context, flow, requiresAge: true });
+    }
+    const followUps = flow.policy.followUpQuestions || [];
+    let index = Number(flow.followUpIndex || 0);
+    const answers = Array.isArray(flow.answers) ? flow.answers : [];
+    if (index > 0 && text !== flow.originalQuestion) answers.push(text.slice(0, 500));
+    // Some dataset policies include age as a later follow-up even after the
+    // selector supplied it. Never ask the same age question twice.
+    while (ageBand && index < followUps.length && /\bage\b|how old|patient.?s age/i.test(String(followUps[index]))) {
+      index += 1;
+    }
+    if (index < followUps.length) {
+      flow = { ...flow, answers, followUpIndex: index };
+      console.info(`[MEDICAL RAG] Follow-up required: yes (${index + 1}/${followUps.length})`);
+      return medicalStateReply({ text: followUps[index], requestedLanguage, context, flow, patientAge: exactAge, ageBand, followUpQuestion: true });
+    }
+    console.info(`[MEDICAL RAG] Patient age: ${exactAge}; Age band: ${ageBand.id}; Follow-up required: no`);
+    const medicalResponse = await answerWithRAG({ question: flow.originalQuestion, conversationHistory: history, language: requestedLanguage, patientAge: exactAge, ageBand, medicalIntent: flow.policy.intent, patientEmotion, additionalSafeContext: `Dataset policy: ${JSON.stringify(flow.policy)}\nFollow-up answers: ${answers.join(' | ')}` });
+    return { intent: flow.policy.intent, type: 'medical', severity: flow.policy.urgency || 'routine', response: medicalResponse.answer, source: 'medical_dataset_rag', requiresAge: false, patientAge: exactAge, ageBand: ageBand.id, showSos: false, doctors: [], hospitals: [], actions: [], sources: medicalResponse.sources, retrievedDocuments: medicalResponse.retrievedChunks, context: { language: requestedLanguage, lastIntent: 'MEDICAL_QUERY', patientAge: exactAge, ageBand: ageBand.id, medicalConversation: { ...flow, patientAge: exactAge, ageBand: ageBand.id, followUpIndex: followUps.length, answers } } };
+  }
+
+  if (routing.needsRag && !routing.needsHospital) {
+    console.info(`[MEDICAL RAG] User question: [redacted; characters=${text.length}]`);
+    const { policy } = await findMedicalDatasetPolicy(text, requestedLanguage);
+    console.info(`[MEDICAL RAG] Intent: ${policy?.intent || routing.intent}; Patient age required: ${policy?.patientAgeRequired === true ? 'yes' : 'no'}`);
+    if (policy && (policy.patientAgeRequired || policy.relevanceAction === 'ask_followups_before_disease_retrieval')) {
+      flow = { originalQuestion: text, policy, patientAge: patientAge ?? null, ageBand: null, followUpIndex: 0, answers: [], conversationId: conversationId || null };
+      const ageBand = mapAgeToBand(patientAge);
+      if (policy.patientAgeRequired && !ageBand) return medicalStateReply({ text: "To give safer information, I need to know the patient's age.", requestedLanguage, context, flow, requiresAge: true });
+      return medicalStateReply({ text: policy.followUpQuestions[0] || 'Please share any relevant details so I can guide you safely.', requestedLanguage, context, flow, patientAge, ageBand, followUpQuestion: true });
+    }
+  }
+
+  let medicalResponse = null;
+  let doctors = [], hospitals = [], hospitalOptions = null;
+  if (routing.needsRag) {
+    try {
+      console.info('[RAG] CareGuide medical query received');
+      medicalResponse = await answerWithRAG({ question: text, conversationHistory: history, language: requestedLanguage, patientEmotion });
+    } catch (error) {
+      if (error instanceof RagStoreError || error instanceof EmbeddingServiceError || error instanceof OllamaServiceError) {
+        console.error(`[RAG] CareGuide medical request unavailable: ${error.message}`);
+        const unavailableMessage = error instanceof OllamaServiceError
+          ? 'The local medical-answer service is unavailable right now. Please try again shortly, or seek professional medical care if this is urgent.'
+          : 'The medical knowledge service is temporarily unavailable. Please try again later or seek professional medical care if this is urgent.';
+        return { intent: routing.intent, type: 'error', severity: 'mild', source: 'rag', available: false, doctors: [], hospitals: [], actions: [], response: unavailableMessage, medical_response: { source: 'rag', available: false, error: error.code }, context: { ...context, language: requestedLanguage, specialty: routing.specialty, lastIntent: routing.intent } };
+      }
+      throw error;
+    }
+  }
+
+  if (routing.needsDoctor) {
+    console.info(`[DoctorDB] query: ${routing.specialty || 'none'}`);
+    doctors = await searchDoctors({ latitude, longitude, specialty: routing.specialty, city: cityFromMessage(text), hospitalName: hospitalNameFromMessage(text), limit: 20 });
+    hospitals = groupDoctorsByHospital(doctors);
+    console.info(`[DoctorDB] results: ${doctors.length}`);
+  } else if (routing.needsHospital) {
+    console.info(`[${routing.needsBlood ? 'BloodDB' : routing.needsResource ? 'ResourceDB' : 'HospitalDB'}] query: ${routing.specialty || 'all'}`);
+    hospitalOptions = hospitalSearchOptionsFromQuestion(text, routing, latitude, longitude);
+    hospitals = await searchHospitals(hospitalOptions);
+    console.info(`[${routing.needsBlood ? 'BloodDB' : routing.needsResource ? 'ResourceDB' : 'HospitalDB'}] bloodGroup=${hospitalOptions.bloodGroup || 'none'}; limit=${hospitalOptions.limit}; results=${hospitals.length}`);
+  }
+  const safetyPrefix = context.emergencyDetected && (routing.needsHospital || routing.needsDoctor) ? `${localizedText[requestedLanguage].emergency}\n\n` : '';
+  const response = safetyPrefix + (medicalResponse?.answer || (routing.needsDoctor
+    ? (doctors.length ? symptomRecommendationText(requestedLanguage, routing.specialty, patientEmotion) : 'No matching doctors were found in the hospital database.')
+    : routing.needsHospital ? (hospitals.length ? (hospitalOptions?.latitude != null && hospitalOptions?.longitude != null
+      ? `Here are the ${hospitals.length} nearest hospitals to your current location.`
+      : `${locationUnavailable ? 'Location is unavailable, so ' : ''}Here are ${hospitals.length} matching hospitals from the hospital directory.`)
+      : 'No matching hospitals were found in the hospital database.') : localizedText[requestedLanguage].clarification));
+  console.info(`[CHATBOT] Total response time: ${Date.now() - startedAt}ms`);
+  return {
+    intent: routing.intent, type: routing.needsRag && routing.needsHospital ? 'mixed' : routing.needsDoctor ? 'doctor_results' : routing.needsBlood ? 'blood_results' : routing.needsResource ? 'bed_results' : routing.needsHospital ? 'hospital_results' : routing.needsRag ? 'medical' : 'general', severity: assessment.primary ? 'moderate' : 'mild', specialty: routing.specialty,
+    response, source: medicalResponse ? 'rag' : (routing.needsHospital || routing.needsDoctor) ? 'postgresql' : 'local', medical_response: medicalResponse, sources: medicalResponse?.sources || [], retrievedDocuments: medicalResponse?.retrievedChunks || 0, recommendations: { source: 'postgresql', specialty: routing.specialty, doctors, hospitals }, doctors, hospitals: hospitals.map((hospital) => chatbotHospital(hospital, requestedLanguage)),
+    bloodGroup: routing.needsBlood ? hospitalOptions?.bloodGroup || null : null, resourceType: routing.needsResource ? routing.resourceType : null, limit: routing.needsHospital ? hospitalOptions?.limit : null,
+    nearby: routing.needsHospital ? routing.needsLocation : false, locationUnavailable,
+    actions: doctors.length ? [{ type: 'BOOK_APPOINTMENT', label: localizedText[requestedLanguage].book }] : hospitalActions(hospitals, routing, requestedLanguage, hospitalOptions?.bloodGroup), context: { symptoms: routing.symptoms, specialty: routing.specialty, language: requestedLanguage, lastIntent: routing.needsRag ? 'MEDICAL_QUERY' : routing.intent, ...(routing.needsRag ? { medicalConversation: { originalQuestion: text, policy: { intent: 'MEDICAL_QUERY', patientAgeRequired: false, followUpQuestions: [] }, patientAge: patientAge ?? null, followUpIndex: 0, answers: [] } } : {}) },
+  };
+}
+
+module.exports = { respond, searchHospitals, searchDoctors, classifyIntent, extractHospitalLimit, extractBloodGroup, hospitalSearchOptionsFromQuestion, normalizePatientMessage: clinicalText, assessSymptoms };

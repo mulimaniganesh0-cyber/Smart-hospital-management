@@ -35,6 +35,14 @@ const ensureMedicalSchema = async (pool) => {
     CREATE INDEX IF NOT EXISTS idx_medical_access_doctor ON medical_access_grants(doctor_user_id, patient_id);
     ALTER TABLE medical_records ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP, ADD COLUMN IF NOT EXISTS deleted_by_user_id INTEGER REFERENCES users(id), ADD COLUMN IF NOT EXISTS deletion_reason TEXT;
     CREATE INDEX IF NOT EXISTS idx_medical_records_active_patient_date ON medical_records(patient_id, record_date DESC) WHERE deleted_at IS NULL;
+    CREATE TABLE IF NOT EXISTS chatbot_conversations (
+      conversation_id VARCHAR(64) PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      state JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_chatbot_conversations_user_updated ON chatbot_conversations(user_id, updated_at DESC);
   `);
 };
 

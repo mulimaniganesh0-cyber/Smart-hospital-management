@@ -9,7 +9,7 @@ const hospitals = [
   ['Sri Satya Sai Hospital','srisatyasaihospital@gmail.com',16.4300334553,74.5837649967,['General Medicine','General Surgery','Cardiology','Neurology','Orthopedics']],
   ["Charati's Sadanand Omkar Trauma and Multispeciality Hospital",'charatissadanandomkartraumaandmultispecialityhospital@gmail.com',16.4284095858,74.5804322439,['Trauma Care','Orthopedics','General Surgery','Emergency Medicine','ICU / Critical Care']],
   ['Chidanand Patil Hospital','chidanandpatilhospital@gmail.com',16.4267188465,74.5829950837,['General Medicine','General Surgery','Orthopedics','Gynecology & Obstetrics']],
-  ['KLE Dr Prabhakar Kore Hospital','kledrprabhakakorehospital@gmail.com',16.4445028589,74.5881387098,['General Medicine','General Surgery','Cardiology','Neurology','Orthopedics','Pediatrics','Gynecology & Obstetrics','Emergency Medicine']],
+  ['KLE Dr Prabhakar Kore Hospital','kledrprabhakakorehospital@gmail.com',16.425781094468473,74.58725268144713,['General Medicine','General Surgery','Cardiology','Neurology','Orthopedics','Pediatrics','Gynecology & Obstetrics','Emergency Medicine']],
   ['Shree Padma Hospital','shreepadmahospital@gmail.com',16.4249543463,74.5740891791,['General Medicine','Gynecology & Obstetrics','Maternity','General Surgery']],
   ['Divyam Childrens Hospital','divyamchildrenshospital@gmail.com',16.4252876838,74.5821199509,['Pediatrics','Neonatology','Child Emergency Medicine']],
   ['Shri Sadguru Eye Hospital','shrisadgurueyehospital@gmail.com',16.4280598169,74.5838029221,['Ophthalmology','Eye Surgery']],
@@ -65,8 +65,8 @@ async function seed() {
       if (number % 2 === 0 || emergency) for (const [group, offset] of bloodGroups.map((g, i) => [g, i])) await client.query(`INSERT INTO blood_bank (hospital_id,blood_group,units_available,minimum_threshold,batch_number) VALUES ($1,$2,$3,5,$4) ON CONFLICT (hospital_id,blood_group) DO UPDATE SET units_available=EXCLUDED.units_available,batch_number=EXCLUDED.batch_number,last_updated=CURRENT_TIMESTAMP`, [hospitalId, group, 5 + ((number + offset) % 12), `TEST-CHI-${String(number).padStart(3, '0')}-${group.replace(/[^A-Z]/g, 'P')}`]);
       const doctorEmail = `test.doctor.${String(number).padStart(2, '0')}@seed.invalid`;
       const existingDoctor = await client.query('SELECT id FROM doctors WHERE email=$1', [doctorEmail]);
-      if (existingDoctor.rowCount) await client.query(`UPDATE doctors SET hospital_id=$1,name=$2,specialization=$3,qualification='Test data',experience_years=$4,availability_status=true,consultation_fee=$5,phone=$6 WHERE id=$7`, [hospitalId, `Dr. Test ${number}`, specialties[0], 3 + number % 12, 300 + number * 25, `91000000${String(number).padStart(2, '0')}`, existingDoctor.rows[0].id]);
-      else await client.query(`INSERT INTO doctors (hospital_id,name,specialization,qualification,experience_years,availability_status,consultation_fee,phone,email) VALUES ($1,$2,$3,'Test data',$4,true,$5,$6,$7)`, [hospitalId, `Dr. Test ${number}`, specialties[0], 3 + number % 12, 300 + number * 25, `91000000${String(number).padStart(2, '0')}`, doctorEmail]);
+      if (existingDoctor.rowCount) await client.query(`UPDATE doctors SET hospital_id=$1,name=$2,specialization=$3,qualification='Test data',experience_years=$4,is_active=false,availability_status=false,consultation_fee=$5,phone=$6 WHERE id=$7`, [hospitalId, `Dr. Test ${number}`, specialties[0], 3 + number % 12, 300 + number * 25, `91000000${String(number).padStart(2, '0')}`, existingDoctor.rows[0].id]);
+      else await client.query(`INSERT INTO doctors (hospital_id,name,specialization,qualification,experience_years,is_active,availability_status,consultation_fee,phone,email) VALUES ($1,$2,$3,'Test data',$4,false,false,$5,$6,$7)`, [hospitalId, `Dr. Test ${number}`, specialties[0], 3 + number % 12, 300 + number * 25, `91000000${String(number).padStart(2, '0')}`, doctorEmail]);
       if (!alreadyExists.rowCount) created += 1;
     }
     await client.query('COMMIT');

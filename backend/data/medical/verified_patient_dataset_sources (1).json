@@ -1,0 +1,31 @@
+[
+  {
+    "source_id": "WHO-IITT",
+    "organization": "World Health Organization",
+    "title": "Interagency Integrated Triage Tool",
+    "url": "https://www.who.int/tools/triage",
+    "accessed_on": "2026-08-28",
+    "supports": "facility triage; separate tools for adults/older children and children under 12; red high-acuity immediate care; yellow soon; green can wait",
+    "source_limit": "Designed for facility-based triage, not a home diagnosis tool."
+  },
+  {
+    "source_id": "MEDLINEPLUS-EMERGENCY",
+    "organization": "MedlinePlus / U.S. National Library of Medicine",
+    "title": "Recognizing medical emergencies",
+    "url": "https://medlineplus.gov/ency/article/001927.htm",
+    "accessed_on": "2026-08-28",
+    "page_review_date": "2025-01-08",
+    "supports": "plain-language emergency signs including uncontrolled bleeding, breathing problems, mental-status change, chest pain, fainting, severe abdominal pain, persistent vomiting/diarrhea, sudden dizziness/weakness/vision change, seizures, and facial/tongue swelling",
+    "source_limit": "Emergency signs are not exhaustive and local emergency procedures vary."
+  },
+  {
+    "source_id": "NHS-FEVER-ADULTS",
+    "organization": "NHS",
+    "title": "High temperature (fever) in adults",
+    "url": "https://www.nhs.uk/symptoms/fever-in-adults/",
+    "accessed_on": "2026-08-28",
+    "page_review_date": "2023-05-24",
+    "supports": "patient-facing fever definition and advice to seek urgent help if fever is worsening or not improving",
+    "source_limit": "The page indicates a next review date of 2026-05-24; recheck before production use."
+  }
+]
