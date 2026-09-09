@@ -175,7 +175,8 @@ const createTables = async () => {
       status VARCHAR(50) DEFAULT 'pending',
       assigned_at TIMESTAMP,
       completed_at TIMESTAMP,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
 
     // Blood Bank table
@@ -198,9 +199,49 @@ const createTables = async () => {
       driver_phone VARCHAR(20),
       type VARCHAR(50),
       is_available BOOLEAN DEFAULT TRUE,
+      status VARCHAR(30) NOT NULL DEFAULT 'AVAILABLE',
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
       current_location_lat DECIMAL(10, 8),
       current_location_lng DECIMAL(11, 8),
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS ambulance_bookings (
+      id SERIAL PRIMARY KEY,
+      patient_id INTEGER NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+      hospital_id INTEGER REFERENCES hospitals(id),
+      ambulance_id INTEGER NOT NULL REFERENCES ambulances(id),
+      pickup_location TEXT,
+      pickup_lat DECIMAL(10, 8),
+      pickup_lng DECIMAL(11, 8),
+      dropoff_location TEXT,
+      patient_name VARCHAR(255),
+      patient_phone VARCHAR(30),
+      status VARCHAR(50) NOT NULL DEFAULT 'pending',
+      is_sos BOOLEAN NOT NULL DEFAULT FALSE,
+      emergency_request_id INTEGER REFERENCES emergency_requests(id) ON DELETE SET NULL,
+      booking_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      completed_at TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS emergency_hospital_dispatches (
+      id SERIAL PRIMARY KEY,
+      emergency_id INTEGER NOT NULL REFERENCES emergency_requests(id) ON DELETE CASCADE,
+      hospital_id INTEGER NOT NULL REFERENCES hospitals(id) ON DELETE CASCADE,
+      sequence_number INTEGER NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+      notified_at TIMESTAMP,
+      response_deadline TIMESTAMP,
+      responded_at TIMESTAMP,
+      accepted_at TIMESTAMP,
+      rejected_at TIMESTAMP,
+      timed_out_at TIMESTAMP,
+      rejection_reason TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(emergency_id, hospital_id), UNIQUE(emergency_id, sequence_number)
     )`,
 
     // Blood Requests table
@@ -223,6 +264,17 @@ const createTables = async () => {
       message TEXT,
       type VARCHAR(50),
       is_read BOOLEAN DEFAULT FALSE,
+      recipient_phone VARCHAR(30),
+      delivery_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+      failure_reason TEXT,
+      hospital_id INTEGER REFERENCES hospitals(id) ON DELETE CASCADE,
+      priority VARCHAR(20) NOT NULL DEFAULT 'normal',
+      related_type VARCHAR(50),
+      related_id INTEGER,
+      patient_id INTEGER REFERENCES patients(id) ON DELETE SET NULL,
+      ambulance_id INTEGER REFERENCES ambulances(id) ON DELETE SET NULL,
+      emergency_id INTEGER REFERENCES emergency_requests(id) ON DELETE SET NULL,
+      read_at TIMESTAMP,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
 
@@ -253,6 +305,32 @@ const createTables = async () => {
     // These ALTERs make initialization safe for databases created before the
     // doctor-directory fields were introduced.
     await pool.query(`ALTER TABLE doctors ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS doctor_schedules (
+      id SERIAL PRIMARY KEY, doctor_id INTEGER NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+      hospital_id INTEGER NOT NULL REFERENCES hospitals(id) ON DELETE CASCADE,
+      weekday SMALLINT NOT NULL CHECK (weekday BETWEEN 0 AND 6), start_time TIME NOT NULL, end_time TIME NOT NULL,
+      slot_duration_minutes INTEGER NOT NULL CHECK (slot_duration_minutes > 0 AND slot_duration_minutes <= 480),
+      break_start_time TIME, break_end_time TIME, is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CHECK (start_time < end_time),
+      CHECK ((break_start_time IS NULL AND break_end_time IS NULL) OR (break_start_time IS NOT NULL AND break_end_time IS NOT NULL AND break_start_time < break_end_time AND break_start_time >= start_time AND break_end_time <= end_time)),
+      UNIQUE (doctor_id, hospital_id, weekday, start_time))`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS doctor_leaves (
+      id SERIAL PRIMARY KEY, doctor_id INTEGER NOT NULL REFERENCES doctors(id) ON DELETE CASCADE,
+      hospital_id INTEGER NOT NULL REFERENCES hospitals(id) ON DELETE CASCADE,
+      leave_start_date DATE NOT NULL, leave_end_date DATE NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'approved', reason TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK (leave_end_date >= leave_start_date))`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_doctor_schedules_lookup ON doctor_schedules(doctor_id, hospital_id, weekday) WHERE is_active`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_doctor_leaves_lookup ON doctor_leaves(doctor_id, hospital_id, leave_start_date, leave_end_date) WHERE status='approved'`);
+    await pool.query(`ALTER TABLE patients ADD COLUMN IF NOT EXISTS emergency_contact_relationship VARCHAR(100)`);
+    await pool.query(`ALTER TABLE ambulances ADD COLUMN IF NOT EXISTS status VARCHAR(30) NOT NULL DEFAULT 'AVAILABLE', ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE, ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP`);
+    await pool.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS recipient_phone VARCHAR(30), ADD COLUMN IF NOT EXISTS delivery_status VARCHAR(20) NOT NULL DEFAULT 'pending', ADD COLUMN IF NOT EXISTS failure_reason TEXT`);
+    await pool.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS hospital_id INTEGER REFERENCES hospitals(id) ON DELETE CASCADE, ADD COLUMN IF NOT EXISTS priority VARCHAR(20) NOT NULL DEFAULT 'normal', ADD COLUMN IF NOT EXISTS related_type VARCHAR(50), ADD COLUMN IF NOT EXISTS related_id INTEGER, ADD COLUMN IF NOT EXISTS patient_id INTEGER REFERENCES patients(id) ON DELETE SET NULL, ADD COLUMN IF NOT EXISTS ambulance_id INTEGER REFERENCES ambulances(id) ON DELETE SET NULL, ADD COLUMN IF NOT EXISTS emergency_id INTEGER REFERENCES emergency_requests(id) ON DELETE SET NULL, ADD COLUMN IF NOT EXISTS read_at TIMESTAMP`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient_unread ON notifications(user_id, is_read, created_at DESC)`);
+    await pool.query(`ALTER TABLE emergency_requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP`);
+    await pool.query(`ALTER TABLE emergency_requests ADD COLUMN IF NOT EXISTS accepting_hospital_id INTEGER REFERENCES hospitals(id), ADD COLUMN IF NOT EXISTS location_accuracy NUMERIC(10,2), ADD COLUMN IF NOT EXISTS location_timestamp TIMESTAMP, ADD COLUMN IF NOT EXISTS escalation_exhausted_at TIMESTAMP, ADD COLUMN IF NOT EXISTS secure_location_token_hash VARCHAR(128), ADD COLUMN IF NOT EXISTS secure_location_expires_at TIMESTAMP`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_emergency_dispatch_active_deadline ON emergency_hospital_dispatches(response_deadline) WHERE status='NOTIFIED'`);
+    await pool.query(`ALTER TABLE ambulance_bookings ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP`);
     await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_doctors_hospital_normalized_name
       ON doctors (hospital_id, lower(regexp_replace(name, '[^a-zA-Z0-9]', '', 'g')))`);
 

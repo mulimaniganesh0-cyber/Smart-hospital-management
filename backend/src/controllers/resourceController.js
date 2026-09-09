@@ -1,5 +1,39 @@
 // src/controllers/resourceController.js
 const { pool } = require('../config/database');
+const { notifyHospital, createNotification } = require('../services/notificationService');
+
+async function notifyPatientRequest({ req, request, type, title, message }) {
+  if (!request.user_id) return null;
+  const hospital = await pool.query('SELECT name FROM hospitals WHERE id=$1', [request.hospital_id]);
+  const hospitalName = hospital.rows[0]?.name || 'the hospital';
+  return createNotification({ io: req.app.get('io'), recipientUserId: request.user_id, hospitalId: request.hospital_id, patientId: request.patient_id, type, priority: type.includes('rejected') ? 'high' : 'normal', relatedType: type.includes('blood') ? 'blood_request' : 'resource_request', relatedId: request.id, title, message: `${message} ${hospitalName}.` });
+}
+
+async function getRequestDetail(req, res, table, requestId) {
+  const hospitalColumn = table === 'blood_requests' ? 'b' : 'r';
+  const result = await pool.query(
+    `SELECT ${hospitalColumn}.*, h.name AS hospital_name
+     FROM ${table} ${hospitalColumn}
+     LEFT JOIN hospitals h ON h.id=${hospitalColumn}.hospital_id
+     LEFT JOIN patients p ON p.id=${hospitalColumn}.patient_id
+     WHERE ${hospitalColumn}.id=$1 AND (
+       ${hospitalColumn}.user_id=$2 OR h.user_id=$2 OR $3='admin'
+     )`,
+    [requestId, req.user.id, req.user.user_type],
+  );
+  if (!result.rows.length) return res.status(404).json({ success: false, message: 'This request is no longer available.' });
+  return res.json({ success: true, data: result.rows[0] });
+}
+
+exports.getResourceRequestDetails = async (req, res) => {
+  try { return await getRequestDetail(req, res, 'resource_requests', req.params.requestId); }
+  catch (error) { console.error('Get resource request detail error:', error); return res.status(500).json({ success: false, message: 'Unable to load request' }); }
+};
+
+exports.getBloodRequestDetails = async (req, res) => {
+  try { return await getRequestDetail(req, res, 'blood_requests', req.params.requestId); }
+  catch (error) { console.error('Get blood request detail error:', error); return res.status(500).json({ success: false, message: 'Unable to load request' }); }
+};
 
 // ==================== RESOURCE REQUESTS ====================
 
@@ -80,6 +114,7 @@ exports.requestResource = async (req, res) => {
     );
 
     console.log('Resource request created:', result.rows[0]);
+    await notifyHospital({ io: req.app.get('io'), hospitalId: result.rows[0].hospital_id, type: 'resource_request', priority: 'high', relatedType: 'resource_request', relatedId: result.rows[0].id, patientId: result.rows[0].patient_id, title: 'NEW RESOURCE REQUEST', message: `${normalizedResourceType.replace('_', ' ')} request requires review.` });
 
     res.status(201).json({
       success: true,
@@ -274,6 +309,8 @@ exports.fulfillResourceRequest = async (req, res) => {
 
     await client.query('COMMIT');
 
+    await notifyPatientRequest({ req, request: result.rows[0], type: 'resource_accepted', title: 'Resource request accepted', message: `Your ${request.resource_type.replace('_', ' ')} request has been accepted.` });
+
     console.log(`Resource request ${requestId} fulfilled successfully`);
 
     res.json({
@@ -338,6 +375,7 @@ exports.rejectResourceRequest = async (req, res) => {
     );
 
     console.log(`Resource request ${requestId} rejected`);
+    await notifyPatientRequest({ req, request: result.rows[0], type: 'resource_rejected', title: 'Resource request rejected', message: `Your ${result.rows[0].resource_type.replace('_', ' ')} request was rejected.` });
 
     res.json({
       success: true,
@@ -487,6 +525,13 @@ exports.requestBlood = async (req, res) => {
     );
 
     console.log('Blood request created:', result.rows[0]);
+    // The notification record is persisted before Socket.IO delivery. Failure
+    // to notify must not invalidate the patient's already-created request.
+    try {
+      await notifyHospital({ io: req.app.get('io'), hospitalId: result.rows[0].hospital_id, type: 'blood_request', priority: 'high', relatedType: 'blood_request', relatedId: result.rows[0].id, patientId: result.rows[0].patient_id, title: 'NEW BLOOD REQUEST', message: `${blood_group} blood request requires review.` });
+    } catch (notificationError) {
+      console.error('Blood request notification failed:', notificationError.message);
+    }
 
     res.status(201).json({
       success: true,
@@ -661,6 +706,8 @@ exports.fulfillBloodRequest = async (req, res) => {
 
     await client.query('COMMIT');
 
+    await notifyPatientRequest({ req, request: result.rows[0], type: 'blood_accepted', title: 'Blood request accepted', message: `Your ${request.blood_group} blood request has been accepted.` });
+
     console.log(`Blood request ${requestId} fulfilled successfully`);
 
     res.json({
@@ -718,6 +765,7 @@ exports.rejectBloodRequest = async (req, res) => {
     }
 
     console.log(`Blood request ${requestId} rejected`);
+    await notifyPatientRequest({ req, request: result.rows[0], type: 'blood_rejected', title: 'Blood request rejected', message: `Your ${result.rows[0].blood_group} blood request was rejected.` });
 
     res.json({
       success: true,

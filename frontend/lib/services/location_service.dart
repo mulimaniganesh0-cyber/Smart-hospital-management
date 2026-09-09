@@ -87,7 +87,10 @@ class LocationService {
     try {
       developer.log('[Location] Requesting current browser location...', name: 'Location');
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        // High accuracy can wait indefinitely indoors on Chrome. Medium uses
+        // the best promptly available browser fix; its accuracy is retained
+        // for the UI to communicate any uncertainty.
+        desiredAccuracy: LocationAccuracy.medium,
         timeLimit: const Duration(seconds: 20),
       );
       if (isUsablePosition(position)) {

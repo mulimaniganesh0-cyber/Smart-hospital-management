@@ -34,6 +34,8 @@ const medicalRoutes = require('./routes/medicalRoutes');
 const specialtyRoutes = require('./routes/specialtyRoutes');
 const doctorRoutes = require('./routes/doctorRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const queueRoutes = require('./routes/queueRoutes');
 const { pool } = require('./config/database');
 const { getOllamaHealth } = require('./services/ollamaService');
 
@@ -147,6 +149,8 @@ app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/careguide', chatbotRoutes);
 app.use('/api/medical', medicalRoutes);
 app.use('/api/doctors', doctorRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/queues', queueRoutes);
 app.use('/api', reviewRoutes);
 
 
@@ -188,6 +192,7 @@ app.get('/', (req, res) => {
       ambulance: '/api/ambulance',
       admin: '/api/admin',
       resources: '/api/resources',
+      queues: '/api/queues',
       chatbot: '/api/chatbot'
     }
   });

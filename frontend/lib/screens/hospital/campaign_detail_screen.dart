@@ -330,15 +330,15 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('ÃƒÂ°Ã…Â¸Ã‚Â©Ã‚Â¸ Blood Group: ${reg['blood_group'] ?? 'N/A'}'),
-                Text('ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â± ${reg['donor_phone'] ?? 'N/A'}'),
+                Text(' Blood Group: ${reg['blood_group'] ?? 'N/A'}'),
+                Text(' ${reg['donor_phone'] ?? 'N/A'}'),
                 if (reg['age'] != null)
-                  Text('ÃƒÂ°Ã…Â¸Ã…Â½Ã¢â‚¬Å¡ Age: ${reg['age']} years'),
+                  Text(' Age: ${reg['age']} years'),
                 if (reg['weight'] != null)
-                  Text('ÃƒÂ¢Ã…Â¡Ã¢â‚¬â€œÃƒÂ¯Ã‚Â¸Ã‚Â Weight: ${reg['weight']} kg'),
-                Text('ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¦ Registered: ${reg['registration_date']?.toString().split('T')[0] ?? ''}'),
+                  Text(' Weight: ${reg['weight']} kg'),
+                Text(' Registered: ${reg['registration_date']?.toString().split('T')[0] ?? ''}'),
                 if (reg['units_donated'] != null && reg['units_donated'] > 0)
-                  Text('ÃƒÂ°Ã…Â¸Ã‚Â©Ã‚Â¸ Units Donated: ${reg['units_donated']}'),
+                  Text(' Units Donated: ${reg['units_donated']}'),
                 if (status == 'registered')
                   const SizedBox(height: 8),
                 if (status == 'registered')
@@ -351,7 +351,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                             backgroundColor: Colors.green,
                             foregroundColor: Colors.white,
                           ),
-                          child: const Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Record Donation'),
+                          child: const Text(' Record Donation'),
                         ),
                       ),
                     ],
@@ -773,7 +773,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Donation recorded! $units unit(s) of $selectedBloodGroup added to blood bank.'),
+                        content: Text(' Donation recorded! $units unit(s) of $selectedBloodGroup added to blood bank.'),
                         backgroundColor: Colors.green,
                       ),
                     );
@@ -791,7 +791,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
               ),
-              child: const Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Record Donation'),
+              child: const Text(' Record Donation'),
             ),
           ],
         ),

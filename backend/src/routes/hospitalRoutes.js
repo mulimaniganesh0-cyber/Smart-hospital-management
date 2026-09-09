@@ -2,11 +2,13 @@
 const express = require('express');
 const router = express.Router();
 const hospitalController = require('../controllers/hospitalController');
+const dailyQrController = require('../controllers/dailyQrController');
 const { protect, authorize } = require('../middleware/auth');
 
 // Static protected paths must be registered before /:hospitalId.
 router.get('/profile', protect, authorize('hospital'), hospitalController.getHospitalProfile);
 router.get('/dashboard-stats', protect, authorize('hospital'), hospitalController.getDashboardStats);
+router.get('/daily-qr', protect, authorize('hospital', 'hospital_admin'), dailyQrController.getToday);
 router.put('/resources', protect, authorize('hospital'), hospitalController.updateResources);
 router.get('/staff', protect, authorize('hospital'), hospitalController.getHospitalStaff);
 router.post('/staff', protect, authorize('hospital'), hospitalController.addHospitalStaff);

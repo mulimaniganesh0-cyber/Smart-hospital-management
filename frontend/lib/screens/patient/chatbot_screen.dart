@@ -9,6 +9,7 @@ import '../../services/chatbot_service.dart';
 import '../../services/location_service.dart';
 import '../../services/careguide_localizations.dart';
 import 'patient_emergency_request.dart';
+import 'ambulance_booking.dart';
 import 'patient_nearby_hospitals.dart';
 import 'patient_bookings.dart';
 import 'health_record_screen.dart';
@@ -403,9 +404,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
             const SnackBar(content: Text('Unable to open Google Maps.')));
       }
     } on PatientLocationException catch (error) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(error.message)));
+      }
     }
   }
 
@@ -489,6 +491,10 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     switch (action.type) {
       case 'EMERGENCY_SOS':
         _openSos();
+        return;
+      case 'REQUEST_AMBULANCE':
+        Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => const AmbulanceBookingScreen()));
         return;
       case 'BOOK_APPOINTMENT':
       case 'VIEW_HOSPITALS':

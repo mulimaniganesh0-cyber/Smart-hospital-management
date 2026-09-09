@@ -405,13 +405,13 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Text('ÃƒÂ°Ã…Â¸Ã‚ÂÃ‚Â¥ ${reg['hospital_name'] ?? 'Hospital'}'),
-                Text('ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â ${reg['location'] ?? 'Location not specified'}'),
-                Text('ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¦ ${reg['start_date']?.toString().split('T')[0] ?? ''}'),
+                Text(' ${reg['hospital_name'] ?? 'Hospital'}'),
+                Text(' ${reg['location'] ?? 'Location not specified'}'),
+                Text(' ${reg['start_date']?.toString().split('T')[0] ?? ''}'),
                 if (reg['units_donated'] != null && reg['units_donated'] > 0)
-                  Text('ÃƒÂ°Ã…Â¸Ã‚Â©Ã‚Â¸ Units Donated: ${reg['units_donated']}'),
+                  Text(' Units Donated: ${reg['units_donated']}'),
                 Text(
-                  'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã‚Â Registered: ${reg['registration_date']?.toString().split('T')[0] ?? ''}',
+                  ' Registered: ${reg['registration_date']?.toString().split('T')[0] ?? ''}',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
                 if (status == 'registered' || status == 'checked_in')
@@ -440,7 +440,7 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Thank you for donating! You saved a life.',
+                            ' Thank you for donating! You saved a life.',
                             style: TextStyle(color: Colors.green),
                           ),
                         ),

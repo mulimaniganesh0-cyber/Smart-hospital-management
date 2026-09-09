@@ -49,9 +49,34 @@ exports.getProfile = async (req, res) => {
 };
 
 exports.getTimeline = async (req, res) => {
-  const result = await pool.query(`SELECT id, record_type, title, record_date, source, verification_status, details, created_by_user_id, created_at, updated_at FROM medical_records WHERE patient_id=$1 AND deleted_at IS NULL ORDER BY record_date DESC, id DESC LIMIT $2 OFFSET $3`, [req.patientId, Math.min(Number(req.query.limit) || 50, 100), Number(req.query.offset) || 0]);
+  const recordType = String(req.query.type || '').trim().toUpperCase();
+  const search = String(req.query.search || '').trim();
+  const result = await pool.query(`SELECT id, record_type, title, record_date, source, verification_status, details, created_by_user_id, created_at, updated_at
+    FROM medical_records WHERE patient_id=$1 AND deleted_at IS NULL
+      AND ($2='' OR record_type=$2)
+      AND ($3='' OR title ILIKE '%' || $3 || '%' OR details::text ILIKE '%' || $3 || '%')
+    ORDER BY record_date DESC, id DESC LIMIT $4 OFFSET $5`, [req.patientId, recordType, search, Math.min(Number(req.query.limit) || 50, 100), Math.max(Number(req.query.offset) || 0, 0)]);
   await audit(req.patientId, req.user.id, 'VIEW_TIMELINE');
   res.json({ success: true, data: result.rows });
+};
+
+// A compact, server-owned view for the dashboard and CareGuide. It avoids
+// sending a patient's complete medical history to either the app or an LLM.
+exports.getMyHealthSummary = async (req, res) => {
+  const patientId = await patientForUser(req.user.id);
+  if (!patientId) return res.status(404).json({ success: false, message: 'Patient profile not found' });
+  const [profile, counts, recent, upcoming] = await Promise.all([
+    pool.query(`SELECT COALESCE(mp.blood_group,p.blood_group) blood_group, mp.allergies, mp.chronic_conditions, mp.current_medications
+      FROM patients p LEFT JOIN medical_profiles mp ON mp.patient_id=p.id WHERE p.id=$1`, [patientId]),
+    pool.query(`SELECT record_type, COUNT(*)::int count FROM medical_records WHERE patient_id=$1 AND deleted_at IS NULL GROUP BY record_type`, [patientId]),
+    pool.query(`SELECT id, record_type, title, record_date, details FROM medical_records WHERE patient_id=$1 AND deleted_at IS NULL ORDER BY record_date DESC, id DESC LIMIT 5`, [patientId]),
+    pool.query(`SELECT a.id, a.appointment_date, a.appointment_time, a.status, h.name hospital_name, d.name doctor_name
+      FROM appointments a JOIN hospitals h ON h.id=a.hospital_id LEFT JOIN doctors d ON d.id=a.doctor_id
+      WHERE a.patient_id=$1 AND a.appointment_date >= CURRENT_DATE AND LOWER(COALESCE(a.status,'')) IN ('pending','confirmed','rescheduled','accepted')
+      ORDER BY a.appointment_date, a.appointment_time LIMIT 1`, [patientId]),
+  ]);
+  await audit(patientId, req.user.id, 'VIEW_SUMMARY');
+  res.json({ success: true, data: { patient_id: patientId, profile: profile.rows[0] || {}, record_counts: counts.rows, recent_records: recent.rows, upcoming_appointment: upcoming.rows[0] || null } });
 };
 
 exports.getOnboarding = async (req, res) => {

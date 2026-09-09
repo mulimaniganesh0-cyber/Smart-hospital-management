@@ -18,7 +18,15 @@ router.post(
   authController.register
 );
 
-router.post('/login', authController.login);
+router.post('/login', (req, res, next) => {
+  const startedAt = process.hrtime.bigint();
+  res.once('finish', () => {
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+    // Do not log passwords or JWTs. The email is intentionally omitted too.
+    console.log(`[AUTH] POST /login -> ${res.statusCode} (${elapsedMs.toFixed(0)}ms), role=${req.body?.user_type || 'unknown'}`);
+  });
+  next();
+}, authController.login);
 router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
 router.get('/profile', protect, authController.getProfile);

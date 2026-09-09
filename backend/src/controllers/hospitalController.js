@@ -243,7 +243,7 @@ exports.getNearbyHospitals = async (req, res) => {
         (SELECT ROUND(AVG(r.rating)::numeric, 1) FROM hospital_reviews r WHERE r.hospital_id=h.id AND r.is_visible=true) patient_rating,
         (SELECT COUNT(*) FROM hospital_reviews r WHERE r.hospital_id=h.id AND r.is_visible=true) patient_review_count,
         h.is_verified, h.specialties, h.emergency_available,
-        h.latitude, h.longitude,
+        h.latitude, h.longitude, h.entrance_latitude, h.entrance_longitude,
         COALESCE(hr.general_beds_total, 0) as total_beds,
         COALESCE(hr.general_beds_available, 0) as available_beds,
         COALESCE(hr.icu_beds_total, 0) as icu_beds,
@@ -252,12 +252,14 @@ exports.getNearbyHospitals = async (req, res) => {
         COALESCE(hr.ventilators_available, 0) as available_ventilators,
         COALESCE(hr.oxygen_supported_beds_total, 0) as oxygen_beds_total,
         COALESCE(hr.oxygen_supported_beds_available, 0) as oxygen_beds_available,
+        COALESCE(bb.total_units, 0) AS blood_units,
         COALESCE(hr.updated_at, h.created_at) as last_updated,
         ${haversineFormula} as distance,
         (SELECT COUNT(*) FROM doctors d WHERE d.hospital_id = h.id AND d.availability_status = true) as doctor_count,
         (SELECT COUNT(*) FROM appointments a WHERE a.hospital_id = h.id AND a.status = 'pending' AND a.appointment_date = CURRENT_DATE) * 15 as waiting_time
       FROM hospitals h
       LEFT JOIN hospital_resources hr ON h.id = hr.hospital_id
+      LEFT JOIN (SELECT hospital_id, SUM(units_available)::int AS total_units FROM blood_bank GROUP BY hospital_id) bb ON bb.hospital_id = h.id
       WHERE (h.is_verified = true OR h.directory_visible = true) AND h.latitude IS NOT NULL AND h.longitude IS NOT NULL AND ${haversineFormula} <= $3
         AND ($4::text IS NULL OR $4 = ANY(h.specialties))
         AND ($5::boolean IS NOT TRUE OR h.emergency_available = true)
@@ -270,17 +272,10 @@ exports.getNearbyHospitals = async (req, res) => {
 
     const result = await pool.query(query, [userLat, userLng, maxRadius, specialty || null, emergency === 'true', icu === 'true', beds === 'true', bloodBank === 'true']);
 
-    const hospitals = await Promise.all(result.rows.map(async (hospital) => {
+    const hospitals = result.rows.map((hospital) => {
       const distKm = parseFloat(hospital.distance) || 0.5;
       const travelTimeMins = Math.max(2, Math.round((distKm / 30) * 60)); // ~30 km/h avg speed
 
-      const bloodResult = await pool.query(
-        `SELECT COALESCE(SUM(units_available), 0) as total_units
-         FROM blood_bank 
-         WHERE hospital_id = $1`,
-        [hospital.id]
-      );
-      
       return {
         id: hospital.id,
         name: hospital.name,
@@ -300,6 +295,8 @@ exports.getNearbyHospitals = async (req, res) => {
         is_verified: hospital.is_verified,
         latitude: parseFloat(hospital.latitude),
         longitude: parseFloat(hospital.longitude),
+        entrance_latitude: hospital.entrance_latitude == null ? null : parseFloat(hospital.entrance_latitude),
+        entrance_longitude: hospital.entrance_longitude == null ? null : parseFloat(hospital.entrance_longitude),
         total_beds: parseInt(hospital.total_beds),
         available_beds: parseInt(hospital.available_beds),
         icu_beds: parseInt(hospital.icu_beds),
@@ -308,7 +305,7 @@ exports.getNearbyHospitals = async (req, res) => {
         available_ventilators: parseInt(hospital.available_ventilators),
         oxygen_beds_total: parseInt(hospital.oxygen_beds_total),
         oxygen_beds_available: parseInt(hospital.oxygen_beds_available),
-        blood_units: parseInt(bloodResult.rows[0]?.total_units || 0),
+        blood_units: parseInt(hospital.blood_units || 0),
         doctor_count: parseInt(hospital.doctor_count || 0),
         waiting_time: parseInt(hospital.waiting_time || 10),
         travel_time: travelTimeMins,
@@ -318,7 +315,7 @@ exports.getNearbyHospitals = async (req, res) => {
         distance_val: distKm,
         last_updated: hospital.last_updated,
       };
-    }));
+    });
     
     res.json({
       success: true,
@@ -350,6 +347,8 @@ exports.getAllHospitals = async (req, res) => {
         h.state,
         h.latitude,
         h.longitude,
+        h.entrance_latitude,
+        h.entrance_longitude,
         h.phone,
         h.email,
         h.google_rating, h.google_review_count, h.google_place_id, h.google_maps_url,
@@ -533,9 +532,12 @@ exports.getHospitalStaff = async (req, res) => {
     const hospitalId = hospitalResult.rows[0].id;
     
     const result = await pool.query(
-      `SELECT id, name, specialization as designation, 
-              qualification, experience_years, 
-              email, phone, availability_status as is_available
+      `SELECT id, name, specialization as designation, department,
+              qualification, experience_years,
+              email, phone,
+              (COALESCE(is_active, true) AND COALESCE(availability_status, true)) AS is_available,
+              COALESCE(is_active, true) AS is_active,
+              COALESCE(availability_status, true) AS availability_status
        FROM doctors 
        WHERE hospital_id = $1 
        ORDER BY name`,
@@ -648,15 +650,22 @@ exports.updateHospitalStaff = async (req, res) => {
     // Since the table has specialization but not designation,
     // we store designation in specialization column
     const result = await pool.query(
-      `UPDATE doctors 
+      `UPDATE doctors
        SET specialization = COALESCE($1, specialization),
-           qualification = COALESCE($2, qualification),
-           experience_years = COALESCE($3, experience_years),
-           phone = COALESCE($4, phone),
-           availability_status = COALESCE($5, availability_status)
-       WHERE id = $6 AND hospital_id = $7
-       RETURNING *`,
-      [designation, qualification, experience_years, phone, is_available, staffId, hospitalId]
+           department = COALESCE($2, department),
+           qualification = COALESCE($3, qualification),
+           experience_years = COALESCE($4, experience_years),
+           phone = COALESCE($5, phone),
+           availability_status = COALESCE($6, availability_status),
+           is_active = COALESCE($6, is_active),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $7 AND hospital_id = $8
+       RETURNING id, name, specialization AS designation, department, qualification,
+                 experience_years, email, phone,
+                 (COALESCE(is_active, true) AND COALESCE(availability_status, true)) AS is_available,
+                 COALESCE(is_active, true) AS is_active,
+                 COALESCE(availability_status, true) AS availability_status`,
+      [designation, department, qualification, experience_years, phone, is_available, staffId, hospitalId]
     );
     
     if (result.rows.length === 0) {
@@ -738,9 +747,9 @@ exports.getHospitalDoctors = async (req, res) => {
     const result = await pool.query(
       `SELECT h.id AS hospital_id, h.name AS hospital_name,
               d.id, d.name, d.specialization, d.designation, d.department,
-              qualification, experience_years, experience_display, availability,
-              availability_status, verification_status, profile_image, bio,
-              phone
+              d.qualification, d.experience_years, d.experience_display,
+              d.availability, d.availability_status, d.verification_status,
+              d.profile_image, d.bio, d.phone
        FROM doctors d
        JOIN hospitals h ON h.id = d.hospital_id
        WHERE d.hospital_id = $1 AND d.availability_status = true AND COALESCE(d.is_active, true) = true

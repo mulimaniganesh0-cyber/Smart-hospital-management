@@ -40,7 +40,8 @@ class _HospitalStaffState extends State<HospitalStaff> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.people_outline, size: 80, color: Colors.grey[400]),
+                      Icon(Icons.people_outline,
+                          size: 80, color: Colors.grey[400]),
                       const SizedBox(height: 16),
                       Text(
                         'No staff members added yet',
@@ -48,12 +49,14 @@ class _HospitalStaffState extends State<HospitalStaff> {
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
-                        onPressed: () => _showAddStaffDialog(context, hospitalProvider),
+                        onPressed: () =>
+                            _showAddStaffDialog(context, hospitalProvider),
                         icon: const Icon(Icons.add),
                         label: const Text('Add Staff Member'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF0A4D68),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
                     ],
@@ -70,8 +73,9 @@ class _HospitalStaffState extends State<HospitalStaff> {
     );
   }
 
-  Widget _buildStaffCard(Map<String, dynamic> member, HospitalProvider provider) {
-    final isAvailable = member['is_available'] ?? true;
+  Widget _buildStaffCard(
+      Map<String, dynamic> member, HospitalProvider provider) {
+    final isAvailable = member['is_available'] == true;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -83,7 +87,12 @@ class _HospitalStaffState extends State<HospitalStaff> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Colors.white, isAvailable ? Colors.green.withValues(alpha: 0.05) : Colors.red.withValues(alpha: 0.05)],
+            colors: [
+              Colors.white,
+              isAvailable
+                  ? Colors.green.withValues(alpha: 0.05)
+                  : Colors.red.withValues(alpha: 0.05)
+            ],
           ),
         ),
         child: Padding(
@@ -101,7 +110,8 @@ class _HospitalStaffState extends State<HospitalStaff> {
                       ),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Icon(Icons.person, color: Colors.white, size: 30),
+                    child:
+                        const Icon(Icons.person, color: Colors.white, size: 30),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -110,16 +120,19 @@ class _HospitalStaffState extends State<HospitalStaff> {
                       children: [
                         Text(
                           member['name'] ?? 'Unknown',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           member['designation'] ?? member['role'] ?? 'Staff',
-                          style: TextStyle(color: Colors.grey[700], fontSize: 14),
+                          style:
+                              TextStyle(color: Colors.grey[700], fontSize: 14),
                         ),
                         Text(
                           member['department'] ?? 'General',
-                          style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                          style:
+                              TextStyle(color: Colors.grey[500], fontSize: 12),
                         ),
                       ],
                     ),
@@ -127,12 +140,17 @@ class _HospitalStaffState extends State<HospitalStaff> {
                   Column(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isAvailable ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+                          color: isAvailable
+                              ? Colors.green.withValues(alpha: 0.1)
+                              : Colors.red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isAvailable ? Colors.green.shade200 : Colors.red.shade200,
+                            color: isAvailable
+                                ? Colors.green.shade200
+                                : Colors.red.shade200,
                           ),
                         ),
                         child: Row(
@@ -163,7 +181,8 @@ class _HospitalStaffState extends State<HospitalStaff> {
                         children: [
                           IconButton(
                             icon: const Icon(Icons.edit, size: 20),
-                            onPressed: () => _showEditStaffDialog(context, member, provider),
+                            onPressed: () =>
+                                _showEditStaffDialog(context, member, provider),
                             style: IconButton.styleFrom(
                               backgroundColor: Colors.blue.shade50,
                               foregroundColor: Colors.blue,
@@ -172,7 +191,8 @@ class _HospitalStaffState extends State<HospitalStaff> {
                           const SizedBox(width: 8),
                           IconButton(
                             icon: const Icon(Icons.delete, size: 20),
-                            onPressed: () => _showDeleteConfirmation(context, member['id'], provider),
+                            onPressed: () => _showDeleteConfirmation(
+                                context, member['id'], provider),
                             style: IconButton.styleFrom(
                               backgroundColor: Colors.red.shade50,
                               foregroundColor: Colors.red,
@@ -191,9 +211,14 @@ class _HospitalStaffState extends State<HospitalStaff> {
                 spacing: 12,
                 runSpacing: 8,
                 children: [
-                  _buildDetailChip(Icons.school, member['qualification'] ?? 'N/A', Colors.purple),
-                  _buildDetailChip(Icons.timer, '${member['experience_years'] ?? 0} years', Colors.orange),
-                  _buildDetailChip(Icons.calendar_today, member['joining_date'] ?? 'N/A', Colors.teal),
+                  _buildDetailChip(Icons.school,
+                      member['qualification'] ?? 'N/A', Colors.purple),
+                  _buildDetailChip(
+                      Icons.timer,
+                      '${member['experience_years'] ?? 0} years',
+                      Colors.orange),
+                  _buildDetailChip(Icons.calendar_today,
+                      member['joining_date'] ?? 'N/A', Colors.teal),
                 ],
               ),
               const SizedBox(height: 12),
@@ -201,7 +226,9 @@ class _HospitalStaffState extends State<HospitalStaff> {
                 children: [
                   Icon(Icons.email, size: 16, color: Colors.grey[500]),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(member['email'] ?? 'N/A', style: TextStyle(color: Colors.grey[700]))),
+                  Expanded(
+                      child: Text(member['email'] ?? 'N/A',
+                          style: TextStyle(color: Colors.grey[700]))),
                 ],
               ),
               const SizedBox(height: 8),
@@ -209,7 +236,8 @@ class _HospitalStaffState extends State<HospitalStaff> {
                 children: [
                   Icon(Icons.phone, size: 16, color: Colors.grey[500]),
                   const SizedBox(width: 8),
-                  Text(member['phone'] ?? 'N/A', style: TextStyle(color: Colors.grey[700])),
+                  Text(member['phone'] ?? 'N/A',
+                      style: TextStyle(color: Colors.grey[700])),
                 ],
               ),
             ],
@@ -233,7 +261,8 @@ class _HospitalStaffState extends State<HospitalStaff> {
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500),
+            style: TextStyle(
+                fontSize: 12, color: color, fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -252,25 +281,60 @@ class _HospitalStaffState extends State<HospitalStaff> {
     bool isAvailable = true;
 
     final List<String> designations = [
-      'Doctor', 'Nurse', 'Surgeon', 'Specialist', 'Pharmacist',
-      'Lab Technician', 'Radiologist', 'Physiotherapist', 'Administrator',
-      'Manager', 'Accountant', 'Security', 'Cleaner', 'Driver', 'Other',
+      'Doctor',
+      'Nurse',
+      'Surgeon',
+      'Specialist',
+      'Pharmacist',
+      'Lab Technician',
+      'Radiologist',
+      'Physiotherapist',
+      'Administrator',
+      'Manager',
+      'Accountant',
+      'Security',
+      'Cleaner',
+      'Driver',
+      'Other',
     ];
 
     final List<String> departments = [
-      'Cardiology', 'Neurology', 'Orthopedics', 'Pediatrics', 'Gynecology',
-      'Ophthalmology', 'ENT', 'Dermatology', 'Psychiatry', 'Oncology',
-      'Nephrology', 'Urology', 'Gastroenterology', 'Pulmonology', 'Radiology',
-      'Pathology', 'Emergency', 'ICU', 'Operation Theater', 'Pharmacy',
-      'Administration', 'Finance', 'HR', 'IT', 'Security', 'Housekeeping',
-      'Maintenance', 'Other',
+      'Cardiology',
+      'Neurology',
+      'Orthopedics',
+      'Pediatrics',
+      'Gynecology',
+      'Ophthalmology',
+      'ENT',
+      'Dermatology',
+      'Psychiatry',
+      'Oncology',
+      'Nephrology',
+      'Urology',
+      'Gastroenterology',
+      'Pulmonology',
+      'Radiology',
+      'Pathology',
+      'Emergency',
+      'ICU',
+      'Operation Theater',
+      'Pharmacy',
+      'Administration',
+      'Finance',
+      'HR',
+      'IT',
+      'Security',
+      'Housekeeping',
+      'Maintenance',
+      'Other',
     ];
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
               Container(
@@ -282,7 +346,8 @@ class _HospitalStaffState extends State<HospitalStaff> {
                 child: const Icon(Icons.person_add, color: Color(0xFF0A4D68)),
               ),
               const SizedBox(width: 12),
-              const Text('Add Staff Member', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Add Staff Member',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
           content: SingleChildScrollView(
@@ -291,13 +356,14 @@ class _HospitalStaffState extends State<HospitalStaff> {
               children: [
                 _buildTextField(nameController, 'Full Name', Icons.person),
                 const SizedBox(height: 12),
-                
                 DropdownButtonFormField<String>(
                   initialValue: selectedDesignation,
                   decoration: InputDecoration(
                     labelText: 'Designation',
-                    prefixIcon: const Icon(Icons.work, color: Color(0xFF0A4D68)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon:
+                        const Icon(Icons.work, color: Color(0xFF0A4D68)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                   items: designations.map((String value) {
                     return DropdownMenuItem<String>(
@@ -305,16 +371,18 @@ class _HospitalStaffState extends State<HospitalStaff> {
                       child: Text(value),
                     );
                   }).toList(),
-                  onChanged: (value) => setState(() => selectedDesignation = value!),
+                  onChanged: (value) =>
+                      setState(() => selectedDesignation = value!),
                 ),
                 const SizedBox(height: 12),
-
                 DropdownButtonFormField<String>(
                   initialValue: selectedDepartment,
                   decoration: InputDecoration(
                     labelText: 'Department',
-                    prefixIcon: const Icon(Icons.business, color: Color(0xFF0A4D68)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon:
+                        const Icon(Icons.business, color: Color(0xFF0A4D68)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                   items: departments.map((String value) {
                     return DropdownMenuItem<String>(
@@ -322,21 +390,24 @@ class _HospitalStaffState extends State<HospitalStaff> {
                       child: Text(value),
                     );
                   }).toList(),
-                  onChanged: (value) => setState(() => selectedDepartment = value!),
+                  onChanged: (value) =>
+                      setState(() => selectedDepartment = value!),
                 ),
                 const SizedBox(height: 12),
-
-                _buildTextField(qualificationController, 'Qualification', Icons.school),
+                _buildTextField(
+                    qualificationController, 'Qualification', Icons.school),
                 const SizedBox(height: 12),
-                _buildTextField(experienceController, 'Experience (Years)', Icons.timer, isNumber: true),
+                _buildTextField(
+                    experienceController, 'Experience (Years)', Icons.timer,
+                    isNumber: true),
                 const SizedBox(height: 12),
                 _buildTextField(emailController, 'Email', Icons.email),
                 const SizedBox(height: 12),
                 _buildTextField(phoneController, 'Phone Number', Icons.phone),
                 const SizedBox(height: 12),
-
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey.shade300),
                     borderRadius: BorderRadius.circular(12),
@@ -345,14 +416,19 @@ class _HospitalStaffState extends State<HospitalStaff> {
                     children: [
                       Checkbox(
                         value: isAvailable,
-                        onChanged: (value) => setState(() => isAvailable = value!),
+                        onChanged: (value) =>
+                            setState(() => isAvailable = value!),
                         activeColor: const Color(0xFF0A4D68),
                       ),
-                      const Expanded(child: Text('Active / Available for duty')),
+                      const Expanded(
+                          child: Text('Active / Available for duty')),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isAvailable ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+                          color: isAvailable
+                              ? Colors.green.withValues(alpha: 0.1)
+                              : Colors.red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -377,54 +453,59 @@ class _HospitalStaffState extends State<HospitalStaff> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-    onPressed: () async {
-      final staffData = {
-        'name': nameController.text,
-        'designation': selectedDesignation,
-        'department': selectedDepartment,
-        'qualification': qualificationController.text,
-        'experience_years': int.tryParse(experienceController.text) ?? 0,
-        'email': emailController.text,
-        'phone': phoneController.text,
-        'is_available': isAvailable,
-      };
+              onPressed: () async {
+                final staffData = {
+                  'name': nameController.text,
+                  'designation': selectedDesignation,
+                  'department': selectedDepartment,
+                  'qualification': qualificationController.text,
+                  'experience_years':
+                      int.tryParse(experienceController.text) ?? 0,
+                  'email': emailController.text,
+                  'phone': phoneController.text,
+                  'is_available': isAvailable,
+                };
 
-      // Use provider instead of calling API directly
-      final success = await provider.addStaffMember(staffData);
-      if (!context.mounted) return;
-      Navigator.pop(context);
-      
-      if (success && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Staff added successfully'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      } else if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(provider.errorMessage ?? 'Failed to add staff'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    },
-    style: ElevatedButton.styleFrom(
-      backgroundColor: const Color(0xFF0A4D68),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ),
-    child: const Text('Add'),
-  ),
+                // Use provider instead of calling API directly
+                final success = await provider.addStaffMember(staffData);
+                if (!context.mounted) return;
+                Navigator.pop(context);
+
+                if (success && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Staff added successfully'),
+                      backgroundColor: Colors.green,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                } else if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content:
+                          Text(provider.errorMessage ?? 'Failed to add staff'),
+                      backgroundColor: Colors.red,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0A4D68),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Add'),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool isNumber = false}) {
+  Widget _buildTextField(
+      TextEditingController controller, String label, IconData icon,
+      {bool isNumber = false}) {
     return TextField(
       controller: controller,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
@@ -436,35 +517,84 @@ class _HospitalStaffState extends State<HospitalStaff> {
     );
   }
 
-  void _showEditStaffDialog(BuildContext context, Map<String, dynamic> staff, HospitalProvider provider) {
+  void _showEditStaffDialog(BuildContext context, Map<String, dynamic> staff,
+      HospitalProvider provider) {
     final List<String> designations = [
-      'Doctor', 'Nurse', 'Surgeon', 'Specialist', 'Pharmacist',
-      'Lab Technician', 'Radiologist', 'Physiotherapist', 'Administrator',
-      'Manager', 'Accountant', 'Security', 'Cleaner', 'Driver', 'Other'
+      'Doctor',
+      'Nurse',
+      'Surgeon',
+      'Specialist',
+      'Pharmacist',
+      'Lab Technician',
+      'Radiologist',
+      'Physiotherapist',
+      'Administrator',
+      'Manager',
+      'Accountant',
+      'Security',
+      'Cleaner',
+      'Driver',
+      'Other'
     ];
 
     final List<String> departments = [
-      'Cardiology', 'Neurology', 'Orthopedics', 'Pediatrics', 'Gynecology',
-      'Ophthalmology', 'ENT', 'Dermatology', 'Psychiatry', 'Oncology',
-      'Nephrology', 'Urology', 'Gastroenterology', 'Pulmonology', 'Radiology',
-      'Pathology', 'Emergency', 'ICU', 'Operation Theater', 'Pharmacy',
-      'Administration', 'Finance', 'HR', 'IT', 'Security', 'Housekeeping',
-      'Maintenance', 'Other'
+      'Cardiology',
+      'Neurology',
+      'Orthopedics',
+      'Pediatrics',
+      'Gynecology',
+      'Ophthalmology',
+      'ENT',
+      'Dermatology',
+      'Psychiatry',
+      'Oncology',
+      'Nephrology',
+      'Urology',
+      'Gastroenterology',
+      'Pulmonology',
+      'Radiology',
+      'Pathology',
+      'Emergency',
+      'ICU',
+      'Operation Theater',
+      'Pharmacy',
+      'Administration',
+      'Finance',
+      'HR',
+      'IT',
+      'Security',
+      'Housekeeping',
+      'Maintenance',
+      'Other'
     ];
 
-    String selectedDesignation = staff['designation'] ?? staff['role'] ?? 'Doctor';
+    String selectedDesignation =
+        staff['designation'] ?? staff['role'] ?? 'Doctor';
     String selectedDepartment = staff['department'] ?? 'Cardiology';
-    bool isAvailable = staff['is_available'] ?? true;
+    // Older records can contain values removed from the current options.
+    // DropdownButton requires exactly one matching value.
+    final uniqueDesignations = designations.toSet().toList();
+    final uniqueDepartments = departments.toSet().toList();
+    if (!uniqueDesignations.contains(selectedDesignation)) {
+      selectedDesignation = uniqueDesignations.first;
+    }
+    if (!uniqueDepartments.contains(selectedDepartment)) {
+      selectedDepartment = uniqueDepartments.first;
+    }
+    bool isAvailable = staff['is_available'] == true;
 
-    final qualificationController = TextEditingController(text: staff['qualification'] ?? '');
-    final experienceController = TextEditingController(text: (staff['experience_years'] ?? 0).toString());
+    final qualificationController =
+        TextEditingController(text: staff['qualification'] ?? '');
+    final experienceController = TextEditingController(
+        text: (staff['experience_years'] ?? 0).toString());
     final phoneController = TextEditingController(text: staff['phone'] ?? '');
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
               Container(
@@ -476,7 +606,8 @@ class _HospitalStaffState extends State<HospitalStaff> {
                 child: const Icon(Icons.edit, color: Colors.blue),
               ),
               const SizedBox(width: 12),
-              Text('Edit ${staff['name']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text('Edit ${staff['name']}',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
             ],
           ),
           content: SingleChildScrollView(
@@ -488,15 +619,17 @@ class _HospitalStaffState extends State<HospitalStaff> {
                   decoration: InputDecoration(
                     labelText: 'Designation',
                     prefixIcon: const Icon(Icons.work, color: Colors.blue),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
-                  items: designations.map((String value) {
+                  items: uniqueDesignations.map((String value) {
                     return DropdownMenuItem<String>(
                       value: value,
                       child: Text(value),
                     );
                   }).toList(),
-                  onChanged: (value) => setState(() => selectedDesignation = value!),
+                  onChanged: (value) =>
+                      setState(() => selectedDesignation = value!),
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -504,25 +637,31 @@ class _HospitalStaffState extends State<HospitalStaff> {
                   decoration: InputDecoration(
                     labelText: 'Department',
                     prefixIcon: const Icon(Icons.business, color: Colors.blue),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
-                  items: departments.map((String value) {
+                  items: uniqueDepartments.map((String value) {
                     return DropdownMenuItem<String>(
                       value: value,
                       child: Text(value),
                     );
                   }).toList(),
-                  onChanged: (value) => setState(() => selectedDepartment = value!),
+                  onChanged: (value) =>
+                      setState(() => selectedDepartment = value!),
                 ),
                 const SizedBox(height: 12),
-                _buildTextField(qualificationController, 'Qualification', Icons.school),
+                _buildTextField(
+                    qualificationController, 'Qualification', Icons.school),
                 const SizedBox(height: 12),
-                _buildTextField(experienceController, 'Experience (Years)', Icons.timer, isNumber: true),
+                _buildTextField(
+                    experienceController, 'Experience (Years)', Icons.timer,
+                    isNumber: true),
                 const SizedBox(height: 12),
                 _buildTextField(phoneController, 'Phone', Icons.phone),
                 const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey.shade300),
                     borderRadius: BorderRadius.circular(12),
@@ -531,14 +670,19 @@ class _HospitalStaffState extends State<HospitalStaff> {
                     children: [
                       Checkbox(
                         value: isAvailable,
-                        onChanged: (value) => setState(() => isAvailable = value!),
+                        onChanged: (value) =>
+                            setState(() => isAvailable = value!),
                         activeColor: Colors.blue,
                       ),
-                      const Expanded(child: Text('Active / Available for duty')),
+                      const Expanded(
+                          child: Text('Active / Available for duty')),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isAvailable ? Colors.green.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1),
+                          color: isAvailable
+                              ? Colors.green.withValues(alpha: 0.1)
+                              : Colors.red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -557,12 +701,26 @@ class _HospitalStaffState extends State<HospitalStaff> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel')),
             ElevatedButton(
               onPressed: () async {
-                Navigator.pop(context);
-                provider.loadHospitalData();
-                if (mounted) {
+                final result = await provider.updateStaffMember(
+                  staff['id'] as int,
+                  {
+                    'designation': selectedDesignation,
+                    'department': selectedDepartment,
+                    'qualification': qualificationController.text.trim(),
+                    'experience_years':
+                        int.tryParse(experienceController.text.trim()),
+                    'phone': phoneController.text.trim(),
+                    'is_available': isAvailable,
+                  },
+                );
+                if (!context.mounted) return;
+                if (result['success'] == true) {
+                  Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Staff updated successfully'),
@@ -570,11 +728,20 @@ class _HospitalStaffState extends State<HospitalStaff> {
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content:
+                          Text(result['message'] ?? 'Could not update staff'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
                 }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0A4D68),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('Save'),
             ),
@@ -584,7 +751,8 @@ class _HospitalStaffState extends State<HospitalStaff> {
     );
   }
 
-  void _showDeleteConfirmation(BuildContext context, int? staffId, HospitalProvider provider) {
+  void _showDeleteConfirmation(
+      BuildContext context, int? staffId, HospitalProvider provider) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -600,21 +768,36 @@ class _HospitalStaffState extends State<HospitalStaff> {
               child: const Icon(Icons.delete, color: Colors.red),
             ),
             const SizedBox(width: 12),
-            const Text('Delete Staff', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Delete Staff',
+                style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
-        content: const Text('Are you sure you want to remove this staff member?'),
+        content:
+            const Text('Are you sure you want to remove this staff member?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           TextButton(
-            onPressed: () {
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          TextButton(
+            onPressed: () async {
+              if (staffId == null) return;
+              final result = await provider.deactivateStaffMember(staffId);
+              if (!context.mounted) return;
               Navigator.pop(context);
-              if (mounted) {
+              if (result['success'] == true) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Staff removed'),
+                    content: Text('Staff member deactivated'),
                     backgroundColor: Colors.red,
                     behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content:
+                        Text(result['message'] ?? 'Could not deactivate staff'),
+                    backgroundColor: Colors.red,
                   ),
                 );
               }

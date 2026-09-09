@@ -50,7 +50,7 @@ class PatientProfile extends StatelessWidget {
               children: [
                 _buildInfoRow(Icons.phone, 'Phone Number', patientData?['phone'] ?? 'Not set', Colors.green, () => _showEditDialog(context, 'Phone Number', patientData?['phone'] ?? '', (v) => patientProvider.updateProfile(phone: v))),
                 _buildInfoRow(Icons.water_drop, 'Blood Group', patientData?['blood_group'] ?? 'Not set', Colors.red, () => _showBloodGroupDialog(context, patientData?['blood_group'] ?? '', (v) => patientProvider.updateProfile(bloodGroup: v))),
-                _buildInfoRow(Icons.emergency, 'Emergency Contact', patientData?['emergency_contact'] ?? 'Not set', Colors.orange, () => _showEditDialog(context, 'Emergency Contact', patientData?['emergency_contact'] ?? '', (v) => patientProvider.updateProfile(emergencyContact: v))),
+                _buildInfoRow(Icons.emergency, 'Emergency Contact', _contactLabel(patientData), Colors.orange, () => _showEmergencyContactDialog(context, patientProvider, patientData)),
               ],
             ),
             const SizedBox(height: 24),
@@ -104,6 +104,32 @@ class PatientProfile extends StatelessWidget {
       ),
     );
     
+  }
+
+  String _contactLabel(Map<String, dynamic>? data) {
+    final name = data?['emergency_contact_name']?.toString() ?? '';
+    final phone = data?['emergency_contact']?.toString() ?? '';
+    return name.isEmpty ? (phone.isEmpty ? 'Not set' : phone) : '$name\n$phone';
+  }
+
+  void _showEmergencyContactDialog(BuildContext context, PatientProvider provider, Map<String, dynamic>? data) {
+    final name = TextEditingController(text: data?['emergency_contact_name']?.toString() ?? '');
+    final phone = TextEditingController(text: data?['emergency_contact']?.toString() ?? '');
+    final relationship = TextEditingController(text: data?['emergency_contact_relationship']?.toString() ?? '');
+    showDialog(context: context, builder: (dialogContext) => AlertDialog(
+      title: const Text('Emergency Contact'),
+      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: name, decoration: const InputDecoration(labelText: 'Contact name')),
+        TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone number')),
+        TextField(controller: relationship, decoration: const InputDecoration(labelText: 'Relationship (optional)')),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')), ElevatedButton(onPressed: () async {
+        final message = await provider.updateEmergencyContact(name: name.text.trim(), phone: phone.text.trim(), relationship: relationship.text.trim());
+        if (!dialogContext.mounted) return;
+        if (message == null) { Navigator.pop(dialogContext); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Emergency contact updated'), backgroundColor: Colors.green)); }
+        else { ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red)); }
+      }, child: const Text('Save'))],
+    ));
   }
 
   Widget _buildInfoCard({required String title, required IconData icon, required List<Widget> children}) {

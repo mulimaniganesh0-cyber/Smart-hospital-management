@@ -19,6 +19,42 @@ const hospitals = [
   ['Pandurang Kumbar Hospital', ['Pandurang Kumbar Hospital Near Pandurang Temple Chikkodi'], [['Dr. Pandurang Kumbar', 'Ayurvedic / Traditional Medicine; Neurological condition care', null, 'Senior Consultant & Lead Specialist', null, 'Integrates traditional Nadi Parikshan (pulse diagnosis) with Ayurvedic formulations.'], ['Dr. Ravi', null, null, 'Consultant Physician'], ['Dr. Dnyaneshwar', null, null, 'Consultant Physician']]],
   ['Sanmeet Hospital', ['Sanmeet Hospital N M Road Chikkodi'], [['Dr. Sanjay S. Kasture', 'Consulting Paediatrician / Child Specialist', 'MBBS, DCH'], ['Dr. Arpana S. Kasture', 'General Practice / Maternity & Obstetric Care', 'MBBS']]],
 ];
+// Facts published by KLE's Chikodi page on 2026-09-04.  The site's public
+// doctor directory does not expose a Chikodi-specific roster, so no clinician
+// records are manufactured from its general network directory.
+const kleChikodi = {
+  name: 'KLES Dr. Prabhakar Kore Hospital, Chikodi',
+  aliases: ['KLE Dr. Prabhakar Kore Hospital & ICU Chikkodi', 'KLES ICU Chikkodi', 'KLE Hospital Chikodi'],
+  address: 'Chikodi, Karnataka 591201',
+  city: 'Chikodi',
+  state: 'Karnataka',
+  pincode: '591201',
+  phone: '08338-274771, 72, 73, 74',
+};
+const publishedHospitalUpdates = [
+  kleChikodi,
+  {
+    // Diyaa's supplied roster already appears above; this is its official
+    // contact information, not a new or replacement doctor roster.
+    name: 'Diyaa Multispeciality Hospital',
+    aliases: ['Diyaa Hospital', 'Diyaa Hospitals'],
+    address: 'TMC No. 6838/1/P22, Nipani-Mahalingpur Road, Chikodi, Karnataka 591201',
+    city: 'Chikodi', state: 'Karnataka', pincode: '591201',
+    phone: '08338-275999', email: 'info@diyaahospital.com',
+  },
+  {
+    name: "Charati's Sadanand Omkar Trauma & Multispeciality Hospital",
+    aliases: ['Charati Sadanand Omkar Trauma And Multispeciality Hospital'],
+    address: 'KC Road, Veer Savarkar Nagar, Chikodi, Karnataka 591201',
+    city: 'Chikodi', state: 'Karnataka', pincode: '591201', phone: '08338-272617',
+  },
+  {
+    name: 'Bhate Hospital And Maternity Home',
+    aliases: ['Bhate Hospital & Maternity Home', 'Bhate Hospital And Maternity Home Chikodi'],
+    address: '1243, Basaveshwar Circle, Near Head Post Office, Chikodi, Karnataka 591201',
+    city: 'Chikodi', state: 'Karnataka', pincode: '591201', phone: '08338-272178',
+  },
+];
 const norm = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 async function main() {
@@ -37,6 +73,9 @@ async function main() {
   // Directory records may legitimately have no supplied address or registration
   // number.  Keep those facts NULL rather than manufacturing credentials.
   await pool.query(`ALTER TABLE hospitals ALTER COLUMN address DROP NOT NULL, ALTER COLUMN registration_number DROP NOT NULL, ADD COLUMN IF NOT EXISTS directory_visible BOOLEAN NOT NULL DEFAULT FALSE`);
+  // Some verified hospital contact lines list multiple extension numbers and
+  // cannot be faithfully stored in the legacy 20-character phone field.
+  await pool.query(`ALTER TABLE hospitals ALTER COLUMN phone TYPE TEXT`);
   // Development fixture doctors must never be surfaced as real providers.
   await pool.query(`UPDATE doctors SET is_active=false, availability_status=false
     WHERE email LIKE '%@seed.invalid'`);
@@ -92,6 +131,28 @@ async function main() {
       } else {
         await pool.query(`INSERT INTO doctors (hospital_id,name,specialization,qualification,designation,experience_years,experience_display,bio,is_active,availability_status,verification_status) VALUES ($8,$7,$1,$2,$3,$4,$5,$6,true,true,'HOSPITAL_CONFIRMATION_REQUIRED')`, values); inserted++;
       }
+    }
+  }
+  // Match all known public names before creating a record, so existing doctor
+  // and appointment references stay attached to their current hospital id.
+  for (const hospitalUpdate of publishedHospitalUpdates) {
+    const candidates = [hospitalUpdate.name, ...hospitalUpdate.aliases].map(norm);
+    const existingHospital = await pool.query(`SELECT id FROM hospitals
+      WHERE lower(regexp_replace(name, '[^a-zA-Z0-9]', '', 'g')) = ANY($1::text[])
+      ORDER BY id LIMIT 1`, [candidates]);
+    if (existingHospital.rowCount) {
+      await pool.query(`UPDATE hospitals SET name=$1, address=$2, city=$3, state=$4,
+        pincode=$5, phone=$6, email=COALESCE($7, email), directory_visible=true,
+        verification_status=CASE WHEN is_verified THEN verification_status ELSE 'directory_unverified' END
+        WHERE id=$8`, [hospitalUpdate.name, hospitalUpdate.address, hospitalUpdate.city,
+        hospitalUpdate.state, hospitalUpdate.pincode, hospitalUpdate.phone,
+        hospitalUpdate.email || null, existingHospital.rows[0].id]);
+    } else {
+      await pool.query(`INSERT INTO hospitals
+        (name, address, city, state, pincode, phone, email, registration_number, verification_status, is_verified, directory_visible)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,NULL,'directory_unverified',false,true)`,
+      [hospitalUpdate.name, hospitalUpdate.address, hospitalUpdate.city, hospitalUpdate.state,
+        hospitalUpdate.pincode, hospitalUpdate.phone, hospitalUpdate.email || null]);
     }
   }
   console.log(JSON.stringify({ inserted, updated, missingHospitals, message: 'No schedules, contacts, fees, registrations, or unprovided qualifications were populated.' }, null, 2));

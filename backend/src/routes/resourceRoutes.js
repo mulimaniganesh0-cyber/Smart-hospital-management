@@ -13,6 +13,8 @@ router.post('/request', protect, resourceController.requestResource);
 router.get('/my-requests', protect, resourceController.getMyResourceRequests);
 
 // Hospital routes
+router.get('/request/:requestId', protect, resourceController.getResourceRequestDetails);
+router.get('/blood/request/:requestId', protect, resourceController.getBloodRequestDetails);
 router.get('/hospital-requests', protect, authorize('hospital'), resourceController.getHospitalResourceRequests);
 router.put('/request/:requestId/fulfill', protect, authorize('hospital'), resourceController.fulfillResourceRequest);
 router.put('/request/:requestId/reject', protect, authorize('hospital'), resourceController.rejectResourceRequest);

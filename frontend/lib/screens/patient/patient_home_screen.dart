@@ -14,6 +14,10 @@ import 'blood_bank_screen.dart';
 import 'chatbot_screen.dart';
 import 'patient_resource_request.dart';
 import 'patient_care_hub.dart';
+import 'patient_qr_scanner.dart';
+import 'patient_emergency_request.dart';
+import '../../widgets/app_ui.dart';
+import '../../widgets/notification_center.dart';
 
 class PatientHomeScreen extends StatefulWidget {
   const PatientHomeScreen({super.key});
@@ -36,19 +40,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        destinations: const [
+    const destinations = [
           NavigationDestination(
             icon: Icon(Icons.dashboard_outlined),
             selectedIcon: Icon(Icons.dashboard),
@@ -79,8 +71,35 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
             selectedIcon: Icon(Icons.person),
             label: 'Profile',
           ),
-        ],
-      ),
+        ];
+    return LayoutBuilder(builder: (context, constraints) {
+      final useRail = constraints.maxWidth >= 900;
+      final content = IndexedStack(index: _selectedIndex, children: _screens);
+      return Scaffold(
+        body: useRail
+            ? Row(children: [
+                NavigationRail(
+                  selectedIndex: _selectedIndex,
+                  labelType: NavigationRailLabelType.all,
+                  backgroundColor: Colors.white,
+                  leading: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: CircleAvatar(backgroundColor: CareGuideColors.teal, child: Icon(Icons.health_and_safety_outlined, color: Colors.white)),
+                  ),
+                  onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+                  destinations: destinations.map((item) => NavigationRailDestination(icon: item.icon, selectedIcon: item.selectedIcon, label: Text(item.label))).toList(),
+                ),
+                const VerticalDivider(width: 1),
+                Expanded(child: content),
+              ])
+            : content,
+        bottomNavigationBar: useRail
+            ? null
+            : NavigationBar(
+                selectedIndex: _selectedIndex,
+                onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+                destinations: destinations,
+              ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'careguide_fab',
         backgroundColor: const Color(0xFF0A4D68),
@@ -91,7 +110,8 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
           MaterialPageRoute(builder: (_) => const ChatbotScreen()),
         ),
       ),
-    );
+      );
+    });
   }
 }
 
@@ -384,7 +404,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                                     const Padding(
                                       padding: EdgeInsets.only(top: 8),
                                       child: Text(
-                                        'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã‚Â¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¯Ãƒâ€šÃ‚Â¸Ãƒâ€šÃ‚Â No blood units available in this hospital',
+                                        ' No blood units available in this hospital',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: Colors.red,
@@ -562,6 +582,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
       final resourceTypeMap = {
         'General Bed': 'bed',
         'ICU Bed': 'icu',
+        'Oxygen Bed': 'oxygen_bed',
         'Ventilator': 'ventilator',
         'Blood Unit': 'blood',
       };
@@ -626,8 +647,9 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Patient Dashboard'),
+        title: const Text('CareGuide'),
         actions: [
+          const NotificationCenterButton(),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
@@ -672,6 +694,15 @@ class _PatientDashboardState extends State<PatientDashboard> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    const SizedBox(height: 5),
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.my_location, color: Color(0xFFBFF7EC), size: 15),
+                        SizedBox(width: 5),
+                        Text('Location is used to find care near you', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                      ],
+                    ),
                     const SizedBox(height: 20),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -702,64 +733,26 @@ class _PatientDashboardState extends State<PatientDashboard> {
               const SizedBox(height: 24),
 
               // Quick Services
-              const Text(
-                'Quick Services',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              const CareGuideSectionHeader(title: 'Quick actions', subtitle: 'Get help or find care in a few taps'),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: QuickActionCard(
-                      icon: Icons.medical_services,
-                      title: 'Book\nAmbulance',
-                      color: Colors.red,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                const AmbulanceBookingScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: QuickActionCard(
-                      icon: Icons.bloodtype,
-                      title: 'Blood\nBank',
-                      color: Colors.red,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const BloodBankScreen(),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: QuickActionCard(
-                      icon: Icons.local_hospital,
-                      title: 'Find\nHospitals',
-                      color: const Color(0xFF0A4D68),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                const PatientNearbyHospitals(),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
+              LayoutBuilder(builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 700 ? 4 : 2;
+                return GridView.count(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: columns,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: columns == 4 ? 1.25 : 1.6,
+                  children: [
+                    CareGuideActionTile(icon: Icons.sos_outlined, label: 'Emergency SOS', description: 'Get urgent help', color: CareGuideColors.danger, onTap: () => showModalBottomSheet(context: context, isScrollControlled: true, builder: (_) => const FractionallySizedBox(heightFactor: .9, child: PatientEmergencyRequest()))),
+                    CareGuideActionTile(icon: Icons.medical_services_outlined, label: 'Ambulance', description: 'Book transport', color: Colors.red, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AmbulanceBookingScreen()))),
+                    CareGuideActionTile(icon: Icons.bloodtype_outlined, label: 'Blood bank', description: 'Check live stock', color: const Color(0xFFBE123C), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BloodBankScreen()))),
+                    CareGuideActionTile(icon: Icons.local_hospital_outlined, label: 'Find hospital', description: 'Nearby care', color: CareGuideColors.teal, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientNearbyHospitals()))),
+                    CareGuideActionTile(icon: Icons.qr_code_scanner, label: 'Scan Hospital QR', description: 'Join or check in', color: Colors.indigo, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientQrScanner()))),
+                  ],
+                );
+              }),
               const SizedBox(height: 24),
 
               // Ongoing care tools
@@ -800,10 +793,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
               const SizedBox(height: 24),
 
               // Request Resources
-              const Text(
-                'Request Resources',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              const CareGuideSectionHeader(title: 'Request a resource', subtitle: 'Choose the type of care you need'),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -843,14 +833,24 @@ class _PatientDashboardState extends State<PatientDashboard> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: ResourceRequestCard(
-                      icon: Icons.bloodtype,
-                      label: 'Blood Unit',
-                      color: Colors.purple,
+                      icon: Icons.air_outlined,
+                      label: 'Oxygen Bed',
+                      color: Colors.orange,
                       onTap: () =>
-                          _showResourceRequestDialog(context, 'Blood Unit'),
+                          _showResourceRequestDialog(context, 'Oxygen Bed'),
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: ResourceRequestCard(
+                  icon: Icons.bloodtype_outlined,
+                  label: 'Blood Unit',
+                  color: Colors.purple,
+                  onTap: () => _showResourceRequestDialog(context, 'Blood Unit'),
+                ),
               ),
               const SizedBox(height: 24),
 

@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Patient = require('../models/Patient');
 const Hospital = require('../models/Hospital');
+const { createNotification } = require('../services/notificationService');
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -43,6 +44,12 @@ exports.register = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Hospital details and a confirmed valid map location are required', fields: missing });
       }
     }
+    if (user_type === 'patient') {
+      const contact = String(additional_data?.emergency_contact || '').replace(/[\s()-]/g, '');
+      if (!String(additional_data?.emergency_contact_name || '').trim() || !/^\+?[1-9]\d{7,14}$/.test(contact)) {
+        return res.status(400).json({ success: false, message: 'A valid emergency contact name and phone number are required' });
+      }
+    }
     
     // Check if user exists
     const userExists = await User.findByEmail(email);
@@ -75,9 +82,10 @@ exports.register = async (req, res) => {
           blood_group: additional_data?.blood_group,
           emergency_contact: additional_data?.emergency_contact,
           emergency_contact_name: additional_data?.emergency_contact_name,
+          emergency_contact_relationship: additional_data?.emergency_contact_relationship,
         });
       } else if (user_type === 'hospital') {
-        await Hospital.create({
+        const hospitalProfile = await Hospital.create({
           user_id: user.id,
           name: additional_data?.hospital_name || name,
           registration_number: additional_data.registration_number,
@@ -94,6 +102,11 @@ exports.register = async (req, res) => {
           email: email,
           latitude: Number(additional_data.latitude), longitude: Number(additional_data.longitude),
         });
+        // Every existing administrator receives a persistent verification task.
+        const admins = await require('../config/database').pool.query(`SELECT id FROM users WHERE user_type='admin'`);
+        for (const admin of admins.rows) {
+          await createNotification({ io: req.app.get('io'), recipientUserId: admin.id, hospitalId: hospitalProfile.id, type: 'hospital_registration', priority: 'high', relatedType: 'hospital', relatedId: hospitalProfile.id, title: 'New hospital registration', message: `${hospitalProfile.name} is awaiting verification.` });
+        }
       }
     } catch (profileError) {
       // Do not leave an account that cannot be used when profile setup fails.

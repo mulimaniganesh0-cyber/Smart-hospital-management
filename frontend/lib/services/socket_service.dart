@@ -13,11 +13,17 @@ class SocketService {
   late io.Socket socket;
   bool isConnected = false;
   bool _isInitialized = false;
+  Future<void>? _connectFuture;
 
   SocketService._();
 
-  Future<void> connect() async {
-    if (_isInitialized) return;
+  Future<void> connect() {
+    if (_isInitialized) return Future.value();
+    return _connectFuture ??= _connect();
+  }
+
+  Future<void> _connect() async {
+    try {
     final prefs = await SharedPreferences.getInstance();
     final userJson = prefs.getString('user');
     final token = prefs.getString('token');
@@ -25,7 +31,12 @@ class SocketService {
 
     socket = io.io(ApiService.socketUrl, <String, dynamic>{
       'transports': ['websocket'],
-      'autoConnect': true,
+      // Start exactly once below. This prevents a second connection attempt
+      // when authentication and a dashboard both request the singleton.
+      'autoConnect': false,
+      'reconnection': true,
+      'reconnectionAttempts': 5,
+      'reconnectionDelay': 1000,
       'auth': {'token': token},
     });
     _isInitialized = true;
@@ -48,7 +59,14 @@ class SocketService {
       isConnected = false;
     });
 
+    socket.onConnectError((error) {
+      debugPrint('Socket connection error: $error');
+    });
+
     socket.connect();
+    } finally {
+      _connectFuture = null;
+    }
   }
 
   void disconnect() {
@@ -57,6 +75,7 @@ class SocketService {
       socket.dispose();
       isConnected = false;
       _isInitialized = false;
+      _connectFuture = null;
     }
   }
 
@@ -80,8 +99,46 @@ class SocketService {
     if (_isInitialized) socket.on('emergency-status-update', callback);
   }
 
+  void onEmergencyCreated(Function(dynamic) callback) {
+    if (_isInitialized) socket.on('emergency:sos_created', callback);
+  }
+
+  void onEmergencyLifecycle(Function(dynamic) callback) {
+    if (!_isInitialized) return;
+    for (final event in const ['emergency:accepted', 'emergency:responding', 'emergency:ambulance_assigned', 'emergency:dispatched', 'emergency:arrived', 'emergency:resolved', 'emergency:completed', 'emergency:cancelled']) {
+      socket.on(event, callback);
+    }
+  }
+
+  void onAmbulanceBooking(Function(dynamic) callback) {
+    if (_isInitialized) socket.on('ambulance:booking_created', callback);
+  }
+
+  void onNotificationNew(Function(dynamic) callback) {
+    if (_isInitialized) socket.on('notification:new', callback);
+  }
+
+  void onNotificationRead(Function(dynamic) callback) {
+    if (_isInitialized) socket.on('notification:read', callback);
+  }
+
+  /// Queue events are emitted only by the API after its transaction commits.
+  void onQueueChanged(Function(dynamic) callback) {
+    if (_isInitialized) socket.on('queue:changed', callback);
+  }
+
+  /// Consumers use this to reconcile persistent data after Socket.IO restores
+  /// a connection. Live events are delivery only; the API remains authoritative.
+  void onReconnect(void Function(dynamic) callback) {
+    if (_isInitialized) socket.onReconnect(callback);
+  }
+
   void emitEmergencyAlert(Map<String, dynamic> data) {
     if (_isInitialized) socket.emit('emergency-alert', data);
+  }
+
+  void emitEmergencyLocation(Map<String, dynamic> data) {
+    if (_isInitialized) socket.emit('emergency-location-update', data);
   }
 
   void emitResourceUpdate(Map<String, dynamic> data) {

@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../services/api_service.dart';
+import '../../widgets/app_ui.dart';
 
 class AmbulanceBookingScreen extends StatefulWidget {
   const AmbulanceBookingScreen({super.key});
@@ -42,10 +43,10 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
   ];
 
   final List<Map<String, dynamic>> _locationTypes = [
-    {'label': 'Ã°Å¸â€œÂ Live Location', 'value': 'live'},
-    {'label': 'Ã°Å¸ÂÂ  Home', 'value': 'home'},
-    {'label': 'Ã°Å¸â€™Â¼ Work', 'value': 'work'},
-    {'label': 'Ã°Å¸â€œÂ Custom Address', 'value': 'custom'},
+    {'label': 'Live location', 'value': 'live'},
+    {'label': 'Home', 'value': 'home'},
+    {'label': 'Work', 'value': 'work'},
+    {'label': 'Custom address', 'value': 'custom'},
   ];
 
   final List<String> _ambulanceSources = [
@@ -62,7 +63,6 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
     _selectedAmbulanceType = _ambulanceTypes.first;
     _selectedLocationType = 'live';
     _getCurrentLocation();
-    _loadNearbyAmbulances();
   }
 
   Future<void> _getCurrentLocation() async {
@@ -100,6 +100,7 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
         setState(() {
           _currentPosition = position;
         });
+        _loadNearbyAmbulances();
 
         // Get address from coordinates
         try {
@@ -187,12 +188,12 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
           _nearbyAmbulances =
               List<Map<String, dynamic>>.from(response['data'] ?? []);
         } else {
-          _errorMessage = response['message'] ?? 'Failed to load ambulances';
+          _errorMessage = 'Ambulance availability could not be loaded. Please try again.';
         }
       }
     } catch (e) {
       if (mounted) {
-        _errorMessage = 'Network error: $e';
+        _errorMessage = 'Ambulance availability could not be loaded. Please try again.';
       }
     } finally {
       if (mounted) {
@@ -209,15 +210,12 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Book Ambulance'),
+          title: const Text('Ambulance care'),
           backgroundColor: Colors.red,
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
-              onPressed: () {
-                _getCurrentLocation();
-                _loadNearbyAmbulances();
-              },
+              onPressed: _getCurrentLocation,
             ),
           ],
           bottom: const TabBar(
@@ -548,46 +546,18 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _errorMessage != null
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error_outline,
-                              size: 64, color: Colors.red),
-                          const SizedBox(height: 16),
-                          Text(_errorMessage!),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: _loadNearbyAmbulances,
-                            child: const Text('Retry'),
-                          ),
-                        ],
-                      ),
+                  ? CareGuideEmptyState(
+                      icon: Icons.local_taxi_outlined,
+                      title: 'Ambulances are unavailable',
+                      message: _errorMessage!,
+                      action: ElevatedButton.icon(onPressed: _getCurrentLocation, icon: const Icon(Icons.refresh), label: const Text('Try again')),
                     )
                   : _nearbyAmbulances.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.local_taxi,
-                                  size: 64, color: Colors.grey),
-                              const SizedBox(height: 16),
-                              const Text('No ambulances available nearby'),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Try changing the filter or location',
-                                style: TextStyle(color: Colors.grey),
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: () {
-                                  _getCurrentLocation();
-                                  _loadNearbyAmbulances();
-                                },
-                                child: const Text('Refresh Location'),
-                              ),
-                            ],
-                          ),
+                      ? CareGuideEmptyState(
+                          icon: Icons.local_taxi_outlined,
+                          title: 'No ambulances nearby',
+                          message: 'Try refreshing your location or changing the service filter.',
+                          action: OutlinedButton.icon(onPressed: _getCurrentLocation, icon: const Icon(Icons.my_location), label: const Text('Refresh location')),
                         )
                       : ListView.builder(
                           padding: const EdgeInsets.all(16),
@@ -702,24 +672,7 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: available
-                            ? Colors.green.shade100
-                            : Colors.red.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        available ? 'Available' : 'Busy',
-                        style: TextStyle(
-                          color: available ? Colors.green : Colors.red,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
+                    CareGuideStatusBadge(label: available ? 'Available' : 'Busy', tone: available ? CareGuideStatusTone.success : CareGuideStatusTone.danger),
                     const SizedBox(height: 4),
                     Text(
                       'ETA: $eta',

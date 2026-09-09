@@ -10,6 +10,10 @@ class Hospital {
   final int? googleReviewCount;
   final String? googlePlaceId;
   final String? googleMapsUrl;
+  final double? latitude;
+  final double? longitude;
+  final double? entranceLatitude;
+  final double? entranceLongitude;
   final bool ratingVerified;
   final String? ratingLastUpdated;
   final bool isVerified;
@@ -41,6 +45,10 @@ class Hospital {
     this.googleReviewCount,
     this.googlePlaceId,
     this.googleMapsUrl,
+    this.latitude,
+    this.longitude,
+    this.entranceLatitude,
+    this.entranceLongitude,
     this.ratingVerified = false,
     this.ratingLastUpdated,
     required this.isVerified,
@@ -76,6 +84,12 @@ class Hospital {
     return 0.0;
   }
 
+  double? parseNullableDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
   List<String> parseList(dynamic value) {
     if (value == null) return [];
     if (value is List) {
@@ -98,6 +112,10 @@ class Hospital {
     googleReviewCount: json['rating_verified'] == true ? parseInt(json['google_review_count']) : null,
     googlePlaceId: json['rating_verified'] == true ? json['google_place_id']?.toString() : null,
     googleMapsUrl: json['rating_verified'] == true ? json['google_maps_url']?.toString() : null,
+    latitude: parseNullableDouble(json['latitude']),
+    longitude: parseNullableDouble(json['longitude']),
+    entranceLatitude: json['entrance_latitude'] == null ? null : parseDouble(json['entrance_latitude']),
+    entranceLongitude: json['entrance_longitude'] == null ? null : parseDouble(json['entrance_longitude']),
     ratingVerified: json['rating_verified'] == true,
     ratingLastUpdated: json['rating_verified'] == true ? json['rating_last_updated']?.toString() : null,
     isVerified: json['is_verified'] == true,
@@ -129,6 +147,10 @@ class Hospital {
       'google_review_count': googleReviewCount,
       'google_place_id': googlePlaceId,
       'google_maps_url': googleMapsUrl,
+      'latitude': latitude,
+      'longitude': longitude,
+      'entrance_latitude': entranceLatitude,
+      'entrance_longitude': entranceLongitude,
       'rating_verified': ratingVerified,
       'rating_last_updated': ratingLastUpdated,
       'is_verified': isVerified,

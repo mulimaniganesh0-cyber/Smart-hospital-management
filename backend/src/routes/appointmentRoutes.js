@@ -4,7 +4,10 @@ const appointmentController = require('../controllers/appointmentController');
 const { protect, authorize } = require('../middleware/auth');
 
 router.get('/my-appointments', protect, appointmentController.getMyAppointments);
+router.get('/doctor-schedules/:doctorId', protect, authorize('hospital', 'hospital_admin'), appointmentController.getDoctorSchedule);
+router.put('/doctor-schedules/:doctorId', protect, authorize('hospital', 'hospital_admin'), appointmentController.replaceDoctorSchedule);
 router.post('/create', protect, authorize('patient'), appointmentController.createAppointment);
+router.get('/available-slots', protect, authorize('patient'), appointmentController.getDoctorAvailableSlots);
 router.get('/:appointmentId/available-slots', protect, authorize('patient'), appointmentController.getAvailableSlots);
 router.put('/:appointmentId/reschedule', protect, authorize('patient'), appointmentController.rescheduleAppointment);
 router.get('/:appointmentId/reschedule-history', protect, authorize('patient'), appointmentController.getRescheduleHistory);

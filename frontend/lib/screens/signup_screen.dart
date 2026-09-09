@@ -41,6 +41,7 @@ class _SignupScreenState extends State<SignupScreen> {
   String _bloodGroup = '';
   String _emergencyContact = '';
   String _emergencyContactName = '';
+  String _emergencyContactRelationship = '';
 
   @override
   Widget build(BuildContext context) {
@@ -224,6 +225,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   const SizedBox(height: 16),
                   _buildTextField(null, 'Emergency Contact Name', Icons.person,
                       onChanged: (v) => _emergencyContactName = v),
+                  const SizedBox(height: 16),
+                  _buildTextField(null, 'Relationship (optional)', Icons.people_outline,
+                      onChanged: (v) => _emergencyContactRelationship = v),
                 ],
 
                 const SizedBox(height: 24),
@@ -548,6 +552,7 @@ class _SignupScreenState extends State<SignupScreen> {
           'blood_group': _bloodGroup,
           'emergency_contact': _emergencyContact,
           'emergency_contact_name': _emergencyContactName,
+          'emergency_contact_relationship': _emergencyContactRelationship,
         };
       }
 

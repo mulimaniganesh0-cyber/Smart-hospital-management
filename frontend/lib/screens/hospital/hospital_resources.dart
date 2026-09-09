@@ -95,8 +95,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
             ],
           ), /*
             tabs: [
-              Tab(text: 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â  Resources', icon: Icon(Icons.medical_services)),
-              Tab(text: 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¹ Requests', icon: Icon(Icons.assignment)),
+              Tab(text: ' Resources', icon: Icon(Icons.medical_services)),
+              Tab(text: ' Requests', icon: Icon(Icons.assignment)),
             ],
           ),
           */ actions: [
@@ -435,7 +435,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
         if (success && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ ${_getResourceDisplayName(result['resourceType'])} added successfully'),
+              content: Text(' ${_getResourceDisplayName(result['resourceType'])} added successfully'),
               backgroundColor: Colors.green,
             ),
           );
@@ -443,7 +443,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
         } else if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ Failed to add resource. Please try again.'),
+              content: Text(' Failed to add resource. Please try again.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -599,7 +599,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
                     ),
                     icon: const Icon(Icons.new_releases),
                     label: Text('Discharge Patient (Free One $title)'), /*
-                    label: Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ Discharge Patient (Free One $title)'),
+                    label: Text(' Discharge Patient (Free One $title)'),
                     */ style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade700,
                       foregroundColor: Colors.white,
@@ -764,7 +764,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green.shade700,
               ),
-              child: const Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Discharge & Free Resource'),
+              child: const Text(' Discharge & Free Resource'),
             ),
           ],
         ),
@@ -777,7 +777,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
         if (response['success'] && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Patient discharged. Resource is now available.'),
+              content: Text(' Patient discharged. Resource is now available.'),
               backgroundColor: Colors.green,
             ),
           );
@@ -785,7 +785,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
         } else if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(response['message'] ?? 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ Failed to free resource. Please try again.'),
+              content: Text(response['message'] ?? ' Failed to free resource. Please try again.'),
               backgroundColor: Colors.red,
             ),
           );
@@ -1408,8 +1408,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
               ],
             ),
             const SizedBox(height: 8),
-            Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â $description'),
-            Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¸ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¾ ${request['patient_phone'] ?? 'N/A'}'),
+            Text(' $description'),
+            Text(' ${request['patient_phone'] ?? 'N/A'}'),
             if (isPending) ...[
               const SizedBox(height: 12),
               Row(
@@ -1454,8 +1454,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
                     const SizedBox(width: 8),
                     Text(
                       status == 'fulfilled' 
-                          ? 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Request fulfilled. Resource allocated to patient.'
-                          : 'ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ Request rejected.',
+                          ? ' Request fulfilled. Resource allocated to patient.'
+                          : ' Request rejected.',
                       style: TextStyle(
                         fontSize: 12,
                         color: status == 'fulfilled' ? Colors.green : Colors.red,
@@ -1519,7 +1519,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ Request fulfilled. Resource allocated.'),
+              content: Text(' Request fulfilled. Resource allocated.'),
               backgroundColor: Colors.green,
             ),
           );
@@ -1575,7 +1575,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ Request rejected'),
+              content: Text(' Request rejected'),
               backgroundColor: Colors.red,
             ),
           );

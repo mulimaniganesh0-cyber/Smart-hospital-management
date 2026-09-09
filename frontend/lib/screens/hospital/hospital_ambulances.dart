@@ -1029,7 +1029,7 @@ class BookingsList extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ Patient Condition',
+                    ' Patient Condition',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                   ),
                   Text(

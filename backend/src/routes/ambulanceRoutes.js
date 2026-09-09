@@ -10,6 +10,7 @@ router.get('/nearby', ambulanceController.getNearbyAmbulances);
 // ==================== PATIENT ROUTES ====================
 router.post('/book', protect, ambulanceController.bookAmbulance);
 router.get('/bookings', protect, ambulanceController.getMyAmbulanceBookings);
+router.get('/booking/:bookingId', protect, ambulanceController.getAmbulanceBookingDetails);
 
 // ==================== HOSPITAL ROUTES ====================
 router.post('/register', protect, authorize('hospital'), ambulanceController.registerAmbulance);

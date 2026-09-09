@@ -19,6 +19,7 @@ router.put('/hospitals/:hospitalId/resources', adminController.updateHospitalRes
 router.get('/hospitals/:hospitalId/blood-bank', adminController.getHospitalBloodBank);
 router.put('/hospitals/:hospitalId/blood-bank', adminController.updateBloodBank);
 router.put('/verify-hospital/:hospitalId', adminController.verifyHospital);
+router.put('/reject-hospital/:hospitalId', adminController.rejectHospital);
 router.delete('/hospitals/:hospitalId', adminController.deleteHospital);
 
 

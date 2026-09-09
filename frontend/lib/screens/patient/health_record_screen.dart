@@ -11,6 +11,8 @@ class _HealthRecordScreenState extends State<HealthRecordScreen> {
   bool _loading = true;
   String? _error;
   List<dynamic> _records = [];
+  String _type = '';
+  String _search = '';
 
   @override
   void initState() { super.initState(); _load(); }
@@ -21,7 +23,8 @@ class _HealthRecordScreenState extends State<HealthRecordScreen> {
     final rawId = status['data']?['patient_id'];
     if (rawId == null) { if (mounted) setState(() { _loading = false; _error = status['message'] ?? 'Unable to load health records'; }); return; }
     final patientId = rawId is num ? rawId.toInt() : int.parse('$rawId');
-    final result = await ApiService.getMedicalTimeline(patientId);
+    final result = await ApiService.getMedicalTimeline(patientId,
+        type: _type.isEmpty ? null : _type, search: _search.isEmpty ? null : _search);
     if (!mounted) return;
     setState(() { _records = result['success'] == true ? List<dynamic>.from(result['data'] ?? []) : []; _error = result['success'] == true ? null : result['message']; _loading = false; });
   }
@@ -47,7 +50,13 @@ class _HealthRecordScreenState extends State<HealthRecordScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('My Health Record'), actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))]),
       floatingActionButton: FloatingActionButton.extended(onPressed: _add, icon: const Icon(Icons.add), label: const Text('Add Health Record')),
-      body: _loading ? const Center(child: CircularProgressIndicator()) : _error != null ? Center(child: Text(_error!)) : _records.isEmpty ? Center(child: ElevatedButton.icon(onPressed: _add, icon: const Icon(Icons.add), label: const Text('Add Health Record'))) : RefreshIndicator(
+      body: _loading ? const Center(child: CircularProgressIndicator()) : _error != null ? Center(child: Text(_error!)) : Column(children: [
+        Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 4), child: TextField(
+          onChanged: (value) { _search = value.trim(); _load(); },
+          decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search health records'),
+        )),
+        SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), child: Row(children: ['', 'CONSULTATION', 'PRESCRIPTION', 'LAB_RESULT', 'MEDICATION', 'BLOOD_PRESSURE', 'BLOOD_SUGAR', 'WEIGHT'].map((type) => Padding(padding: const EdgeInsets.only(right: 6), child: ChoiceChip(label: Text(type.isEmpty ? 'All' : type.replaceAll('_', ' ')), selected: _type == type, onSelected: (_) { setState(() => _type = type); _load(); }))).toList())),
+        Expanded(child: _records.isEmpty ? Center(child: ElevatedButton.icon(onPressed: _add, icon: const Icon(Icons.add), label: const Text('Add Health Record'))) : RefreshIndicator(
         onRefresh: _load,
         child: ListView.builder(padding: const EdgeInsets.all(16), itemCount: _records.length, itemBuilder: (_, index) {
           final record = Map<String, dynamic>.from(_records[index]);
@@ -61,7 +70,7 @@ class _HealthRecordScreenState extends State<HealthRecordScreen> {
             trailing: PopupMenuButton<String>(onSelected: (value) { if (value == 'remove') _remove((record['id'] as num).toInt()); }, itemBuilder: (_) => const [PopupMenuItem(value: 'remove', child: Text('Remove'))]),
           ));
         }),
-      ),
+      ))]),
     );
   }
 }

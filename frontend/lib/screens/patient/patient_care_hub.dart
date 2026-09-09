@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../services/api_service.dart';
+import '../../services/socket_service.dart';
+
 import 'chatbot_screen.dart';
 import 'patient_emergency_request.dart';
 import 'patient_nearby_hospitals.dart';
@@ -16,10 +19,42 @@ class PatientCareHub extends StatefulWidget {
 
 class _PatientCareHubState extends State<PatientCareHub> {
   bool _largeText = false;
+  bool _loadingToken = true;
+  Map<String, dynamic>? _activeToken;
   final List<_Reminder> _reminders = [
     const _Reminder('Metformin', 'After breakfast', '08:00 AM'),
     const _Reminder('Vitamin D3', 'Every Sunday', '09:00 AM'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadToken();
+    SocketService.instance.onQueueChanged((_) => _loadToken());
+    SocketService.instance.onNotificationNew((_) => _loadToken());
+    SocketService.instance.onReconnect((_) => _loadToken());
+  }
+
+  Future<void> _loadToken() async {
+    final response = await ApiService.getMyQueueTokens();
+    if (!mounted) return;
+    final tokens = response['data'] is List ? List<Map<String, dynamic>>.from(response['data']) : <Map<String, dynamic>>[];
+    const active = {'BOOKED', 'CHECKED_IN', 'WAITING', 'CALLED', 'SERVING', 'HELD'};
+    final activeTokens = tokens.where((token) => active.contains(token['status'])).toList();
+    setState(() {
+      _activeToken = activeTokens.isEmpty ? null : activeTokens.first;
+      _loadingToken = false;
+    });
+  }
+
+  Future<void> _checkIn() async {
+    final token = _activeToken;
+    if (token == null) return;
+    final result = await ApiService.updateQueueToken(token['id'] as int, 'CHECKED_IN');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['success'] == true ? 'You are checked in.' : (result['message'] ?? 'Unable to check in'))));
+    if (result['success'] == true) _loadToken();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,11 +126,14 @@ class _PatientCareHubState extends State<PatientCareHub> {
   Widget _queueCard() => Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Row(children: [
+          child: _loadingToken ? const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator())) : Row(children: [
             Container(padding: const EdgeInsets.all(11), decoration: BoxDecoration(color: const Color(0xFFD9F0F3), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.confirmation_number_outlined, color: Color(0xFF0A4D68))),
             const SizedBox(width: 12),
-            const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('No active queue token', style: TextStyle(fontWeight: FontWeight.bold)), SizedBox(height: 3), Text('Your next token and estimated wait will appear here.')])) ,
-            TextButton(onPressed: _showAppointments, child: const Text('View')),
+            Expanded(child: _activeToken == null
+                ? const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('No active queue token', style: TextStyle(fontWeight: FontWeight.bold)), SizedBox(height: 3), Text('Your next token and estimated wait will appear here.')])
+                : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Token #${_activeToken!['token_number']}', style: const TextStyle(fontWeight: FontWeight.bold)), Text('${_activeToken!['hospital_name']} • ${_activeToken!['status']}'), Text('Current token: ${_activeToken!['current_token_number'] ?? 'Not started'} • ${_activeToken!['patients_ahead']} ahead'), if (_activeToken!['estimated_turn_at'] != null) Text('Estimated turn: ${_activeToken!['estimated_turn_at']}')]),
+            ),
+            if (_activeToken?['status'] == 'BOOKED') TextButton(onPressed: _checkIn, child: const Text('Check in')) else IconButton(onPressed: _loadToken, icon: const Icon(Icons.refresh), tooltip: 'Refresh token'),
           ]),
         ),
       );

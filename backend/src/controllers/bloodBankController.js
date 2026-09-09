@@ -1,43 +1,51 @@
 // src/controllers/bloodBankController.js
 const { pool } = require('../config/database');
+const {
+  BLOOD_GROUPS,
+  normalizeBloodGroup,
+  getHospitalBloodStock,
+  getVisibleHospitalBloodStock,
+} = require('../services/bloodInventoryService');
+
+async function emitBloodInventoryChanged(req, hospitalId) {
+  try {
+    const io = req.app?.get('io');
+    if (!io) return;
+    const inventory = await getHospitalBloodStock(hospitalId);
+    const event = { hospitalId, bloodStock: inventory.bloodStock };
+    io.to(`hospital_${hospitalId}`).emit('blood-stock-changed', event);
+    io.emit('global-blood-stock-changed', event);
+  } catch (error) {
+    // A realtime failure must never make a committed PostgreSQL stock update
+    // look like it failed to the hospital user.
+    console.error('Blood inventory realtime notification failed:', error.message);
+  }
+}
 
 // ==================== PUBLIC ROUTES ====================
 
 exports.getAllBloodBanks = async (req, res) => {
   try {
     const { city } = req.query;
-    
-    let query = `
-      SELECT 
-        bb.*, 
-        h.name as hospital_name, 
-        h.address, 
-        h.city, 
-        h.phone
-      FROM blood_bank bb
-      JOIN hospitals h ON bb.hospital_id = h.id
-      WHERE h.is_verified = true
-    `;
-    
-    const params = [];
-    if (city) {
-      query += ` AND h.city ILIKE $1`;
-      params.push(`%${city}%`);
-    }
-    
-    query += ` ORDER BY h.name, bb.blood_group`;
-    
-    const result = await pool.query(query, params);
-    
     const grouped = {};
     const allBanks = [];
-    
-    result.rows.forEach(row => {
-      allBanks.push(row);
-      if (!grouped[row.blood_group]) {
-        grouped[row.blood_group] = [];
-      }
-      grouped[row.blood_group].push(row);
+    const hospitals = await getVisibleHospitalBloodStock(city);
+    hospitals.forEach((hospital) => {
+      hospital.bloodStock.forEach((stock) => {
+        const row = {
+          hospital_id: hospital.id,
+          hospital_name: hospital.name,
+          address: hospital.address,
+          city: hospital.city,
+          phone: hospital.phone,
+          ...stock,
+        };
+        allBanks.push(row);
+        if (!grouped[stock.blood_group]) {
+          grouped[stock.blood_group] = [];
+        }
+        grouped[stock.blood_group].push(row);
+      });
     });
     
     res.json({
@@ -57,31 +65,17 @@ exports.getAllBloodBanks = async (req, res) => {
 
 exports.getBloodAvailability = async (req, res) => {
   try {
-    const { hospitalId } = req.params;
-    
-    const hospitalIdNum = parseInt(hospitalId);
-    if (isNaN(hospitalIdNum)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid hospital ID' 
-      });
-    }
-    
-    const result = await pool.query(
-      `SELECT blood_group, units_available, minimum_threshold 
-       FROM blood_bank 
-       WHERE hospital_id = $1
-       ORDER BY blood_group`,
-      [hospitalIdNum]
-    );
-    
+    const inventory = await getHospitalBloodStock(req.params.hospitalId);
     res.json({
       success: true,
-      data: result.rows,
+      hospitalId: inventory.hospital.id,
+      bloodStock: inventory.bloodStock,
+      // `data` is retained for existing Flutter callers.
+      data: inventory.bloodStock,
     });
   } catch (error) {
     console.error('Get blood availability error:', error);
-    res.status(500).json({ 
+    res.status(error.code === 'INVALID_HOSPITAL_ID' ? 400 : error.code === 'HOSPITAL_NOT_FOUND' ? 404 : 500).json({
       success: false, 
       message: 'Server error', 
       error: error.message 
@@ -163,7 +157,7 @@ exports.requestBlood = async (req, res) => {
 exports.updateBloodStock = async (req, res) => {
   try {
     const userId = req.user.id;
-    const bloodGroup = req.body.blood_group ?? req.body.bloodGroup;
+    const bloodGroup = normalizeBloodGroup(req.body.blood_group ?? req.body.bloodGroup);
     const units = Number(req.body.units);
     
     console.log('Updating blood stock:', { userId, bloodGroup, units });
@@ -194,6 +188,7 @@ exports.updateBloodStock = async (req, res) => {
        RETURNING *`,
       [hospitalId, bloodGroup, units]
     );
+    await emitBloodInventoryChanged(req, hospitalId);
     
     res.json({
       success: true,
@@ -216,7 +211,7 @@ exports.addBloodWithExpiry = async (req, res) => {
   try {
     const userId = req.user.id;
     const { 
-      blood_group, 
+      blood_group: requestedBloodGroup,
       units, 
       expiry_date,
       donation_date,
@@ -224,6 +219,11 @@ exports.addBloodWithExpiry = async (req, res) => {
       donor_phone,
       batch_number
     } = req.body;
+    const blood_group = normalizeBloodGroup(requestedBloodGroup);
+
+    if (!blood_group || !Number.isInteger(Number(units)) || Number(units) <= 0) {
+      return res.status(400).json({ success: false, message: 'A valid blood group and positive unit count are required' });
+    }
 
     console.log('Adding blood with expiry:', { blood_group, units, expiry_date, donor_name });
 
@@ -290,6 +290,7 @@ exports.addBloodWithExpiry = async (req, res) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [hospitalId, donor_name || 'Anonymous', donor_phone || '', blood_group, units, donation_date || new Date(), expiry_date, batchNum]
     );
+    await emitBloodInventoryChanged(req, hospitalId);
 
     res.status(201).json({
       success: true,
@@ -459,6 +460,7 @@ exports.rejectBloodRequest = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Pending request not found' });
     }
+    await emitBloodInventoryChanged(req, hospitalResult.rows[0].id);
 
     res.json({ success: true, message: 'Blood request rejected', data: result.rows[0] });
   } catch (error) {
@@ -1077,82 +1079,20 @@ exports.getBloodStockWithExpiry = async (req, res) => {
 
     const hospitalId = hospitalResult.rows[0].id;
 
-    const columnsCheck = await pool.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'blood_bank' 
-      AND column_name IN ('expiry_date', 'batch_number', 'donation_date', 'donor_name')
-    `);
-
-    const hasExpiryColumns = columnsCheck.rows.length > 0;
-
-    let query;
-    if (hasExpiryColumns) {
-      query = `
-        SELECT 
-          id, 
-          blood_group, 
-          units_available, 
-          expiry_date, 
-          batch_number, 
-          donation_date, 
-          donor_name,
-          CASE 
-            WHEN expiry_date IS NULL THEN 'good'
-            WHEN expiry_date < CURRENT_DATE THEN 'expired'
-            WHEN expiry_date <= CURRENT_DATE + INTERVAL '7 days' THEN 'critical'
-            WHEN expiry_date <= CURRENT_DATE + INTERVAL '30 days' THEN 'warning'
-            ELSE 'good'
-          END as status,
-          CASE 
-            WHEN expiry_date IS NULL THEN NULL
-            WHEN expiry_date < CURRENT_DATE THEN 0
-            ELSE (expiry_date - CURRENT_DATE) 
-          END as days_remaining
-        FROM blood_bank 
-        WHERE hospital_id = $1 AND units_available > 0
-        ORDER BY expiry_date ASC NULLS LAST
-      `;
-    } else {
-      query = `
-        SELECT 
-          id, 
-          blood_group, 
-          units_available, 
-          NULL as expiry_date, 
-          NULL as batch_number, 
-          NULL as donation_date, 
-          NULL as donor_name,
-          'good' as status,
-          NULL as days_remaining
-        FROM blood_bank 
-        WHERE hospital_id = $1 AND units_available > 0
-        ORDER BY blood_group
-      `;
-    }
-
-    const result = await pool.query(query, [hospitalId]);
-
-    let notifications = [];
-    try {
-      const notificationsResult = await pool.query(`
-        SELECT * FROM blood_expiry_notifications 
-        WHERE hospital_id = $1 AND is_read = false
-        ORDER BY created_at DESC
-        LIMIT 50
-      `, [hospitalId]);
-      notifications = notificationsResult.rows;
-    } catch (err) {
-      console.log('Notifications table not yet created');
-    }
+    // Both hospital and patient reads go through the same stock normalizer.
+    // Expiry detail has a separate screen; it must not alter inventory totals.
+    const inventory = await getHospitalBloodStock(hospitalId);
+    const result = { rows: inventory.bloodStock };
 
     res.json({
       success: true,
       data: {
         blood_stock: result.rows,
-        notifications: notifications,
+        notifications: [],
         summary: _getBloodSummary(result.rows),
       },
+      hospitalId,
+      bloodStock: result.rows,
     });
   } catch (error) {
     console.error('Get blood stock with expiry error:', error);
@@ -1228,7 +1168,7 @@ const _getBloodSummary = (bloodStock) => {
   }
 
   bloodStock.forEach((item) => {
-    const units = item.units_available || 0;
+    const units = Number(item.units_available) || 0;
     summary.total_units += units;
     
     if (!summary.by_group[item.blood_group]) {

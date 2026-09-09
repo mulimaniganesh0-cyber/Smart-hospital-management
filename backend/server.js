@@ -11,6 +11,18 @@ const Patient = require('./src/models/Patient');
 const { ensureMedicalSchema } = require('./src/config/medicalSchema');
 const { ensureDonationCampaignSchema } = require('./src/config/donationCampaignSchema');
 const { getOllamaHealth } = require('./src/services/ollamaService');
+const { processDueQueueNotifications } = require('./src/services/queueTimingService');
+const { ensureTodayForHospitals } = require('./src/controllers/dailyQrController');
+
+// Keep failures visible without leaking request data or secrets. Express owns
+// request errors; these handlers cover only unexpected background failures.
+process.on('unhandledRejection', (reason) => {
+  console.error('[Process] Unhandled rejection:', reason instanceof Error ? reason.message : reason);
+});
+process.on('uncaughtException', (error) => {
+  console.error('[Process] Uncaught exception:', error.message);
+});
+
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || '')
   .split(',')
@@ -72,6 +84,8 @@ io.on('connection', (socket) => {
   console.log('🟢 New client connected:', socket.id);
   
   activeConnections.set(socket.id, { socket, joinedAt: new Date() });
+  socket.join(`user_${socket.data.user.id}`);
+  if (socket.data.user.user_type === 'admin') socket.join('admins');
   
   socket.on('join-hospital', () => {
     const hospitalId = socket.data.hospital?.id;
@@ -91,31 +105,50 @@ io.on('connection', (socket) => {
     console.log(`📌 Socket ${socket.id} joined patient_${patientId}`);
   });
   
-  socket.on('emergency-alert', (data) => {
-    if (!socket.data.patient) {
-      return socket.emit('socket-error', { message: 'Patient authentication required' });
-    }
-    const targetHospital = data?.hospitalId || data?.hospital_id;
-    if (targetHospital) {
-      io.to(`hospital_${targetHospital}`).emit('new-emergency', data);
-      console.log(`🚨 Emergency alert sent to hospital_${targetHospital}`);
-    } else {
-      // Broadcast to all hospitals if no specific hospital target
-      io.emit('new-emergency', data);
-      console.log(`🚨 Emergency alert broadcasted globally`);
-    }
+  // SOS creation is REST/transaction driven. Accepting a client-created alert
+  // here would let a patient select arbitrary hospital rooms or forge details.
+  socket.on('emergency-alert', () => {
+    socket.emit('socket-error', { message: 'Create SOS requests through the authenticated emergency API' });
   });
   
-  socket.on('emergency-location-update', (data) => {
-    if (data?.emergencyId) {
-      if (data?.hospitalId) {
-        io.to(`hospital_${data.hospitalId}`).emit('emergency-location-changed', data);
+  socket.on('emergency-location-update', async (data) => {
+    const emergencyId = Number(data?.emergencyId);
+    const patientId = socket.data.patient?.id;
+    const latitude = Number(data?.latitude);
+    const longitude = Number(data?.longitude);
+    if (!patientId || !Number.isInteger(emergencyId) ||
+        !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+        !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      return socket.emit('socket-error', { message: 'A valid patient emergency location update is required' });
+    }
+    try {
+      // Never accept a patient or hospital id supplied by the socket client.
+      // Ownership and the notification room are derived from the stored SOS.
+      const result = await pool.query(
+        `SELECT hospital_id FROM emergency_requests
+         WHERE id = $1 AND patient_id = $2
+           AND status NOT IN ('completed', 'resolved', 'cancelled')`,
+        [emergencyId, patientId]
+      );
+      if (!result.rows.length) {
+        return socket.emit('socket-error', { message: 'Emergency request not found or no longer active' });
       }
-      if (data?.patientId) {
-        io.to(`patient_${data.patientId}`).emit('emergency-location-changed', data);
+      const payload = {
+        emergencyId,
+        patientId,
+        hospitalId: result.rows[0].hospital_id,
+        latitude,
+        longitude,
+        timestamp: data?.timestamp || new Date().toISOString(),
+      };
+      if (payload.hospitalId) {
+        io.to(`hospital_${payload.hospitalId}`).emit('emergency-location-changed', payload);
       }
-      io.emit(`emergency_${data.emergencyId}_location`, data);
-      console.log(`📍 Emergency location update for emergency #${data.emergencyId}`);
+      io.to(`patient_${patientId}`).emit('emergency-location-changed', payload);
+      console.log(`📍 Emergency location update for emergency #${emergencyId}`);
+    } catch (error) {
+      console.error('Emergency socket location update failed:', error.message);
+      socket.emit('socket-error', { message: 'Unable to update emergency location' });
     }
   });
 
@@ -129,14 +162,11 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('queue-update', (data) => {
-    if (data?.hospitalId) {
-      io.to(`hospital_${data.hospitalId}`).emit('queue-changed', data);
-    }
-    if (data?.patientId) {
-      io.to(`patient_${data.patientId}`).emit('queue-changed', data);
-    }
-  });
+  // Queue updates are emitted only by the transactional queue API, never by
+  // an untrusted client that could otherwise alter another hospital's view.
+  socket.on('queue-update', () => socket.emit('socket-error', {
+    message: 'Queue updates are published by the server after an API action.',
+  }));
 
   socket.on('appointment-update', (data) => {
     if (data?.hospitalId) {
@@ -187,7 +217,10 @@ io.on('connection', (socket) => {
 
 // Keep the runtime fallback aligned with .env.example and the Flutter client.
 // A mismatched default made the CareGuide endpoint unreachable in local runs.
-const PORT = process.env.PORT || 5001;
+const PORT = Number(process.env.PORT || 5001);
+// Explicitly bind all interfaces for Android emulator and LAN-device testing.
+// In production this server should be behind an HTTPS reverse proxy/firewall.
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Report configuration state without ever exposing credentials.
 console.info('[AI CONFIG]');
@@ -396,8 +429,19 @@ const startServer = async () => {
     await pool.query(`UPDATE users u SET hospital_id = d.hospital_id FROM doctors d WHERE d.user_id = u.id AND u.hospital_id IS NULL`);
   }
 
-  server.listen(PORT, () => {
+  server.listen(PORT, HOST, () => {
+    // The database persists ETA state and notification de-duplication; this
+    // worker is safe to rerun after a process restart or on multiple servers.
+    const processQueueNotifications = () => processDueQueueNotifications({ io }).catch(error => console.error('[Queue ETA worker]', error.message));
+    processQueueNotifications();
+    setInterval(processQueueNotifications, 60_000).unref();
+    // Daily QR records are also lazily created by the protected endpoint.
+    // This worker pre-generates them after a restart and around midnight.
+    const rotateDailyQrs = () => ensureTodayForHospitals().catch(error => console.error('[Daily QR worker]', error.message));
+    rotateDailyQrs();
+    setInterval(rotateDailyQrs, 60 * 60_000).unref();
     console.log(`\n🚀 Server running on port ${PORT}`);
+    console.log(`🧭 Listening host: ${HOST}`);
     console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`\n📡 Access URLs:`);
     console.log(`   Local: http://localhost:${PORT}`);
@@ -447,6 +491,9 @@ process.on('SIGTERM', () => {
     process.exit(0);
   });
 });
+// Controllers publish only after their database transaction commits. Keeping
+// the instance on Express avoids a circular server/controller dependency.
+app.set('io', io);
 
 process.on('SIGINT', () => {
   console.log('\n🛑 SIGINT signal received: closing HTTP server');

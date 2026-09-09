@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/patient_provider.dart';
 import '../../services/api_service.dart';
 import 'patient_nearby_hospitals.dart';
+import '../../widgets/app_ui.dart';
 
 class PatientBookings extends StatelessWidget {
   const PatientBookings({super.key});
@@ -15,7 +16,7 @@ class PatientBookings extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Bookings'),
+        title: const Text('My appointments'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -30,38 +31,19 @@ class PatientBookings extends StatelessWidget {
         child: patientProvider.isLoading
             ? const Center(child: CircularProgressIndicator())
             : bookings.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.bookmark_border, size: 64, color: Colors.grey[400]),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No bookings yet',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Book your first appointment',
-                          style: TextStyle(color: Colors.grey[500], fontSize: 14),
-                        ),
-                        const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const PatientNearbyHospitals(),
-                              ),
-                            );
-                          },
-                          child: const Text('Browse Hospitals'),
-                        ),
-                      ],
+                ? CareGuideEmptyState(
+                    icon: Icons.calendar_month_outlined,
+                    title: 'No appointments yet',
+                    message: 'When you book a doctor visit, its details will appear here.',
+                    action: ElevatedButton.icon(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PatientNearbyHospitals())),
+                      icon: const Icon(Icons.local_hospital_outlined),
+                      label: const Text('Find a hospital'),
                     ),
                   )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                : CareGuidePage(
+                    child: ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 24),
                     itemCount: bookings.length,
                     itemBuilder: (context, index) {
                       final booking = bookings[index];
@@ -76,7 +58,7 @@ class PatientBookings extends StatelessWidget {
                         onReschedule: () => _showRescheduleDialog(context, booking),
                       );
                     },
-                  ),
+                  )),
       ),
     );
     // lib/screens/patient/patient_bookings.dart
@@ -166,18 +148,18 @@ class BookingCard extends StatelessWidget {
     required this.onReschedule,
   });
 
-  Color get _statusColor {
+  CareGuideStatusTone get _statusTone {
     switch (status.toLowerCase()) {
       case 'confirmed':
-        return Colors.green;
+        return CareGuideStatusTone.success;
       case 'pending':
-        return Colors.orange;
+        return CareGuideStatusTone.warning;
       case 'completed':
-        return Colors.blue;
+        return CareGuideStatusTone.info;
       case 'cancelled':
-        return Colors.red;
+        return CareGuideStatusTone.danger;
       default:
-        return Colors.grey;
+        return CareGuideStatusTone.neutral;
     }
   }
 
@@ -202,21 +184,11 @@ class BookingCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: _statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    status,
-                    style: TextStyle(color: _statusColor, fontSize: 12),
-                  ),
-                ),
+                CareGuideStatusBadge(label: status, tone: _statusTone),
               ],
             ),
             const SizedBox(height: 8),
-            Text(doctorName),
+            Text('Dr. $doctorName', style: const TextStyle(color: CareGuideColors.ink, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Row(
               children: [

@@ -1,0 +1,11 @@
+const router=require('express').Router(); const c=require('../controllers/queueController'); const {protect,authorize}=require('../middleware/auth');
+router.post('/',protect,authorize('patient'),c.getOrCreateQueue);
+router.post('/validate-qr',protect,authorize('patient'),c.validateQr);
+router.post('/:queueId/tokens',protect,authorize('patient'),c.bookToken);
+router.get('/my-tokens',protect,authorize('patient'),c.myTokens);
+router.get('/tokens/:tokenId',protect,authorize('patient'),c.token);
+router.post('/tokens/:tokenId/transition',protect,authorize('patient'),c.patientTransition);
+router.post('/:queueId/call-next',protect,authorize('hospital','hospital_admin'),c.callNext);
+router.get('/hospital/current',protect,authorize('hospital','hospital_admin'),c.hospitalQueues);
+router.post('/tokens/:tokenId/action',protect,authorize('hospital','hospital_admin'),c.staffTokenAction);
+module.exports=router;

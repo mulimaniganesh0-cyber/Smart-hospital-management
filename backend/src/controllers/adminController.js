@@ -2,6 +2,7 @@
 const { pool } = require('../config/database');
 const User = require('../models/User');
 const Hospital = require('../models/Hospital');
+const { createNotification, emitNotification } = require('../services/notificationService');
 
 exports.getAllUsers = async (req, res) => {
   try {
@@ -76,22 +77,25 @@ exports.getDashboardStats = async (req, res) => {
 };
 
 exports.verifyHospital = async (req, res) => {
+  const client = await pool.connect();
   try {
     const { hospitalId } = req.params;
     const { adminNotes } = req.body;
     
     console.log('Verifying hospital:', hospitalId);
     
-    const checkResult = await pool.query(
+    await client.query('BEGIN');
+    const checkResult = await client.query(
       'SELECT * FROM hospitals WHERE id = $1',
       [hospitalId]
     );
     
     if (checkResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ success: false, message: 'Hospital not found' });
     }
     
-    const result = await pool.query(
+    const result = await client.query(
       `UPDATE hospitals 
        SET is_verified = true, 
            verification_status = 'verified', 
@@ -101,15 +105,62 @@ exports.verifyHospital = async (req, res) => {
       [hospitalId]
     );
     
+    const hospital = result.rows[0];
+    const notification = await createNotification({
+      db: client,
+      recipientUserId: hospital.user_id,
+      hospitalId: hospital.id,
+      type: 'hospital_verified',
+      priority: 'high',
+      relatedType: 'hospital',
+      relatedId: hospital.id,
+      title: 'HOSPITAL VERIFIED',
+      message: 'Your hospital has been verified by the administrator. You can now use hospital management features.',
+    });
+    await client.query('COMMIT');
+    emitNotification(req.app.get('io'), notification);
     res.json({
       success: true,
       message: 'Hospital verified successfully',
-      data: result.rows[0],
+      data: hospital,
     });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Verify hospital error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
-  }
+  } finally { client.release(); }
+};
+
+// Keep a rejected registration in the real hospital record so that it can be
+// reviewed later; never fabricate a rejection reason when the admin omitted it.
+exports.rejectHospital = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { hospitalId } = req.params;
+    const reason = String(req.body.reason || req.body.adminNotes || '').trim();
+    await client.query('BEGIN');
+    const result = await client.query(
+      `UPDATE hospitals SET is_verified=FALSE, verification_status='rejected', updated_at=CURRENT_TIMESTAMP
+       WHERE id=$1 RETURNING *`, [hospitalId]);
+    if (!result.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Hospital not found' });
+    }
+    const hospital = result.rows[0];
+    const notification = await createNotification({
+      db: client, recipientUserId: hospital.user_id, hospitalId: hospital.id,
+      type: 'hospital_verification_rejected', priority: 'high', relatedType: 'hospital', relatedId: hospital.id,
+      title: 'HOSPITAL VERIFICATION REJECTED',
+      message: reason ? `Your hospital verification request was rejected. Reason: ${reason}` : 'Your hospital verification request was rejected.',
+    });
+    await client.query('COMMIT');
+    emitNotification(req.app.get('io'), notification);
+    res.json({ success: true, message: 'Hospital verification rejected', data: hospital });
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('Reject hospital error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  } finally { client.release(); }
 };
 
 // ==================== ADMIN HOSPITAL RESOURCE MANAGEMENT ====================

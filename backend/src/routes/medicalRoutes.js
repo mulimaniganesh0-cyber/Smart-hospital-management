@@ -3,6 +3,7 @@ const medical = require('../controllers/medicalController');
 const { protect, authorize } = require('../middleware/auth');
 router.use(protect);
 router.get('/onboarding-status', authorize('patient'), medical.getOnboarding);
+router.get('/health-summary', authorize('patient'), medical.getMyHealthSummary);
 router.put('/profile', authorize('patient'), medical.saveProfile);
 router.post('/records', medical.createRecord);
 router.get('/health-records/:recordId', medical.getRecord);

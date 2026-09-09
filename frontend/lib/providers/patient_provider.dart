@@ -79,6 +79,17 @@ Future<void> loadPatientData() async {
     }
   }
 
+  Future<String?> updateEmergencyContact({required String name, required String phone, String? relationship}) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final response = await ApiService.updateEmergencyContact({'name': name, 'phone': phone, 'relationship': relationship});
+      if (response['success'] == true) { await loadPatientData(); return null; }
+      return response['message'] ?? 'Could not update emergency contact';
+    } catch (_) { return 'Could not update emergency contact'; }
+    finally { _isLoading = false; notifyListeners(); }
+  }
+
   Future<bool> addBooking(Map<String, dynamic> booking) async {
     _isLoading = true;
     notifyListeners();

@@ -1,5 +1,5 @@
 const { pool } = require('../config/database');
-const { analyzeUserIntent } = require('./medicalIntentService');
+const { analyzeUserIntent, normalizeMessage, detectEmergency } = require('./medicalIntentService');
 const { OllamaServiceError } = require('./ollamaService');
 const { answerWithRAG, answerHospitalWithRAG } = require('./ragService');
 const { RagStoreError } = require('./ragVectorStore');
@@ -534,7 +534,9 @@ async function respond({ message, latitude, longitude, language, patientAge, con
   const assessment = assessSymptoms(normalisedText, context, history);
   const patientEmotion = detectPatientEmotion(text);
   const suicidal = /self.?harm|suicid|kill myself|end my life|want to die/i.test(text);
-  const emergency = suicidal || EMERGENCY_PATTERN.test(normalisedText);
+  // Deterministic safety routing is evaluated before RAG/Ollama and before
+  // any conversational context can turn a new emergency message stale.
+  const emergency = suicidal || detectEmergency(normalizeMessage(text)) || EMERGENCY_PATTERN.test(normalisedText);
   console.info(`[CareGuide] User message: ${text.slice(0, 300)} (Detected Emotion: ${patientEmotion})`);
 
   let routing;
@@ -559,7 +561,7 @@ async function respond({ message, latitude, longitude, language, patientAge, con
       return { intent: 'EMERGENCY_QUERY', type: 'emergency', severity: 'emergency', showSos: true, actions: [{ type: 'EMERGENCY_SOS', label: localizedText[requestedLanguage].sos }], response, hospitals: [], source: 'emergency_rules', errorCode: 'DATABASE_ERROR', context: { language: requestedLanguage, lastIntent: 'EMERGENCY_QUERY', emergencyDetected: true } };
     }
   }
-  if (emergency || routing.emergency) return { intent: 'EMERGENCY_QUERY', type: 'emergency', severity: 'emergency', showSos: true, doctors: [], hospitals: [], actions: [{ type: 'EMERGENCY_SOS', label: localizedText[requestedLanguage].sos }], response: localizedText[requestedLanguage].emergency, source: 'emergency_rules', context: { language: requestedLanguage, lastIntent: 'EMERGENCY_QUERY', emergencyDetected: true } };
+  if (emergency || routing.emergency) return { intent: 'EMERGENCY_QUERY', type: 'emergency', severity: 'emergency', showSos: true, requiresImmediateAttention: true, emergency: true, doctors: [], hospitals: [], actions: [{ type: 'EMERGENCY_SOS', label: localizedText[requestedLanguage].sos }, { type: 'REQUEST_AMBULANCE', label: 'Request Ambulance' }, { type: 'VIEW_HOSPITALS', label: 'Find Nearby Hospitals' }], response: localizedText[requestedLanguage].emergency, source: 'emergency_rules', context: { language: requestedLanguage, lastIntent: 'EMERGENCY_QUERY', emergencyDetected: true } };
   // Location improves result ordering, but an unavailable indoor/browser fix
   // must not turn a live blood or bed search into an empty response.
   const locationUnavailable = routing.needsLocation && !hasCoordinates(latitude, longitude);

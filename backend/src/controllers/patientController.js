@@ -8,7 +8,7 @@ exports.getPatientProfile = async (req, res) => {
     
     const result = await pool.query(
       `SELECT u.id, u.name, u.email, u.phone, 
-              p.date_of_birth, p.blood_group, p.emergency_contact, p.emergency_contact_name,
+              p.date_of_birth, p.blood_group, p.emergency_contact, p.emergency_contact_name, p.emergency_contact_relationship,
               p.allergies, p.chronic_conditions
        FROM users u
        LEFT JOIN patients p ON u.id = p.user_id
@@ -33,7 +33,7 @@ exports.getPatientProfile = async (req, res) => {
 exports.updatePatientProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { name, phone, blood_group, emergency_contact } = req.body;
+    const { name, phone, blood_group, emergency_contact, emergency_contact_name, emergency_contact_relationship } = req.body;
     
     await pool.query(
       'UPDATE users SET name = COALESCE($1, name), phone = COALESCE($2, phone) WHERE id = $3',
@@ -43,9 +43,11 @@ exports.updatePatientProfile = async (req, res) => {
     await pool.query(
       `UPDATE patients 
        SET blood_group = COALESCE($1, blood_group),
-           emergency_contact = COALESCE($2, emergency_contact)
-       WHERE user_id = $3`,
-      [blood_group, emergency_contact, userId]
+           emergency_contact = COALESCE($2, emergency_contact),
+           emergency_contact_name = COALESCE($3, emergency_contact_name),
+           emergency_contact_relationship = COALESCE($4, emergency_contact_relationship)
+       WHERE user_id = $5`,
+      [blood_group, emergency_contact, emergency_contact_name, emergency_contact_relationship, userId]
     );
     
     res.json({
@@ -81,4 +83,28 @@ exports.getMedicalHistory = async (req, res) => {
     console.error('Get medical history error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
+};
+
+const normalizePhone = (value) => String(value || '').replace(/[\s()-]/g, '');
+const validPhone = (value) => /^\+?[1-9]\d{7,14}$/.test(value);
+
+exports.getEmergencyContact = async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT emergency_contact_name AS name, emergency_contact AS phone, emergency_contact_relationship AS relationship FROM patients WHERE user_id = $1`, [req.user.id]);
+    if (!result.rows.length) return res.status(404).json({ success: false, message: 'Patient profile not found' });
+    res.json({ success: true, data: result.rows[0] });
+  } catch (_) { res.status(500).json({ success: false, message: 'Server error' }); }
+};
+
+exports.updateEmergencyContact = async (req, res) => {
+  const name = String(req.body.name || '').trim();
+  const phone = normalizePhone(req.body.phone);
+  const relationship = String(req.body.relationship || '').trim() || null;
+  if (!name) return res.status(400).json({ success: false, message: 'Emergency contact name is required' });
+  if (!validPhone(phone)) return res.status(400).json({ success: false, message: 'Enter a valid emergency contact phone number' });
+  try {
+    const result = await pool.query(`UPDATE patients SET emergency_contact_name=$1, emergency_contact=$2, emergency_contact_relationship=$3, updated_at=CURRENT_TIMESTAMP WHERE user_id=$4 RETURNING emergency_contact_name AS name, emergency_contact AS phone, emergency_contact_relationship AS relationship`, [name, phone, relationship, req.user.id]);
+    if (!result.rows.length) return res.status(404).json({ success: false, message: 'Patient profile not found' });
+    res.json({ success: true, message: 'Emergency contact updated successfully', data: result.rows[0] });
+  } catch (_) { res.status(500).json({ success: false, message: 'Server error' }); }
 };

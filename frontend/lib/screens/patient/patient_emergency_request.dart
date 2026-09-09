@@ -26,6 +26,7 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
   
   double? _currentLat;
   double? _currentLng;
+  double? _locationAccuracy;
   bool _isLocating = false;
   String _locationStatus = 'Fetching location...';
 
@@ -46,6 +47,23 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
     _checkLocationPermissionAndFetch();
     _processOfflineQueue();
     _loadSosHistory();
+    _connectEmergencyUpdates();
+  }
+
+  Future<void> _connectEmergencyUpdates() async {
+    final socket = SocketService.instance;
+    await socket.connect();
+    if (!mounted) return;
+    void apply(dynamic event) {
+      if (!mounted || event is! Map) return;
+      final update = Map<String, dynamic>.from(event);
+      if (_activeEmergencyId != null && update['id'] == _activeEmergencyId) {
+        setState(() => _activeEmergencyData = {...?_activeEmergencyData, ...update});
+      }
+      _loadSosHistory();
+    }
+    socket.onEmergencyStatusUpdate(apply);
+    socket.onEmergencyLifecycle(apply);
   }
 
   @override
@@ -64,6 +82,7 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
 
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!mounted) return;
       if (!serviceEnabled) {
         setState(() {
           _isLocating = false;
@@ -76,6 +95,7 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
+        if (!mounted) return;
       }
 
       if (permission == LocationPermission.deniedForever) {
@@ -95,15 +115,26 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
         return;
       }
 
-      // High accuracy current position
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      } catch (_) {
+        // An approximate/last-known fix is still materially safer than making
+        // a patient wait indefinitely before an SOS can be persisted.
+        position = await Geolocator.getLastKnownPosition();
+      }
+      if (position == null) {
+        throw StateError('No current or recent location is available');
+      }
+      // `position` is captured by the setState callback below. Keep a
+      // non-null local after the guard so Dart's flow analysis remains valid.
+      final resolvedPosition = position;
 
       if (mounted) {
         setState(() {
-          _currentLat = position.latitude;
-          _currentLng = position.longitude;
+          _currentLat = resolvedPosition.latitude;
+          _currentLng = resolvedPosition.longitude;
+          _locationAccuracy = resolvedPosition.accuracy;
           _isLocating = false;
           _locationStatus = 'Live GPS Location Acquired';
         });
@@ -190,7 +221,7 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
         );
 
         // Send via Socket.io
-        SocketService.instance.socket.emit('emergency-location-update', {
+        SocketService.instance.emitEmergencyLocation({
           'emergencyId': emergencyId,
           'latitude': position.latitude,
           'longitude': position.longitude,
@@ -201,6 +232,15 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
         debugPrint('Location stream error: $err');
       },
     );
+  }
+
+  Future<void> _confirmAndSendEmergencyRequest() async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Activate Emergency SOS?'),
+      content: const Text('This will alert your registered emergency contact and nearby eligible hospitals.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white), onPressed: () => Navigator.pop(context, true), child: const Text('SEND SOS'))],
+    ));
+    if (confirmed == true) await _sendEmergencyRequest();
   }
 
   Future<void> _sendEmergencyRequest() async {
@@ -214,6 +254,8 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
       'description': _description,
       'location_lat': _currentLat,
       'location_lng': _currentLng,
+      'location_accuracy': _locationAccuracy,
+      'location_timestamp': DateTime.now().toIso8601String(),
       'timestamp': DateTime.now().toIso8601String(),
     };
 
@@ -233,20 +275,10 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
         // Start real-time stream
         _startContinuousLocationStream(emergencyId);
 
-        // Also emit Socket alert
-        SocketService.instance.emitEmergencyAlert({
-          'emergencyId': emergencyId,
-          'hospitalId': data['hospital_id'],
-          'emergency_type': _emergencyType,
-          'severity': _severity,
-          'lat': _currentLat,
-          'lng': _currentLng,
-        });
-
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('🚨 Emergency SOS Broadcasted! Nearest hospital and caregivers notified.'),
+              content: Text('🚨 Emergency SOS created. We are contacting nearby eligible hospitals.'),
               backgroundColor: Colors.green,
               duration: Duration(seconds: 4),
             ),
@@ -340,6 +372,11 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
       if (res['success'] == true && res['data'] != null) {
         setState(() {
           _sosHistory = List<Map<String, dynamic>>.from(res['data']);
+          final active = _sosHistory.where((item) => !['completed', 'resolved', 'cancelled'].contains(item['status'])).toList();
+          if (_activeEmergencyId == null && active.isNotEmpty) {
+            _activeEmergencyData = active.first;
+            _activeEmergencyId = active.first['id'] as int?;
+          }
         });
       }
     } catch (e) {
@@ -407,7 +444,7 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
-                      'Triggering SOS instantly notifies the nearest hospital, dispatches available ambulances, and alerts family contacts.',
+                      'SOS alerts your registered emergency contact and contacts eligible nearby hospitals one at a time until one accepts.',
                       style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 13),
                     ),
                   ),
@@ -489,7 +526,7 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
               width: double.infinity,
               height: 54,
               child: ElevatedButton.icon(
-                onPressed: _isRequesting ? null : _sendEmergencyRequest,
+                onPressed: _isRequesting ? null : _confirmAndSendEmergencyRequest,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.red,
                   foregroundColor: Colors.white,
@@ -548,9 +585,9 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
           Card(
             child: ListTile(
               leading: const CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.local_hospital, color: Colors.white)),
-              title: Text(hospital?['name'] ?? 'Nearest Hospital Notified'),
-              subtitle: Text(hospital?['phone'] != null ? 'Phone: ${hospital['phone']}' : 'Address: ${hospital?['address'] ?? 'Search in progress'}'),
-              trailing: const Icon(Icons.check_circle, color: Colors.green),
+              title: Text(hospital?['name'] ?? 'Searching for hospital assistance'),
+              subtitle: Text(hospital?['phone'] != null ? 'Phone: ${hospital['phone']}' : 'A hospital has not accepted yet.'),
+              trailing: Icon(hospital == null ? Icons.hourglass_top : Icons.check_circle, color: hospital == null ? Colors.orange : Colors.green),
             ),
           ),
           const SizedBox(height: 12),
@@ -590,7 +627,7 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text('Live GPS Sync: Active', style: TextStyle(color: Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.bold)),
-                      const Text('Estimated ETA: ~8 mins', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      const Text('ETA will appear when supplied by the dispatch team', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                     ],
                   ),
                 ],

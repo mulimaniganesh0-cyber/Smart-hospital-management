@@ -1,5 +1,7 @@
 node_modules/
 .env
+.rag-ingestion.log
+.rag-ingestion-error.log*
 .env.*
 !.env.example
 coverage/

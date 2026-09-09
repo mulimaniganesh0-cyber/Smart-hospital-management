@@ -1,6 +1,7 @@
 // lib/screens/admin/admin_dashboard.dart
 import 'package:flutter/material.dart';
 import '../../services/api_service.dart';
+import '../../widgets/app_ui.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -29,18 +30,20 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
     try {
       final statsResponse = await ApiService.getDashboardStats();
+      if (!mounted) return;
       if (statsResponse['success'] == true) {
         _stats = statsResponse['data'] ?? {};
       }
 
       final hospitalsResponse = await ApiService.getAllHospitalsWithResources(page: 1, limit: 5);
+      if (!mounted) return;
       if (hospitalsResponse['success'] == true) {
         _recentHospitals = List<Map<String, dynamic>>.from(hospitalsResponse['data'] ?? []);
       }
     } catch (e) {
-      _errorMessage = 'Failed to load dashboard data: $e';
+      _errorMessage = 'The system overview could not be loaded. Please try again.';
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -48,7 +51,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Admin Dashboard'),
+        title: const Text('System overview'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -61,36 +64,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _errorMessage != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                        const SizedBox(height: 16),
-                        Text(_errorMessage!),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _loadDashboardData,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
+                ? CareGuideEmptyState(
+                    icon: Icons.cloud_off_outlined,
+                    title: 'Dashboard unavailable',
+                    message: _errorMessage!,
+                    action: ElevatedButton.icon(onPressed: _loadDashboardData, icon: const Icon(Icons.refresh), label: const Text('Try again')),
                   )
-                : SingleChildScrollView(
+                : CareGuidePage(child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'System Overview',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
+                        const CareGuideSectionHeader(title: 'System overview', subtitle: 'Live operational data across CareGuide'),
                         const SizedBox(height: 16),
-                        GridView.count(
+                        LayoutBuilder(builder: (context, constraints) => GridView.count(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: 2,
+                          crossAxisCount: constraints.maxWidth >= 800 ? 4 : 2,
                           mainAxisSpacing: 16,
                           crossAxisSpacing: 16,
                           childAspectRatio: 1.2,
@@ -124,12 +115,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
                               change: '+${_stats['new_emergencies'] ?? 0}',
                             ),
                           ],
-                        ),
+                        )),
                         const SizedBox(height: 24),
-                        const Text(
-                          'Recent Hospital Registrations',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
+                        const CareGuideSectionHeader(title: 'Recent hospital registrations'),
                         const SizedBox(height: 12),
                         if (_recentHospitals.isEmpty)
                           const Card(
@@ -152,7 +140,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                           }),
                       ],
                     ),
-                  ),
+                  )),
       ),
     );
   }
@@ -176,7 +164,9 @@ class AdminMetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return Semantics(
+      label: '$title: $value',
+      child: Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -219,7 +209,7 @@ class AdminMetricCard extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 
@@ -242,6 +232,7 @@ class AdminRecentHospitalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPending = status.toLowerCase() == 'pending';
+    final tone = isPending ? CareGuideStatusTone.warning : CareGuideStatusTone.success;
     
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -254,21 +245,8 @@ class AdminRecentHospitalCard extends StatelessWidget {
           ),
         ),
         title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('$location â€¢ $registrationDate'),
-        trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(
-            color: isPending ? Colors.orange.withValues(alpha: 0.1) : Colors.green.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            status,
-            style: TextStyle(
-              color: isPending ? Colors.orange : Colors.green,
-              fontSize: 12,
-            ),
-          ),
-        ),
+        subtitle: Text('$location • $registrationDate'),
+        trailing: CareGuideStatusBadge(label: status, tone: tone),
         onTap: onTap,
       ),
     );
