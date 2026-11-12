@@ -1,5 +1,6 @@
 // lib/screens/patient/patient_home_screen.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:hospital_resource_management/screens/patient/patient_campaigns.dart';
 import 'package:provider/provider.dart';
 import '../../providers/patient_provider.dart';
@@ -9,6 +10,7 @@ import '../../services/location_service.dart';
 import 'patient_nearby_hospitals.dart';
 import 'patient_bookings.dart';
 import 'patient_profile.dart';
+import 'health_record_screen.dart';
 import 'ambulance_booking.dart';
 import 'blood_bank_screen.dart';
 import 'chatbot_screen.dart';
@@ -29,49 +31,51 @@ class PatientHomeScreen extends StatefulWidget {
 class _PatientHomeScreenState extends State<PatientHomeScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = [
-    const PatientDashboard(),
-    const PatientNearbyHospitals(),
-    const PatientResourceRequest(),
-    const PatientCampaigns(),
-    const PatientBookings(),
-    const PatientProfile(),
-  ];
+  void navigateToTab(int index) => setState(() => _selectedIndex = index);
+
+  List<Widget> get _screens => [
+        const PatientDashboard(),
+        const PatientNearbyHospitals(),
+        PatientResourceRequest(onBackToDashboard: () => navigateToTab(0)),
+        const PatientCampaigns(),
+        const PatientBookings(),
+        const PatientProfile(),
+      ];
 
   @override
   Widget build(BuildContext context) {
     const destinations = [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.local_hospital_outlined),
-            selectedIcon: Icon(Icons.local_hospital),
-            label: 'Hospitals',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.request_page_outlined),
-            selectedIcon: Icon(Icons.request_page),
-            label: 'Requests',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.campaign_outlined),
-            selectedIcon: Icon(Icons.campaign),
-            label: 'Camps',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.bookmark_outline),
-            selectedIcon: Icon(Icons.bookmark),
-            label: 'Bookings',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ];
+      NavigationDestination(
+        icon: Icon(Icons.dashboard_outlined),
+        selectedIcon: Icon(Icons.dashboard),
+        label: 'Dashboard',
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.local_hospital_outlined),
+        selectedIcon: Icon(Icons.local_hospital),
+        label: 'Hospitals',
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.request_page_outlined),
+        selectedIcon: Icon(Icons.request_page),
+        label: 'Requests',
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.campaign_outlined),
+        selectedIcon: Icon(Icons.campaign),
+        label: 'Camps',
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.bookmark_outline),
+        selectedIcon: Icon(Icons.bookmark),
+        label: 'Bookings',
+      ),
+      NavigationDestination(
+        icon: Icon(Icons.person_outline),
+        selectedIcon: Icon(Icons.person),
+        label: 'Profile',
+      ),
+    ];
     return LayoutBuilder(builder: (context, constraints) {
       final useRail = constraints.maxWidth >= 900;
       final content = IndexedStack(index: _selectedIndex, children: _screens);
@@ -80,14 +84,26 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
             ? Row(children: [
                 NavigationRail(
                   selectedIndex: _selectedIndex,
-                  labelType: NavigationRailLabelType.all,
+                  extended: constraints.maxWidth >= 1300,
+                  labelType: constraints.maxWidth >= 1300
+                      ? NavigationRailLabelType.none
+                      : NavigationRailLabelType.all,
                   backgroundColor: Colors.white,
                   leading: const Padding(
                     padding: EdgeInsets.symmetric(vertical: 20),
-                    child: CircleAvatar(backgroundColor: CareGuideColors.teal, child: Icon(Icons.health_and_safety_outlined, color: Colors.white)),
+                    child: CircleAvatar(
+                        backgroundColor: CareGuideColors.teal,
+                        child: Icon(Icons.health_and_safety_outlined,
+                            color: Colors.white)),
                   ),
-                  onDestinationSelected: (index) => setState(() => _selectedIndex = index),
-                  destinations: destinations.map((item) => NavigationRailDestination(icon: item.icon, selectedIcon: item.selectedIcon, label: Text(item.label))).toList(),
+                  onDestinationSelected: (index) =>
+                      setState(() => _selectedIndex = index),
+                  destinations: destinations
+                      .map((item) => NavigationRailDestination(
+                          icon: item.icon,
+                          selectedIcon: item.selectedIcon,
+                          label: Text(item.label)))
+                      .toList(),
                 ),
                 const VerticalDivider(width: 1),
                 Expanded(child: content),
@@ -97,19 +113,20 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
             ? null
             : NavigationBar(
                 selectedIndex: _selectedIndex,
-                onDestinationSelected: (index) => setState(() => _selectedIndex = index),
+                onDestinationSelected: (index) =>
+                    setState(() => _selectedIndex = index),
                 destinations: destinations,
               ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'careguide_fab',
-        backgroundColor: const Color(0xFF0A4D68),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.health_and_safety_outlined),
-        label: const Text('CareGuide'),
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const ChatbotScreen()),
+        floatingActionButton: FloatingActionButton.extended(
+          heroTag: 'careguide_fab',
+          backgroundColor: CareGuideColors.navy,
+          foregroundColor: Colors.white,
+          icon: const Icon(Icons.health_and_safety_outlined),
+          label: const Text('CareGuide'),
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ChatbotScreen()),
+          ),
         ),
-      ),
       );
     });
   }
@@ -129,11 +146,25 @@ class _PatientDashboardState extends State<PatientDashboard> {
     'blood_units': 0,
   };
   bool _isRequesting = false;
+  int _reportCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadDashboardStats();
+    _loadReportCount();
+  }
+
+  Future<void> _loadReportCount() async {
+    final result = await ApiService.getHealthSummary();
+    if (!mounted || result['success'] != true) return;
+    final counts = result['data']?['record_counts'] as List? ?? [];
+    final count = counts
+        .whereType<Map>()
+        .where((r) => const {'CONSULTATION_REPORT', 'PRESCRIPTION'}
+            .contains(r['record_type']))
+        .fold<int>(0, (sum, r) => sum + ((r['count'] as num?)?.toInt() ?? 0));
+    setState(() => _reportCount = count);
   }
 
   @override
@@ -147,10 +178,17 @@ class _PatientDashboardState extends State<PatientDashboard> {
     try {
       final position = await LocationService.getCurrentLocation();
       if (position == null) {
-        if (mounted) setState(() => _stats = {'nearby_hospitals': 0, 'available_icus': 0, 'blood_units': 0});
+        if (mounted) {
+          setState(() => _stats = {
+                'nearby_hospitals': 0,
+                'available_icus': 0,
+                'blood_units': 0
+              });
+        }
         return;
       }
-      final response = await ApiService.getNearbyHospitals(position.latitude, position.longitude);
+      final response = await ApiService.getNearbyHospitals(
+          position.latitude, position.longitude);
       if (!context.mounted) return;
 
       if (response['success'] && response['data'] != null) {
@@ -235,7 +273,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                                 : resourceType == 'Blood Unit'
                                     ? Icons.bloodtype
                                     : Icons.medical_services,
-                    color: Colors.red,
+                    color: AppColors.error,
                   ),
                   const SizedBox(width: 8),
                   Text('Request $resourceType'),
@@ -289,9 +327,11 @@ class _PatientDashboardState extends State<PatientDashboard> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.red.shade50,
+                                color: AppColors.error.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.red.shade200),
+                                border: Border.all(
+                                    color:
+                                        AppColors.error.withValues(alpha: 0.1)),
                               ),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -300,7 +340,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                                     'Blood Availability',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.red,
+                                      color: AppColors.error,
                                     ),
                                   ),
                                   const SizedBox(height: 8),
@@ -327,7 +367,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                                           ),
                                           decoration: BoxDecoration(
                                             color: selectedBloodGroup == group
-                                                ? Colors.red
+                                                ? AppColors.error
                                                 : isAvailable
                                                     ? Colors.white
                                                     : Colors.grey.shade200,
@@ -335,9 +375,9 @@ class _PatientDashboardState extends State<PatientDashboard> {
                                                 BorderRadius.circular(20),
                                             border: Border.all(
                                               color: selectedBloodGroup == group
-                                                  ? Colors.red
+                                                  ? AppColors.error
                                                   : isAvailable
-                                                      ? Colors.green
+                                                      ? AppColors.success
                                                       : Colors.grey.shade300,
                                               width: selectedBloodGroup == group
                                                   ? 2
@@ -370,8 +410,8 @@ class _PatientDashboardState extends State<PatientDashboard> {
                                                   style: TextStyle(
                                                     fontSize: 10,
                                                     color: isAvailable
-                                                        ? Colors.green
-                                                        : Colors.red,
+                                                        ? AppColors.success
+                                                        : AppColors.error,
                                                   ),
                                                 ),
                                               if (!isAvailable &&
@@ -379,7 +419,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                                                 const Icon(
                                                   Icons.close,
                                                   size: 14,
-                                                  color: Colors.red,
+                                                  color: AppColors.error,
                                                 ),
                                             ],
                                           ),
@@ -394,7 +434,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                                         'Please select a hospital first to check blood availability',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Colors.orange,
+                                          color: AppColors.warning,
                                         ),
                                       ),
                                     ),
@@ -407,7 +447,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                                         ' No blood units available in this hospital',
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: Colors.red,
+                                          color: AppColors.error,
                                         ),
                                       ),
                                     ),
@@ -421,20 +461,22 @@ class _PatientDashboardState extends State<PatientDashboard> {
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: Colors.green.shade50,
+                                  color:
+                                      AppColors.success.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(8),
-                                  border:
-                                      Border.all(color: Colors.green.shade200),
+                                  border: Border.all(
+                                      color: AppColors.success
+                                          .withValues(alpha: 0.1)),
                                 ),
                                 child: Row(
                                   children: [
                                     const Icon(Icons.check_circle,
-                                        color: Colors.green, size: 16),
+                                        color: AppColors.success, size: 16),
                                     const SizedBox(width: 8),
                                     Text(
                                       'Selected: $selectedBloodGroup (${bloodAvailability[selectedBloodGroup] ?? 0} units available)',
-                                      style: TextStyle(
-                                        color: Colors.green.shade700,
+                                      style: const TextStyle(
+                                        color: AppColors.success,
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
@@ -487,7 +529,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Please select a hospital'),
-                          backgroundColor: Colors.red,
+                          backgroundColor: AppColors.error,
                         ),
                       );
                       return;
@@ -498,7 +540,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Please select a blood group'),
-                          backgroundColor: Colors.red,
+                          backgroundColor: AppColors.error,
                         ),
                       );
                       return;
@@ -513,7 +555,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                           SnackBar(
                             content: Text(
                                 'Not enough $selectedBloodGroup blood. Available: $available, Requested: $quantity'),
-                            backgroundColor: Colors.red,
+                            backgroundColor: AppColors.error,
                           ),
                         );
                         return;
@@ -531,7 +573,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0A4D68),
+                    backgroundColor: const Color(0xFF142D4E),
                   ),
                   child: const Text('Submit Request'),
                 ),
@@ -547,7 +589,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Network error. Please try again.'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -610,7 +652,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$resourceType request sent successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
       } else if (mounted) {
@@ -618,7 +660,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(requestResponse['message'] ?? 'Request failed'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -629,7 +671,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Network error. Please try again.'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -644,6 +686,9 @@ class _PatientDashboardState extends State<PatientDashboard> {
 
     final String patientName =
         patientData?['name'] ?? authProvider.currentUser?.name ?? 'Patient';
+    final latestBooking = patientProvider.bookings.isEmpty
+        ? null
+        : patientProvider.bookings.first;
 
     return Scaffold(
       appBar: AppBar(
@@ -654,6 +699,7 @@ class _PatientDashboardState extends State<PatientDashboard> {
             icon: const Icon(Icons.refresh),
             onPressed: () {
               _loadDashboardStats();
+              _loadReportCount();
               patientProvider.loadPatientData();
             },
           ),
@@ -662,247 +708,406 @@ class _PatientDashboardState extends State<PatientDashboard> {
       body: RefreshIndicator(
         onRefresh: () async {
           await _loadDashboardStats();
+          await _loadReportCount();
           await patientProvider.loadPatientData();
         },
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Welcome Card
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF0A4D68), Color(0xFF088395)],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Welcome back,',
-                      style: TextStyle(color: Colors.white, fontSize: 14),
-                    ),
-                    Text(
-                      patientName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.my_location, color: Color(0xFFBFF7EC), size: 15),
-                        SizedBox(width: 5),
-                        Text('Location is used to find care near you', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildEmergencyMetric(
-                          context,
-                          icon: Icons.local_hospital,
-                          label: 'Nearby\nHospitals',
-                          value: _stats['nearby_hospitals'].toString(),
-                        ),
-                        _buildEmergencyMetric(
-                          context,
-                          icon: Icons.air,
-                          label: 'Available\nICUs',
-                          value: _stats['available_icus'].toString(),
-                        ),
-                        _buildEmergencyMetric(
-                          context,
-                          icon: Icons.water_drop,
-                          label: 'Blood\nUnits',
-                          value: _stats['blood_units'].toString(),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Quick Services
-              const CareGuideSectionHeader(title: 'Quick actions', subtitle: 'Get help or find care in a few taps'),
-              const SizedBox(height: 12),
-              LayoutBuilder(builder: (context, constraints) {
-                final columns = constraints.maxWidth >= 700 ? 4 : 2;
-                return GridView.count(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisCount: columns,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  childAspectRatio: columns == 4 ? 1.25 : 1.6,
-                  children: [
-                    CareGuideActionTile(icon: Icons.sos_outlined, label: 'Emergency SOS', description: 'Get urgent help', color: CareGuideColors.danger, onTap: () => showModalBottomSheet(context: context, isScrollControlled: true, builder: (_) => const FractionallySizedBox(heightFactor: .9, child: PatientEmergencyRequest()))),
-                    CareGuideActionTile(icon: Icons.medical_services_outlined, label: 'Ambulance', description: 'Book transport', color: Colors.red, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AmbulanceBookingScreen()))),
-                    CareGuideActionTile(icon: Icons.bloodtype_outlined, label: 'Blood bank', description: 'Check live stock', color: const Color(0xFFBE123C), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BloodBankScreen()))),
-                    CareGuideActionTile(icon: Icons.local_hospital_outlined, label: 'Find hospital', description: 'Nearby care', color: CareGuideColors.teal, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientNearbyHospitals()))),
-                    CareGuideActionTile(icon: Icons.qr_code_scanner, label: 'Scan Hospital QR', description: 'Join or check in', color: Colors.indigo, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PatientQrScanner()))),
-                  ],
-                );
-              }),
-              const SizedBox(height: 24),
-
-              // Ongoing care tools
-              InkWell(
-                borderRadius: BorderRadius.circular(18),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const PatientCareHub()),
-                ),
-                child: Ink(
-                  padding: const EdgeInsets.all(16),
+        child: CareGuidePage(
+          padding: EdgeInsets.zero,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Welcome Card
+                Container(
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEAF7F8),
-                    borderRadius: BorderRadius.circular(18),
+                    gradient: const LinearGradient(
+                      colors: [CareGuideColors.navy, CareGuideColors.teal],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      CircleAvatar(
-                        backgroundColor: Color(0xFF0A4D68),
-                        child: Icon(Icons.favorite_outline, color: Colors.white),
+                      const Text(
+                        'Welcome back,',
+                        style: TextStyle(color: Colors.white, fontSize: 14),
                       ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('My Care Hub', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            SizedBox(height: 2),
-                            Text('Reminders, records, family access and payments'),
-                          ],
+                      Text(
+                        patientName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      Icon(Icons.chevron_right),
+                      const SizedBox(height: 5),
+                      const Row(
+                        children: [
+                          Icon(Icons.my_location,
+                              color: Color(0xFFBFF7EC), size: 15),
+                          SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                                'Location is used to find care near you',
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildEmergencyMetric(
+                            context,
+                            icon: Icons.local_hospital,
+                            label: 'Nearby\nHospitals',
+                            value: _stats['nearby_hospitals'].toString(),
+                          ),
+                          _buildEmergencyMetric(
+                            context,
+                            icon: Icons.air,
+                            label: 'Available\nICUs',
+                            value: _stats['available_icus'].toString(),
+                          ),
+                          _buildEmergencyMetric(
+                            context,
+                            icon: Icons.water_drop,
+                            label: 'Blood\nUnits',
+                            value: _stats['blood_units'].toString(),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
-
-              // Request Resources
-              const CareGuideSectionHeader(title: 'Request a resource', subtitle: 'Choose the type of care you need'),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: ResourceRequestCard(
-                      icon: Icons.king_bed,
-                      label: 'General Bed',
-                      color: Colors.blue,
-                      onTap: () =>
-                          _showResourceRequestDialog(context, 'General Bed'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ResourceRequestCard(
-                      icon: Icons.local_hospital,
-                      label: 'ICU Bed',
-                      color: Colors.red,
-                      onTap: () =>
-                          _showResourceRequestDialog(context, 'ICU Bed'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: ResourceRequestCard(
-                      icon: Icons.air,
-                      label: 'Ventilator',
-                      color: Colors.green,
-                      onTap: () =>
-                          _showResourceRequestDialog(context, 'Ventilator'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ResourceRequestCard(
-                      icon: Icons.air_outlined,
-                      label: 'Oxygen Bed',
-                      color: Colors.orange,
-                      onTap: () =>
-                          _showResourceRequestDialog(context, 'Oxygen Bed'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: ResourceRequestCard(
-                  icon: Icons.bloodtype_outlined,
-                  label: 'Blood Unit',
-                  color: Colors.purple,
-                  onTap: () => _showResourceRequestDialog(context, 'Blood Unit'),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Recent Bookings
-              const Text(
-                'Recent Bookings',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              if (patientProvider.bookings.isNotEmpty)
-                ...patientProvider.bookings.take(3).map((booking) {
-                  return RecentHospitalCard(
-                    name: booking['hospital_name'] ?? 'Hospital',
-                    date: booking['appointment_date'] ?? '',
-                    doctor: booking['doctor_name'] ?? 'Doctor',
-                    status: booking['status'] ?? 'Pending',
-                    onTap: () {
-                      _showBookingDetails(context, booking);
-                    },
-                  );
-                })
-              else
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        const Icon(Icons.bookmark_border,
-                            size: 48, color: Colors.grey),
-                        const SizedBox(height: 8),
-                        Text(
-                          'No recent bookings',
-                          style: TextStyle(color: Colors.grey[600]),
+                const SizedBox(height: 16),
+                LayoutBuilder(builder: (context, constraints) {
+                  final panels = <Widget>[
+                    Card(
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(16),
+                        leading: const CircleAvatar(
+                          backgroundColor: Color(0xFFE2F4F3),
+                          child: Icon(Icons.calendar_month_outlined,
+                              color: CareGuideColors.teal),
                         ),
-                        const SizedBox(height: 8),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
+                        title: const Text('Latest appointment'),
+                        subtitle: Text(latestBooking == null
+                            ? 'No appointment booked yet. Find a doctor when you are ready.'
+                            : '${latestBooking['hospital_name'] ?? 'Hospital'} · ${latestBooking['appointment_date'] ?? 'Date pending'} at ${latestBooking['appointment_time'] ?? 'Time pending'}'),
+                        trailing: latestBooking == null
+                            ? const Icon(Icons.chevron_right)
+                            : CareGuideStatusBadge(
+                                label: (latestBooking['status'] ?? 'pending')
+                                    .toString()),
+                        onTap: latestBooking == null
+                            ? () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const PatientNearbyHospitals()))
+                            : () => _showBookingDetails(context, latestBooking),
+                      ),
+                    ),
+                    Card(
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(16),
+                        leading: const CircleAvatar(
+                          backgroundColor: Color(0xFFEAF7F8),
+                          child: Icon(Icons.location_on_outlined,
+                              color: CareGuideColors.navy),
+                        ),
+                        title: const Text('Find care nearby'),
+                        subtitle: const Text(
+                            'Explore hospitals, doctors and available services'),
+                        trailing: const Icon(Icons.arrow_forward),
+                        onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    const PatientNearbyHospitals())),
+                      ),
+                    ),
+                  ];
+                  if (constraints.maxWidth >= 800) {
+                    return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: panels[0]),
+                          const SizedBox(width: 12),
+                          Expanded(child: panels[1])
+                        ]);
+                  }
+                  return Column(children: panels);
+                }),
+                const SizedBox(height: 16),
+
+                InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const HealthRecordScreen())),
+                  child: Ink(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFDCE9EC))),
+                    child: Row(children: [
+                      const CircleAvatar(
+                          backgroundColor: Color(0xFFE2F4F3),
+                          child: Icon(Icons.medical_information_outlined,
+                              color: Color(0xFF0D9488))),
+                      const SizedBox(width: 12),
+                      Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            const Text('My Medical Reports',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.w700, fontSize: 16)),
+                            Text(
+                                '$_reportCount reports and prescriptions from your care team')
+                          ])),
+                      const Icon(Icons.chevron_right),
+                    ]),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Quick Services
+                const CareGuideSectionHeader(
+                    title: 'Quick actions',
+                    subtitle: 'Get help or find care in a few taps'),
+                const SizedBox(height: 12),
+                LayoutBuilder(builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 700 ? 4 : 2;
+                  return GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: columns,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: columns == 4 ? 1.25 : 1.0,
+                    children: [
+                      CareGuideActionTile(
+                          icon: Icons.sos_outlined,
+                          label: 'Emergency SOS',
+                          description: 'Get urgent help',
+                          color: CareGuideColors.danger,
+                          onTap: () => showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              builder: (_) => const FractionallySizedBox(
+                                  heightFactor: .9,
+                                  child: PatientEmergencyRequest()))),
+                      CareGuideActionTile(
+                          icon: Icons.medical_services_outlined,
+                          label: 'Ambulance',
+                          description: 'Book transport',
+                          color: CareGuideColors.navy,
+                          onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) =>
-                                    const PatientNearbyHospitals(),
-                              ),
-                            );
-                          },
-                          child: const Text('Book Appointment'),
+                                  builder: (_) =>
+                                      const AmbulanceBookingScreen()))),
+                      CareGuideActionTile(
+                          icon: Icons.bloodtype_outlined,
+                          label: 'Blood bank',
+                          description: 'Check live stock',
+                          color: CareGuideColors.danger,
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const BloodBankScreen()))),
+                      CareGuideActionTile(
+                          icon: Icons.local_hospital_outlined,
+                          label: 'Find hospital',
+                          description: 'Nearby care',
+                          color: CareGuideColors.teal,
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const PatientNearbyHospitals()))),
+                      CareGuideActionTile(
+                          icon: Icons.qr_code_scanner,
+                          label: 'Scan Hospital QR',
+                          description: 'Join or check in',
+                          color: CareGuideColors.teal,
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const PatientQrScanner()))),
+                    ],
+                  );
+                }),
+                const SizedBox(height: 24),
+
+                // Ongoing care tools
+                InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PatientCareHub()),
+                  ),
+                  child: Ink(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEAF7F8),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: const Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: Color(0xFF142D4E),
+                          child:
+                              Icon(Icons.favorite_outline, color: Colors.white),
                         ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('My Care Hub',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16)),
+                              SizedBox(height: 2),
+                              Text(
+                                  'Reminders, records, family access and payments'),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.chevron_right),
                       ],
                     ),
                   ),
                 ),
-            ],
+                const SizedBox(height: 24),
+
+                // Request Resources
+                const CareGuideSectionHeader(
+                    title: 'Request a resource',
+                    subtitle: 'Choose the type of care you need'),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ResourceRequestCard(
+                        icon: Icons.king_bed,
+                        label: 'General Bed',
+                        color: AppColors.primary,
+                        onTap: () =>
+                            _showResourceRequestDialog(context, 'General Bed'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ResourceRequestCard(
+                        icon: Icons.local_hospital,
+                        label: 'ICU Bed',
+                        color: AppColors.error,
+                        onTap: () =>
+                            _showResourceRequestDialog(context, 'ICU Bed'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ResourceRequestCard(
+                        icon: Icons.air,
+                        label: 'Ventilator',
+                        color: AppColors.success,
+                        onTap: () =>
+                            _showResourceRequestDialog(context, 'Ventilator'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ResourceRequestCard(
+                        icon: Icons.air_outlined,
+                        label: 'Oxygen Bed',
+                        color: AppColors.warning,
+                        onTap: () =>
+                            _showResourceRequestDialog(context, 'Oxygen Bed'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: ResourceRequestCard(
+                    icon: Icons.bloodtype_outlined,
+                    label: 'Blood Unit',
+                    color: AppColors.secondary,
+                    onTap: () =>
+                        _showResourceRequestDialog(context, 'Blood Unit'),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Recent Bookings
+                const Text(
+                  'Recent Bookings',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                if (patientProvider.bookings.isNotEmpty)
+                  ...patientProvider.bookings.take(3).map((booking) {
+                    return RecentHospitalCard(
+                      name: booking['hospital_name'] ?? 'Hospital',
+                      date: booking['appointment_date'] ?? '',
+                      doctor: booking['doctor_name'] ?? 'Doctor',
+                      status: booking['status'] ?? 'Pending',
+                      onTap: () {
+                        _showBookingDetails(context, booking);
+                      },
+                    );
+                  })
+                else
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.bookmark_border,
+                              size: 48, color: Colors.grey),
+                          const SizedBox(height: 8),
+                          Text(
+                            'No recent bookings',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                          const SizedBox(height: 8),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const PatientNearbyHospitals(),
+                                ),
+                              );
+                            },
+                            child: const Text('Book Appointment'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1080,13 +1285,13 @@ class RecentHospitalCard extends StatelessWidget {
     Color statusColor;
     switch (status) {
       case 'Confirmed':
-        statusColor = Colors.green;
+        statusColor = AppColors.success;
         break;
       case 'Pending':
-        statusColor = Colors.orange;
+        statusColor = AppColors.warning;
         break;
       case 'Completed':
-        statusColor = Colors.blue;
+        statusColor = AppColors.primary;
         break;
       default:
         statusColor = Colors.grey;

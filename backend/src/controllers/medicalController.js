@@ -1,4 +1,5 @@
 const { pool } = require('../config/database');
+const { canAccess: familyCanAccess } = require('./familyController');
 
 const patientForUser = async (userId) => {
   const result = await pool.query('SELECT id FROM patients WHERE user_id = $1', [userId]);
@@ -31,7 +32,7 @@ const doctorForAppointment = async (doctorUserId, appointmentId) => {
 const resolvePatient = async (req, res, next) => {
   const patientId = Number(req.params.id || req.body.patient_id);
   if (!Number.isInteger(patientId) || patientId <= 0) return res.status(400).json({ success: false, message: 'Valid patient ID is required' });
-  if (req.user.user_type === 'patient' && !(await ownsPatient(req.user.id, patientId))) return res.status(403).json({ success: false, message: 'You can access only your own medical record' });
+  if (req.user.user_type === 'patient' && !(await familyCanAccess(req.user.id, patientId))) return res.status(403).json({ success: false, message: 'You can access only your own or an authorized family medical record' });
   if (req.user.user_type !== 'patient' && !(await doctorCanAccess(req.user.id, patientId))) return res.status(403).json({ success: false, message: 'No active appointment or access grant for this patient' });
   req.patientId = patientId;
   next();
@@ -51,11 +52,13 @@ exports.getProfile = async (req, res) => {
 exports.getTimeline = async (req, res) => {
   const recordType = String(req.query.type || '').trim().toUpperCase();
   const search = String(req.query.search || '').trim();
-  const result = await pool.query(`SELECT id, record_type, title, record_date, source, verification_status, details, created_by_user_id, created_at, updated_at
-    FROM medical_records WHERE patient_id=$1 AND deleted_at IS NULL
-      AND ($2='' OR record_type=$2)
-      AND ($3='' OR title ILIKE '%' || $3 || '%' OR details::text ILIKE '%' || $3 || '%')
-    ORDER BY record_date DESC, id DESC LIMIT $4 OFFSET $5`, [req.patientId, recordType, search, Math.min(Number(req.query.limit) || 50, 100), Math.max(Number(req.query.offset) || 0, 0)]);
+  const result = await pool.query(`SELECT mr.id, mr.record_type, mr.title, mr.record_date, mr.source, mr.verification_status, mr.details, mr.created_by_user_id, mr.created_at, mr.updated_at,
+      mr.appointment_id, mr.doctor_id, d.name AS doctor_name, mr.hospital_id, h.name AS hospital_name, mr.publication_status, mr.published_at
+    FROM medical_records mr LEFT JOIN doctors d ON d.id=mr.doctor_id LEFT JOIN hospitals h ON h.id=mr.hospital_id
+    WHERE mr.patient_id=$1 AND mr.deleted_at IS NULL AND mr.publication_status='PUBLISHED'
+      AND ($2='' OR mr.record_type=$2)
+      AND ($3='' OR mr.title ILIKE '%' || $3 || '%' OR mr.details::text ILIKE '%' || $3 || '%')
+    ORDER BY mr.record_date DESC, mr.id DESC LIMIT $4 OFFSET $5`, [req.patientId, recordType, search, Math.min(Number(req.query.limit) || 50, 100), Math.max(Number(req.query.offset) || 0, 0)]);
   await audit(req.patientId, req.user.id, 'VIEW_TIMELINE');
   res.json({ success: true, data: result.rows });
 };
@@ -68,8 +71,8 @@ exports.getMyHealthSummary = async (req, res) => {
   const [profile, counts, recent, upcoming] = await Promise.all([
     pool.query(`SELECT COALESCE(mp.blood_group,p.blood_group) blood_group, mp.allergies, mp.chronic_conditions, mp.current_medications
       FROM patients p LEFT JOIN medical_profiles mp ON mp.patient_id=p.id WHERE p.id=$1`, [patientId]),
-    pool.query(`SELECT record_type, COUNT(*)::int count FROM medical_records WHERE patient_id=$1 AND deleted_at IS NULL GROUP BY record_type`, [patientId]),
-    pool.query(`SELECT id, record_type, title, record_date, details FROM medical_records WHERE patient_id=$1 AND deleted_at IS NULL ORDER BY record_date DESC, id DESC LIMIT 5`, [patientId]),
+    pool.query(`SELECT record_type, COUNT(*)::int count FROM medical_records WHERE patient_id=$1 AND deleted_at IS NULL AND publication_status='PUBLISHED' GROUP BY record_type`, [patientId]),
+    pool.query(`SELECT id, record_type, title, record_date, details FROM medical_records WHERE patient_id=$1 AND deleted_at IS NULL AND publication_status='PUBLISHED' ORDER BY record_date DESC, id DESC LIMIT 5`, [patientId]),
     pool.query(`SELECT a.id, a.appointment_date, a.appointment_time, a.status, h.name hospital_name, d.name doctor_name
       FROM appointments a JOIN hospitals h ON h.id=a.hospital_id LEFT JOIN doctors d ON d.id=a.doctor_id
       WHERE a.patient_id=$1 AND a.appointment_date >= CURRENT_DATE AND LOWER(COALESCE(a.status,'')) IN ('pending','confirmed','rescheduled','accepted')

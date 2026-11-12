@@ -1,5 +1,6 @@
 // lib/screens/hospital/campaign_detail_screen.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import '../../providers/hospital_provider.dart';
 import '../../services/api_service.dart';
@@ -33,31 +34,36 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
 
   Future<void> _loadData() async {
     if (!context.mounted) return;
-    
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final campaignResponse = await ApiService.getCampaignDetails(widget.campaignId);
+      final campaignResponse =
+          await ApiService.getCampaignDetails(widget.campaignId);
       if (campaignResponse['success'] && mounted) {
         setState(() {
           _campaign = campaignResponse['data'];
         });
       }
 
-      final registrationsResponse = await ApiService.getCampaignRegistrations(widget.campaignId);
+      final registrationsResponse =
+          await ApiService.getCampaignRegistrations(widget.campaignId);
       if (registrationsResponse['success'] && mounted) {
         setState(() {
-          _registrations = List<Map<String, dynamic>>.from(registrationsResponse['data']);
+          _registrations =
+              List<Map<String, dynamic>>.from(registrationsResponse['data']);
         });
       }
 
-      final donationsResponse = await ApiService.getCampaignDonations(widget.campaignId);
+      final donationsResponse =
+          await ApiService.getCampaignDonations(widget.campaignId);
       if (donationsResponse['success'] && mounted) {
         setState(() {
-          _donations = List<Map<String, dynamic>>.from(donationsResponse['data']);
+          _donations =
+              List<Map<String, dynamic>>.from(donationsResponse['data']);
         });
       }
     } catch (e) {
@@ -82,12 +88,18 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(widget.campaignName),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
           bottom: const TabBar(
             tabs: [
-              Tab(text: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ Overview', icon: Icon(Icons.info)),
-              Tab(text: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‚Â¤ Registrations', icon: Icon(Icons.people)),
-              Tab(text: 'ÃƒÂ°Ã…Â¸Ã‚Â©Ã‚Â¸ Donations', icon: Icon(Icons.bloodtype)),
+              Tab(
+                  text: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬Å“Ã¢â‚¬Â¹ Overview',
+                  icon: Icon(Icons.info)),
+              Tab(
+                  text: 'ÃƒÂ°Ã…Â¸Ã¢â‚¬ËœÃ‚Â¤ Registrations',
+                  icon: Icon(Icons.people)),
+              Tab(
+                  text: 'ÃƒÂ°Ã…Â¸Ã‚Â©Ã‚Â¸ Donations',
+                  icon: Icon(Icons.bloodtype)),
             ],
           ),
           actions: [
@@ -104,7 +116,8 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                        const Icon(Icons.error_outline,
+                            size: 64, color: AppColors.error),
                         const SizedBox(height: 16),
                         Text(_errorMessage!),
                         const SizedBox(height: 16),
@@ -151,15 +164,24 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _buildDetailRow('Campaign Name', campaign['campaign_name'] ?? 'N/A'),
-                  _buildDetailRow('Description', campaign['description'] ?? 'No description'),
+                  _buildDetailRow(
+                      'Campaign Name', campaign['campaign_name'] ?? 'N/A'),
+                  _buildDetailRow('Description',
+                      campaign['description'] ?? 'No description'),
                   _buildDetailRow('Location', campaign['location'] ?? 'N/A'),
                   _buildDetailRow('City', campaign['city'] ?? 'N/A'),
-                  _buildDetailRow('Contact Person', campaign['contact_person'] ?? 'N/A'),
-                  _buildDetailRow('Contact Phone', campaign['contact_phone'] ?? 'N/A'),
-                  _buildDetailRow('Status', campaign['status']?.toUpperCase() ?? 'PENDING'),
-                  _buildDetailRow('Start Date', campaign['start_date']?.toString().split('T')[0] ?? 'N/A'),
-                  _buildDetailRow('End Date', campaign['end_date']?.toString().split('T')[0] ?? 'N/A'),
+                  _buildDetailRow(
+                      'Contact Person', campaign['contact_person'] ?? 'N/A'),
+                  _buildDetailRow(
+                      'Contact Phone', campaign['contact_phone'] ?? 'N/A'),
+                  _buildDetailRow(
+                      'Status', campaign['status']?.toUpperCase() ?? 'PENDING'),
+                  _buildDetailRow(
+                      'Start Date',
+                      campaign['start_date']?.toString().split('T')[0] ??
+                          'N/A'),
+                  _buildDetailRow('End Date',
+                      campaign['end_date']?.toString().split('T')[0] ?? 'N/A'),
                 ],
               ),
             ),
@@ -182,20 +204,24 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildStatItem('Target Donors', campaign['target_donors']?.toString() ?? '0'),
-                      _buildStatItem('Registered', campaign['registered_donors']?.toString() ?? '0'),
+                      _buildStatItem('Target Donors',
+                          campaign['target_donors']?.toString() ?? '0'),
+                      _buildStatItem('Registered',
+                          campaign['registered_donors']?.toString() ?? '0'),
                       _buildStatItem('Donated', _donations.length.toString()),
-                      _buildStatItem('Blood Collected', '${campaign['total_blood_collected'] ?? 0} units'),
+                      _buildStatItem('Blood Collected',
+                          '${campaign['total_blood_collected'] ?? 0} units'),
                     ],
                   ),
                   const SizedBox(height: 12),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
-                      value: ((campaign['registered_donors'] ?? 0) / (campaign['target_donors'] ?? 50))
+                      value: ((campaign['registered_donors'] ?? 0) /
+                              (campaign['target_donors'] ?? 50))
                           .clamp(0.0, 1.0),
                       backgroundColor: Colors.grey.shade200,
-                      color: Colors.red,
+                      color: AppColors.error,
                       minHeight: 8,
                     ),
                   ),
@@ -246,7 +272,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: Colors.red,
+            color: AppColors.error,
           ),
         ),
         Text(
@@ -277,20 +303,20 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
       itemBuilder: (context, index) {
         final reg = _registrations[index];
         final status = reg['status'] ?? 'registered';
-        
+
         Color statusColor;
         switch (status) {
           case 'donated':
-            statusColor = Colors.green;
+            statusColor = AppColors.success;
             break;
           case 'checked_in':
-            statusColor = Colors.blue;
+            statusColor = AppColors.primary;
             break;
           case 'cancelled':
-            statusColor = Colors.red;
+            statusColor = AppColors.error;
             break;
           default:
-            statusColor = Colors.orange;
+            statusColor = AppColors.warning;
         }
 
         return Card(
@@ -313,7 +339,8 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
                       decoration: BoxDecoration(
                         color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
@@ -332,23 +359,22 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                 const SizedBox(height: 8),
                 Text(' Blood Group: ${reg['blood_group'] ?? 'N/A'}'),
                 Text(' ${reg['donor_phone'] ?? 'N/A'}'),
-                if (reg['age'] != null)
-                  Text(' Age: ${reg['age']} years'),
-                if (reg['weight'] != null)
-                  Text(' Weight: ${reg['weight']} kg'),
-                Text(' Registered: ${reg['registration_date']?.toString().split('T')[0] ?? ''}'),
+                if (reg['age'] != null) Text(' Age: ${reg['age']} years'),
+                if (reg['weight'] != null) Text(' Weight: ${reg['weight']} kg'),
+                Text(
+                    ' Registered: ${reg['registration_date']?.toString().split('T')[0] ?? ''}'),
                 if (reg['units_donated'] != null && reg['units_donated'] > 0)
                   Text(' Units Donated: ${reg['units_donated']}'),
-                if (status == 'registered')
-                  const SizedBox(height: 8),
+                if (status == 'registered') const SizedBox(height: 8),
                 if (status == 'registered')
                   Row(
                     children: [
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () => _showRecordDonationDialog(context, reg),
+                          onPressed: () =>
+                              _showRecordDonationDialog(context, reg),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
+                            backgroundColor: AppColors.success,
                             foregroundColor: Colors.white,
                           ),
                           child: const Text(' Record Donation'),
@@ -398,12 +424,12 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.red.shade50,
+                            color: AppColors.error.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Icon(
                             Icons.bloodtype,
-                            color: Colors.red,
+                            color: AppColors.error,
                             size: 24,
                           ),
                         ),
@@ -420,8 +446,8 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                             ),
                             Text(
                               '${donation['blood_group']} - ${donation['units_donated']} units',
-                              style: TextStyle(
-                                color: Colors.red.shade700,
+                              style: const TextStyle(
+                                color: AppColors.error,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -430,16 +456,17 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                       ],
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.green.withValues(alpha: 0.1),
+                        color: AppColors.success.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         'Batch: ${donation['batch_number'] ?? 'N/A'}',
                         style: const TextStyle(
                           fontSize: 10,
-                          color: Colors.green,
+                          color: AppColors.success,
                         ),
                       ),
                     ),
@@ -448,7 +475,8 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                    const Icon(Icons.calendar_today,
+                        size: 14, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
                       donation['donation_date']?.toString().split('T')[0] ?? '',
@@ -458,7 +486,8 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                     const Icon(Icons.access_time, size: 14, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
-                      donation['donation_time']?.toString().substring(0, 5) ?? '',
+                      donation['donation_time']?.toString().substring(0, 5) ??
+                          '',
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
@@ -466,7 +495,8 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                 if (donation['expiry_date'] != null)
                   Text(
                     'Expires: ${donation['expiry_date']?.toString().split('T')[0] ?? ''}',
-                    style: const TextStyle(fontSize: 12, color: Colors.orange),
+                    style:
+                        const TextStyle(fontSize: 12, color: AppColors.warning),
                   ),
                 if (donation['collected_by'] != null)
                   Text(
@@ -481,7 +511,8 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
     );
   }
 
-  void _showRecordDonationDialog(BuildContext context, Map<String, dynamic> registration) {
+  void _showRecordDonationDialog(
+      BuildContext context, Map<String, dynamic> registration) {
     final unitsController = TextEditingController(text: '1');
     final collectedByController = TextEditingController();
     final hemoglobinController = TextEditingController();
@@ -512,7 +543,8 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                   items: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
                       .map((g) => DropdownMenuItem(value: g, child: Text(g)))
                       .toList(),
-                  onChanged: (value) => setState(() => selectedBloodGroup = value!),
+                  onChanged: (value) =>
+                      setState(() => selectedBloodGroup = value!),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -533,7 +565,8 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                           final date = await showDatePicker(
                             context: context,
                             initialDate: DateTime.now(),
-                            firstDate: DateTime.now().subtract(const Duration(days: 7)),
+                            firstDate: DateTime.now()
+                                .subtract(const Duration(days: 7)),
                             lastDate: DateTime.now(),
                           );
                           if (date != null) {
@@ -541,14 +574,16 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                           }
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 16),
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.grey.shade300),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.calendar_today, color: Colors.red),
+                              const Icon(Icons.calendar_today,
+                                  color: AppColors.error),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -556,7 +591,9 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                                       ? 'Date: ${donationDate!.day}/${donationDate!.month}/${donationDate!.year}'
                                       : 'Donation Date *',
                                   style: TextStyle(
-                                    color: donationDate != null ? Colors.black : Colors.grey,
+                                    color: donationDate != null
+                                        ? Colors.black
+                                        : Colors.grey,
                                   ),
                                 ),
                               ),
@@ -578,14 +615,16 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                           }
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 16),
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.grey.shade300),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.access_time, color: Colors.red),
+                              const Icon(Icons.access_time,
+                                  color: AppColors.error),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -593,7 +632,9 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                                       ? 'Time: ${donationTime!.format(context)}'
                                       : 'Donation Time *',
                                   style: TextStyle(
-                                    color: donationTime != null ? Colors.black : Colors.grey,
+                                    color: donationTime != null
+                                        ? Colors.black
+                                        : Colors.grey,
                                   ),
                                 ),
                               ),
@@ -694,13 +735,15 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
+                    color: AppColors.warning.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.shade200),
+                    border: Border.all(
+                        color: AppColors.warning.withValues(alpha: 0.1)),
                   ),
                   child: const Row(
                     children: [
-                      Icon(Icons.info_outline, size: 16, color: Colors.orange),
+                      Icon(Icons.info_outline,
+                          size: 16, color: AppColors.warning),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -726,7 +769,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Please enter valid units'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppColors.error,
                     ),
                   );
                   return;
@@ -736,7 +779,7 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Please select donation date and time'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppColors.error,
                     ),
                   );
                   return;
@@ -748,12 +791,16 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                   'registration_id': registration['id'],
                   'blood_group': selectedBloodGroup,
                   'units_donated': units,
-                  'donation_date': donationDate!.toIso8601String().split('T')[0],
-                  'donation_time': '${donationTime!.hour.toString().padLeft(2, '0')}:${donationTime!.minute.toString().padLeft(2, '0')}:00',
+                  'donation_date':
+                      donationDate!.toIso8601String().split('T')[0],
+                  'donation_time':
+                      '${donationTime!.hour.toString().padLeft(2, '0')}:${donationTime!.minute.toString().padLeft(2, '0')}:00',
                   'collected_by': collectedByController.text,
-                  'hemoglobin_level': double.tryParse(hemoglobinController.text),
-                  'blood_pressure': bpSystolicController.text.isNotEmpty && bpDiastolicController.text.isNotEmpty 
-                      ? '${bpSystolicController.text}/${bpDiastolicController.text}' 
+                  'hemoglobin_level':
+                      double.tryParse(hemoglobinController.text),
+                  'blood_pressure': bpSystolicController.text.isNotEmpty &&
+                          bpDiastolicController.text.isNotEmpty
+                      ? '${bpSystolicController.text}/${bpDiastolicController.text}'
                       : null,
                   'pulse_rate': int.tryParse(pulseController.text),
                   'temperature': double.tryParse(temperatureController.text),
@@ -763,18 +810,20 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                 if (response['success'] && mounted) {
                   // Refresh all data
                   await _loadData();
-                  
+
                   // Also refresh the hospital provider to update blood bank
                   if (!context.mounted) return;
-                  final hospitalProvider = Provider.of<HospitalProvider>(context, listen: false);
+                  final hospitalProvider =
+                      Provider.of<HospitalProvider>(context, listen: false);
                   await hospitalProvider.loadHospitalData();
-                  
+
                   if (mounted) {
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(' Donation recorded! $units unit(s) of $selectedBloodGroup added to blood bank.'),
-                        backgroundColor: Colors.green,
+                        content: Text(
+                            ' Donation recorded! $units unit(s) of $selectedBloodGroup added to blood bank.'),
+                        backgroundColor: AppColors.success,
                       ),
                     );
                   }
@@ -782,14 +831,15 @@ class _CampaignDetailScreenState extends State<CampaignDetailScreen> {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(response['message'] ?? 'Failed to record donation'),
-                      backgroundColor: Colors.red,
+                      content: Text(
+                          response['message'] ?? 'Failed to record donation'),
+                      backgroundColor: AppColors.error,
                     ),
                   );
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
+                backgroundColor: AppColors.success,
               ),
               child: const Text(' Record Donation'),
             ),

@@ -1,5 +1,6 @@
 // lib/widgets/hospital_recommendation_card.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 
 class HospitalRecommendationCard extends StatelessWidget {
   final Map<String, dynamic> hospital;
@@ -36,7 +37,7 @@ class HospitalRecommendationCard extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: isEmergency
-                ? Border.all(color: Colors.red, width: 2)
+                ? Border.all(color: AppColors.error, width: 2)
                 : null,
           ),
           child: Column(
@@ -47,12 +48,16 @@ class HospitalRecommendationCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: isEmergency ? Colors.red.shade50 : const Color(0xFF0A4D68).withValues(alpha: 0.1),
+                      color: isEmergency
+                          ? AppColors.error.withValues(alpha: 0.1)
+                          : const Color(0xFF142D4E).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
                       isEmergency ? Icons.emergency : Icons.local_hospital,
-                      color: isEmergency ? Colors.red : const Color(0xFF0A4D68),
+                      color: isEmergency
+                          ? AppColors.error
+                          : const Color(0xFF142D4E),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -73,12 +78,14 @@ class HospitalRecommendationCard extends StatelessWidget {
                               ),
                             ),
                             if (isVerified)
-                              const Icon(Icons.verified, color: Colors.green, size: 16),
+                              const Icon(Icons.verified,
+                                  color: AppColors.success, size: 16),
                           ],
                         ),
                         Text(
                           'ðŸ“ $address',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.grey[600]),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -92,19 +99,19 @@ class HospitalRecommendationCard extends StatelessWidget {
                   _buildInfoChip(
                     icon: Icons.location_on,
                     label: '$distance km',
-                    color: Colors.blue,
+                    color: AppColors.primary,
                   ),
                   const SizedBox(width: 8),
                   _buildInfoChip(
                     icon: Icons.star,
                     label: rating,
-                    color: Colors.amber,
+                    color: AppColors.warning,
                   ),
                   const SizedBox(width: 8),
                   _buildInfoChip(
                     icon: Icons.king_bed,
                     label: '$availableBeds beds',
-                    color: Colors.green,
+                    color: AppColors.success,
                   ),
                 ],
               ),
@@ -115,19 +122,20 @@ class HospitalRecommendationCard extends StatelessWidget {
                     _buildInfoChip(
                       icon: Icons.local_hospital,
                       label: '$availableIcu ICU',
-                      color: Colors.purple,
+                      color: AppColors.secondary,
                     ),
                   if (availableIcu > 0) const SizedBox(width: 8),
                   if (hasEmergency)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.red.shade100,
+                        color: AppColors.error.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Text(
                         'ðŸš¨ Emergency',
-                        style: TextStyle(fontSize: 10, color: Colors.red),
+                        style: TextStyle(fontSize: 10, color: AppColors.error),
                       ),
                     ),
                 ],
@@ -138,10 +146,13 @@ class HospitalRecommendationCard extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: onSelect,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isEmergency ? Colors.red : const Color(0xFF0A4D68),
+                    backgroundColor:
+                        isEmergency ? AppColors.error : const Color(0xFF142D4E),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
-                  child: Text(isEmergency ? 'ðŸš‘ Request Emergency Help' : 'ðŸ“‹ View Details'),
+                  child: Text(isEmergency
+                      ? 'ðŸš‘ Request Emergency Help'
+                      : 'ðŸ“‹ View Details'),
                 ),
               ),
             ],

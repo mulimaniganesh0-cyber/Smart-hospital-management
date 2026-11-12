@@ -1,0 +1,13 @@
+const express = require('express');
+const router = express.Router();
+const driver = require('../controllers/driverController');
+const { protect, authorize, requireActiveDriver } = require('../middleware/auth');
+const handle = (controller) => (req, res, next) => Promise.resolve(controller(req, res, next)).catch(next);
+router.use(protect, authorize('ambulance_driver'), requireActiveDriver);
+router.get('/profile', handle(driver.profile));
+router.get('/assignments', handle(driver.assignments));
+router.get('/history', handle(driver.history));
+router.put('/assignments/:emergencyId/status', handle(driver.updateAssignmentStatus));
+router.put('/bookings/:bookingId/status', handle(driver.updateBookingStatus));
+router.post('/location', handle(driver.updateLocation));
+module.exports = router;

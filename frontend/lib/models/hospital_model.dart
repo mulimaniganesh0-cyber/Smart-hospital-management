@@ -10,14 +10,17 @@ class Hospital {
   final int? googleReviewCount;
   final String? googlePlaceId;
   final String? googleMapsUrl;
+  final String? coverPhotoUrl;
   final double? latitude;
   final double? longitude;
   final double? entranceLatitude;
   final double? entranceLongitude;
+  final String? entranceAddress;
+  final bool entranceVerified;
   final bool ratingVerified;
   final String? ratingLastUpdated;
   final bool isVerified;
-  
+
   // Resource fields
   final int totalBeds;
   final int availableBeds;
@@ -28,7 +31,7 @@ class Hospital {
   final int oxygenBedsTotal;
   final int oxygenBedsAvailable;
   final int bloodUnits;
-  
+
   final List<String> specialties;
   final bool emergencyServices;
   final String distance;
@@ -45,10 +48,13 @@ class Hospital {
     this.googleReviewCount,
     this.googlePlaceId,
     this.googleMapsUrl,
+    this.coverPhotoUrl,
     this.latitude,
     this.longitude,
     this.entranceLatitude,
     this.entranceLongitude,
+    this.entranceAddress,
+    this.entranceVerified = false,
     this.ratingVerified = false,
     this.ratingLastUpdated,
     required this.isVerified,
@@ -68,72 +74,91 @@ class Hospital {
   });
 
   factory Hospital.fromJson(Map<String, dynamic> json) {
-  // Helper function to safely parse values
-  int parseInt(dynamic value) {
-    if (value == null) return 0;
-    if (value is int) return value;
-    if (value is String) return int.tryParse(value) ?? 0;
-    return 0;
-  }
-
-  double parseDouble(dynamic value) {
-    if (value == null) return 0.0;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? 0.0;
-    return 0.0;
-  }
-
-  double? parseNullableDouble(dynamic value) {
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value);
-    return null;
-  }
-
-  List<String> parseList(dynamic value) {
-    if (value == null) return [];
-    if (value is List) {
-      return value.map((e) => e.toString()).toList();
+    // Helper function to safely parse values
+    int parseInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
     }
-    if (value is String && value.isNotEmpty) {
-      return [value];
-    }
-    return [];
-  }
 
-  return Hospital(
-    id: parseInt(json['id']),
-    name: json['name']?.toString() ?? 'Unknown Hospital',
-    address: json['address']?.toString() ?? '',
-    city: json['city']?.toString() ?? '',
-    phone: json['phone']?.toString() ?? '',
-    email: json['email']?.toString() ?? '',
-    googleRating: json['rating_verified'] == true ? parseDouble(json['google_rating']) : null,
-    googleReviewCount: json['rating_verified'] == true ? parseInt(json['google_review_count']) : null,
-    googlePlaceId: json['rating_verified'] == true ? json['google_place_id']?.toString() : null,
-    googleMapsUrl: json['rating_verified'] == true ? json['google_maps_url']?.toString() : null,
-    latitude: parseNullableDouble(json['latitude']),
-    longitude: parseNullableDouble(json['longitude']),
-    entranceLatitude: json['entrance_latitude'] == null ? null : parseDouble(json['entrance_latitude']),
-    entranceLongitude: json['entrance_longitude'] == null ? null : parseDouble(json['entrance_longitude']),
-    ratingVerified: json['rating_verified'] == true,
-    ratingLastUpdated: json['rating_verified'] == true ? json['rating_last_updated']?.toString() : null,
-    isVerified: json['is_verified'] == true,
-    totalBeds: parseInt(json['total_beds']),
-    availableBeds: parseInt(json['available_beds']),
-    icuBeds: parseInt(json['icu_beds']),
-    availableIcu: parseInt(json['available_icu']),
-    ventilatorCount: parseInt(json['ventilator_count']),
-    availableVentilators: parseInt(json['available_ventilators']),
-    oxygenBedsTotal: parseInt(json['oxygen_beds_total']),
-    oxygenBedsAvailable: parseInt(json['oxygen_beds_available']),
-    bloodUnits: parseInt(json['blood_units']),
-    specialties: parseList(json['specialties']),
-    emergencyServices: json['emergency_services'] == true,
-    distance: json['distance']?.toString() ?? 'N/A',
-    lastUpdated: json['last_updated']?.toString() ?? DateTime.now().toIso8601String(),
-  );
-}
+    double parseDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is double) return value;
+      if (value is int) return value.toDouble();
+      if (value is String) return double.tryParse(value) ?? 0.0;
+      return 0.0;
+    }
+
+    double? parseNullableDouble(dynamic value) {
+      if (value is num) return value.toDouble();
+      if (value is String) return double.tryParse(value);
+      return null;
+    }
+
+    List<String> parseList(dynamic value) {
+      if (value == null) return [];
+      if (value is List) {
+        return value.map((e) => e.toString()).toList();
+      }
+      if (value is String && value.isNotEmpty) {
+        return [value];
+      }
+      return [];
+    }
+
+    return Hospital(
+      id: parseInt(json['id']),
+      name: json['name']?.toString() ?? 'Unknown Hospital',
+      address: json['address']?.toString() ?? '',
+      city: json['city']?.toString() ?? '',
+      phone: json['phone']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      googleRating: json['rating_verified'] == true
+          ? parseDouble(json['google_rating'])
+          : null,
+      googleReviewCount: json['rating_verified'] == true
+          ? parseInt(json['google_review_count'])
+          : null,
+      googlePlaceId:
+          json['rating_verified'] == true || json['location_verified'] == true
+              ? json['google_place_id']?.toString()
+              : null,
+      googleMapsUrl: json['rating_verified'] == true
+          ? json['google_maps_url']?.toString()
+          : null,
+      coverPhotoUrl: json['cover_photo_url']?.toString(),
+      latitude: parseNullableDouble(json['latitude']),
+      longitude: parseNullableDouble(json['longitude']),
+      entranceLatitude: json['entrance_latitude'] == null
+          ? null
+          : parseDouble(json['entrance_latitude']),
+      entranceLongitude: json['entrance_longitude'] == null
+          ? null
+          : parseDouble(json['entrance_longitude']),
+      entranceAddress: json['entrance_address']?.toString(),
+      entranceVerified: json['entrance_verified'] == true,
+      ratingVerified: json['rating_verified'] == true,
+      ratingLastUpdated: json['rating_verified'] == true
+          ? json['rating_last_updated']?.toString()
+          : null,
+      isVerified: json['is_verified'] == true,
+      totalBeds: parseInt(json['total_beds']),
+      availableBeds: parseInt(json['available_beds']),
+      icuBeds: parseInt(json['icu_beds']),
+      availableIcu: parseInt(json['available_icu']),
+      ventilatorCount: parseInt(json['ventilator_count']),
+      availableVentilators: parseInt(json['available_ventilators']),
+      oxygenBedsTotal: parseInt(json['oxygen_beds_total']),
+      oxygenBedsAvailable: parseInt(json['oxygen_beds_available']),
+      bloodUnits: parseInt(json['blood_units']),
+      specialties: parseList(json['specialties']),
+      emergencyServices: json['emergency_services'] == true,
+      distance: json['distance']?.toString() ?? 'N/A',
+      lastUpdated:
+          json['last_updated']?.toString() ?? DateTime.now().toIso8601String(),
+    );
+  }
 
   Map<String, dynamic> toJson() {
     return {
@@ -147,10 +172,13 @@ class Hospital {
       'google_review_count': googleReviewCount,
       'google_place_id': googlePlaceId,
       'google_maps_url': googleMapsUrl,
+      'cover_photo_url': coverPhotoUrl,
       'latitude': latitude,
       'longitude': longitude,
       'entrance_latitude': entranceLatitude,
       'entrance_longitude': entranceLongitude,
+      'entrance_address': entranceAddress,
+      'entrance_verified': entranceVerified,
       'rating_verified': ratingVerified,
       'rating_last_updated': ratingLastUpdated,
       'is_verified': isVerified,

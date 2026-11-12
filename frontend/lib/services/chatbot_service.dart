@@ -135,6 +135,7 @@ class ChatbotService {
       entranceLongitude: hospital['entrance_longitude'] is num
           ? (hospital['entrance_longitude'] as num).toDouble()
           : double.tryParse('${hospital['entrance_longitude'] ?? ''}'),
+      entranceVerified: hospital['entrance_verified'] == true,
       distance: asDouble(hospital['distance']),
       rating: asDouble(hospital['rating']),
       specialty:

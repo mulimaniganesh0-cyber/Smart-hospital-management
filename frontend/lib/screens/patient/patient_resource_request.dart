@@ -1,13 +1,21 @@
 // lib/screens/patient/patient_resource_request.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import '../../services/api_service.dart';
 import '../../providers/auth_provider.dart';
 import 'patient_my_requests.dart';
-import 'patient_home_screen.dart';
 
 class PatientResourceRequest extends StatefulWidget {
-  const PatientResourceRequest({super.key, this.hospitalId, this.hospitalName, this.resourceType, this.bloodGroup, this.availableQuantity});
+  const PatientResourceRequest(
+      {super.key,
+      this.hospitalId,
+      this.hospitalName,
+      this.resourceType,
+      this.bloodGroup,
+      this.availableQuantity,
+      this.onBackToDashboard});
+  final VoidCallback? onBackToDashboard;
   final int? hospitalId;
   final String? hospitalName;
   final String? resourceType;
@@ -30,7 +38,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
   String _patientName = '';
   String _patientPhone = '';
   String _hospitalAddress = '';
-  
+
   // Blood availability cache
   Map<String, Map<String, dynamic>> _bloodAvailability = {};
   Map<String, dynamic> _hospitalResources = {};
@@ -46,7 +54,14 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
   ];
 
   final List<String> _bloodGroups = [
-    'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-',
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'AB+',
+    'AB-',
+    'O+',
+    'O-',
   ];
 
   final Map<String, String> _resourceTypeMap = {
@@ -80,12 +95,19 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
 
   String? _resourceLabel(String? value) {
     switch (value?.toLowerCase()) {
-      case 'blood': return 'Blood';
-      case 'icu_beds': return 'ICU Bed';
-      case 'oxygen_beds': return 'Oxygen Supported Bed';
-      case 'ventilators': return 'Ventilator';
-      case 'beds': case 'general_bed': return 'General Bed';
-      default: return null;
+      case 'blood':
+        return 'Blood';
+      case 'icu_beds':
+        return 'ICU Bed';
+      case 'oxygen_beds':
+        return 'Oxygen Supported Bed';
+      case 'ventilators':
+        return 'Ventilator';
+      case 'beds':
+      case 'general_bed':
+        return 'General Bed';
+      default:
+        return null;
     }
   }
 
@@ -113,8 +135,13 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
         setState(() {
           _hospitals = List<Map<String, dynamic>>.from(response['data']);
           if (_hospitals.isNotEmpty) {
-            final selected = _hospitals.where((hospital) => hospital['id'].toString() == _selectedHospitalId).cast<Map<String, dynamic>>().toList();
-            final hospital = selected.isNotEmpty ? selected.first : _hospitals.first;
+            final selected = _hospitals
+                .where((hospital) =>
+                    hospital['id'].toString() == _selectedHospitalId)
+                .cast<Map<String, dynamic>>()
+                .toList();
+            final hospital =
+                selected.isNotEmpty ? selected.first : _hospitals.first;
             _selectedHospitalId = hospital['id'].toString();
             _hospitalAddress = hospital['address'] ?? '';
             _loadHospitalResources(hospital['id']);
@@ -134,19 +161,20 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
 
   Future<void> _loadHospitalResources(dynamic hospitalId) async {
     if (hospitalId == null) return;
-    
+
     setState(() {
       _isLoadingResources = true;
       _resourceError = null;
     });
-    
+
     try {
       final hospitalIdInt = int.parse(hospitalId.toString());
-      
+
       debugPrint('Loading resources for hospital: $hospitalIdInt');
-      
+
       // Load blood availability
-      final bloodResponse = await ApiService.getBloodAvailability(hospitalIdInt);
+      final bloodResponse =
+          await ApiService.getBloodAvailability(hospitalIdInt);
       if (!mounted) return;
       if (bloodResponse['success'] && bloodResponse['data'] != null) {
         final Map<String, Map<String, dynamic>> availability = {
@@ -170,10 +198,10 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
       }
 
       // Load hospital resources
-      final hospitalResponse = await ApiService.getHospitalResources(hospitalIdInt);
+      final hospitalResponse =
+          await ApiService.getHospitalResources(hospitalIdInt);
       if (!mounted) return;
-      debugPrint('Hospital resources response: $hospitalResponse');
-      
+
       if (hospitalResponse['success'] && hospitalResponse['data'] != null) {
         final data = hospitalResponse['data'];
         setState(() {
@@ -183,13 +211,16 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
             'ventilators': data['ventilators_available'] ?? 0,
             // The public resource endpoint uses oxygen_beds_available while
             // older hospital endpoints use oxygen_supported_beds_available.
-            'oxygen_beds': data['oxygen_beds_available'] ?? data['oxygen_supported_beds_available'] ?? 0,
+            'oxygen_beds': data['oxygen_beds_available'] ??
+                data['oxygen_supported_beds_available'] ??
+                0,
           };
         });
         debugPrint('Hospital resources set: $_hospitalResources');
       } else {
         setState(() {
-          _resourceError = hospitalResponse['message'] ?? 'Failed to load resources';
+          _resourceError =
+              hospitalResponse['message'] ?? 'Failed to load resources';
         });
       }
     } catch (e) {
@@ -203,7 +234,6 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
       }
     }
   }
-
 
   bool _isBloodAvailable(String bloodGroup) {
     final stock = _bloodAvailability[bloodGroup];
@@ -246,7 +276,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.error, color: Colors.red),
+            Icon(Icons.error, color: AppColors.error),
             SizedBox(width: 8),
             Text('âŒ Error'),
           ],
@@ -271,7 +301,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.green),
+            Icon(Icons.check_circle, color: AppColors.success),
             SizedBox(width: 8),
             Text('âœ… Request Submitted'),
           ],
@@ -285,12 +315,12 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text(
                 'ðŸ“‹ The hospital will review your request and respond shortly. You can track the status in your bookings.',
-                style: TextStyle(fontSize: 12, color: Colors.blue),
+                style: TextStyle(fontSize: 12, color: AppColors.primary),
               ),
             ),
           ],
@@ -310,21 +340,21 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0A4D68),
+              backgroundColor: const Color(0xFF142D4E),
             ),
             child: const Text('View My Requests'),
           ),
           TextButton(
             onPressed: () {
               // Close the dialog
-              Navigator.pop(context);
-              // Navigate back to home screen
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const PatientHomeScreen(),
-                ),
-              );
+              final navigator = Navigator.of(context);
+              navigator.pop();
+              // Return to the dashboard tab without importing PatientHomeScreen.
+              if (widget.onBackToDashboard != null) {
+                widget.onBackToDashboard!.call();
+              } else if (navigator.canPop()) {
+                navigator.pop();
+              }
             },
             child: const Text('Back to Dashboard'),
           ),
@@ -338,7 +368,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Request Resource'),
-        backgroundColor: const Color(0xFF0A4D68),
+        backgroundColor: const Color(0xFF142D4E),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -375,13 +405,14 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0A4D68),
+                                  color: Color(0xFF142D4E),
                                 ),
                               ),
                               const SizedBox(height: 8),
                               Row(
                                 children: [
-                                  const Icon(Icons.person, size: 16, color: Colors.grey),
+                                  const Icon(Icons.person,
+                                      size: 16, color: Colors.grey),
                                   const SizedBox(width: 8),
                                   Text('Name: $_patientName'),
                                 ],
@@ -389,7 +420,8 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                               const SizedBox(height: 4),
                               Row(
                                 children: [
-                                  const Icon(Icons.phone, size: 16, color: Colors.grey),
+                                  const Icon(Icons.phone,
+                                      size: 16, color: Colors.grey),
                                   const SizedBox(width: 8),
                                   Text('Phone: $_patientPhone'),
                                 ],
@@ -406,7 +438,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0A4D68),
+                          color: Color(0xFF142D4E),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -465,18 +497,20 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.red.shade50,
+                            color: AppColors.error.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.red.shade200),
+                            border: Border.all(
+                                color: AppColors.error.withValues(alpha: 0.1)),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.error, color: Colors.red),
+                              const Icon(Icons.error, color: AppColors.error),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   _resourceError!,
-                                  style: const TextStyle(color: Colors.red),
+                                  style:
+                                      const TextStyle(color: AppColors.error),
                                 ),
                               ),
                             ],
@@ -491,7 +525,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0A4D68),
+                          color: Color(0xFF142D4E),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -507,20 +541,21 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                             isExpanded: true,
                             hint: const Text('Select Resource Type'),
                             items: _resourceTypes.map((type) {
-                              final available = type == 'Blood' 
-                                  ? null 
+                              final available = type == 'Blood'
+                                  ? null
                                   : _getResourceAvailability(type);
                               final isAvailable = type == 'Blood'
                                   ? true
                                   : _isResourceAvailable(type);
-                              
+
                               return DropdownMenuItem(
                                 value: type,
                                 child: Row(
                                   children: [
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(type),
                                           if (type != 'Blood')
@@ -528,9 +563,9 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                                               '$available units available',
                                               style: TextStyle(
                                                 fontSize: 12,
-                                                color: isAvailable 
-                                                    ? Colors.green 
-                                                    : Colors.red,
+                                                color: isAvailable
+                                                    ? AppColors.success
+                                                    : AppColors.error,
                                               ),
                                             ),
                                         ],
@@ -539,7 +574,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                                     if (type != 'Blood' && !isAvailable)
                                       const Icon(
                                         Icons.warning,
-                                        color: Colors.red,
+                                        color: AppColors.error,
                                         size: 16,
                                       ),
                                   ],
@@ -566,7 +601,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0A4D68),
+                            color: Color(0xFF142D4E),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -590,16 +625,17 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                                     children: [
                                       Expanded(
                                         child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
                                             Text(
                                               group,
                                               style: TextStyle(
-                                                color: isAvailable 
-                                                    ? Colors.black 
-                                                    : Colors.red,
-                                                fontWeight: isAvailable 
-                                                    ? FontWeight.normal 
+                                                color: isAvailable
+                                                    ? Colors.black
+                                                    : AppColors.error,
+                                                fontWeight: isAvailable
+                                                    ? FontWeight.normal
                                                     : FontWeight.bold,
                                               ),
                                             ),
@@ -607,9 +643,9 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                                               '$units units available',
                                               style: TextStyle(
                                                 fontSize: 12,
-                                                color: isAvailable 
-                                                    ? Colors.green 
-                                                    : Colors.red,
+                                                color: isAvailable
+                                                    ? AppColors.success
+                                                    : AppColors.error,
                                               ),
                                             ),
                                           ],
@@ -618,7 +654,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                                       if (!isAvailable)
                                         const Icon(
                                           Icons.warning,
-                                          color: Colors.red,
+                                          color: AppColors.error,
                                           size: 16,
                                         ),
                                     ],
@@ -633,7 +669,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                             ),
                           ),
                         ),
-                        
+
                         // Show availability message
                         if (_selectedBloodGroup != null) ...[
                           const SizedBox(height: 8),
@@ -641,13 +677,13 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: _isBloodAvailable(_selectedBloodGroup!)
-                                  ? Colors.green.shade50
-                                  : Colors.red.shade50,
+                                  ? AppColors.success.withValues(alpha: 0.1)
+                                  : AppColors.error.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color: _isBloodAvailable(_selectedBloodGroup!)
-                                    ? Colors.green.shade200
-                                    : Colors.red.shade200,
+                                    ? AppColors.success.withValues(alpha: 0.1)
+                                    : AppColors.error.withValues(alpha: 0.1),
                               ),
                             ),
                             child: Row(
@@ -657,8 +693,8 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                                       ? Icons.check_circle
                                       : Icons.warning,
                                   color: _isBloodAvailable(_selectedBloodGroup!)
-                                      ? Colors.green
-                                      : Colors.red,
+                                      ? AppColors.success
+                                      : AppColors.error,
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
@@ -667,10 +703,12 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                                         ? 'âœ… Blood is available. Units: ${_getBloodUnits(_selectedBloodGroup!)}'
                                         : 'âš ï¸ Blood group unavailable or insufficient stock. Available: ${_getBloodUnits(_selectedBloodGroup!)} units',
                                     style: TextStyle(
-                                      color: _isBloodAvailable(_selectedBloodGroup!)
-                                          ? Colors.green.shade700
-                                          : Colors.red.shade700,
-                                      fontWeight: _isBloodAvailable(_selectedBloodGroup!)
+                                      color: _isBloodAvailable(
+                                              _selectedBloodGroup!)
+                                          ? AppColors.success
+                                          : AppColors.error,
+                                      fontWeight: _isBloodAvailable(
+                                              _selectedBloodGroup!)
                                           ? FontWeight.normal
                                           : FontWeight.bold,
                                     ),
@@ -684,19 +722,21 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                       ],
 
                       // Resource availability warning for non-blood resources
-                      if (_selectedResourceType != null && 
+                      if (_selectedResourceType != null &&
                           _selectedResourceType != 'Blood') ...[
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: _isResourceAvailable(_selectedResourceType!)
-                                ? Colors.green.shade50
-                                : Colors.orange.shade50,
+                                ? AppColors.success.withValues(alpha: 0.1)
+                                : AppColors.warning.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: _isResourceAvailable(_selectedResourceType!)
-                                  ? Colors.green.shade200
-                                  : Colors.orange.shade200,
+                              color:
+                                  _isResourceAvailable(_selectedResourceType!)
+                                      ? AppColors.success.withValues(alpha: 0.1)
+                                      : AppColors.warning
+                                          .withValues(alpha: 0.1),
                             ),
                           ),
                           child: Row(
@@ -705,9 +745,10 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                                 _isResourceAvailable(_selectedResourceType!)
                                     ? Icons.check_circle
                                     : Icons.warning,
-                                color: _isResourceAvailable(_selectedResourceType!)
-                                    ? Colors.green
-                                    : Colors.orange,
+                                color:
+                                    _isResourceAvailable(_selectedResourceType!)
+                                        ? AppColors.success
+                                        : AppColors.warning,
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -716,10 +757,12 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                                       ? 'âœ… Resource is available. Units: ${_getResourceAvailability(_selectedResourceType!)}'
                                       : 'âš ï¸ Resource unavailable or insufficient stock. Available: ${_getResourceAvailability(_selectedResourceType!)} units',
                                   style: TextStyle(
-                                    color: _isResourceAvailable(_selectedResourceType!)
-                                        ? Colors.green.shade700
-                                        : Colors.orange.shade700,
-                                    fontWeight: _isResourceAvailable(_selectedResourceType!)
+                                    color: _isResourceAvailable(
+                                            _selectedResourceType!)
+                                        ? AppColors.success
+                                        : AppColors.warning,
+                                    fontWeight: _isResourceAvailable(
+                                            _selectedResourceType!)
                                         ? FontWeight.normal
                                         : FontWeight.bold,
                                   ),
@@ -737,7 +780,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0A4D68),
+                          color: Color(0xFF142D4E),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -759,7 +802,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0A4D68),
+                            color: Color(0xFF142D4E),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -767,7 +810,8 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                           maxLines: 3,
                           decoration: const InputDecoration(
                             border: OutlineInputBorder(),
-                            hintText: 'Describe the reason for request (e.g., emergency surgery, patient admission)',
+                            hintText:
+                                'Describe the reason for request (e.g., emergency surgery, patient admission)',
                             prefixIcon: Icon(Icons.description),
                           ),
                           onChanged: (value) => _description = value,
@@ -781,12 +825,13 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0A4D68),
+                          color: Color(0xFF142D4E),
                         ),
                       ),
                       const SizedBox(height: 8),
                       TextField(
-                        controller: TextEditingController(text: _hospitalAddress),
+                        controller:
+                            TextEditingController(text: _hospitalAddress),
                         decoration: const InputDecoration(
                           border: OutlineInputBorder(),
                           hintText: 'Hospital address',
@@ -803,7 +848,7 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
                         child: ElevatedButton(
                           onPressed: _isSubmitting ? null : _submitRequest,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A4D68),
+                            backgroundColor: const Color(0xFF142D4E),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
@@ -849,11 +894,9 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
     if (_selectedResourceType != 'Blood') {
       final available = _getResourceAvailability(_selectedResourceType!);
       if (available < requiredUnits) {
-        _showErrorDialog(
-          'Insufficient resources available.\n'
-          'Available: $available units\n'
-          'Requested: $requiredUnits units'
-        );
+        _showErrorDialog('Insufficient resources available.\n'
+            'Available: $available units\n'
+            'Requested: $requiredUnits units');
         return;
       }
     }
@@ -864,13 +907,11 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
         _showErrorDialog('Please select blood group');
         return;
       }
-      
+
       if (!_isBloodAvailable(_selectedBloodGroup!)) {
-        _showErrorDialog(
-          'Blood group unavailable.\n'
-          'Available: ${_getBloodUnits(_selectedBloodGroup!)} units\n'
-          'Requested: $requiredUnits units'
-        );
+        _showErrorDialog('Blood group unavailable.\n'
+            'Available: ${_getBloodUnits(_selectedBloodGroup!)} units\n'
+            'Requested: $requiredUnits units');
         return;
       }
     }
@@ -899,7 +940,8 @@ class _PatientResourceRequestState extends State<PatientResourceRequest> {
       } else {
         requestData = {
           'hospital_id': int.parse(_selectedHospitalId!),
-          'resource_type': _resourceTypeMap[_selectedResourceType] ?? 'general_bed',
+          'resource_type':
+              _resourceTypeMap[_selectedResourceType] ?? 'general_bed',
           'quantity': requiredUnits,
           'description': _description,
           'patient_name': _patientName,

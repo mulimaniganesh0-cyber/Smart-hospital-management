@@ -20,8 +20,9 @@ class ChatBubble extends StatelessWidget {
           if (!message.isUser)
             const CircleAvatar(
               radius: 16,
-              backgroundColor: Color(0xFF0A4D68),
-              child: Icon(Icons.medical_information, size: 18, color: Colors.white),
+              backgroundColor: Color(0xFF142D4E),
+              child: Icon(Icons.medical_information,
+                  size: 18, color: Colors.white),
             ),
           if (!message.isUser) const SizedBox(width: 8),
           Flexible(
@@ -29,7 +30,7 @@ class ChatBubble extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: message.isUser
-                    ? const Color(0xFF0A4D68)
+                    ? const Color(0xFF142D4E)
                     : Colors.grey.shade200,
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(message.isUser ? 12 : 0),
@@ -79,7 +80,7 @@ class ChatBubble extends StatelessWidget {
           if (message.isUser)
             const CircleAvatar(
               radius: 16,
-              backgroundColor: Color(0xFF088395),
+              backgroundColor: Color(0xFF0D9488),
               child: Icon(Icons.person, size: 18, color: Colors.white),
             ),
         ],
@@ -97,7 +98,8 @@ class _TypingDot extends StatefulWidget {
   State<_TypingDot> createState() => _TypingDotState();
 }
 
-class _TypingDotState extends State<_TypingDot> with SingleTickerProviderStateMixin {
+class _TypingDotState extends State<_TypingDot>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
 
@@ -108,11 +110,11 @@ class _TypingDotState extends State<_TypingDot> with SingleTickerProviderStateMi
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
-    
+
     _animation = Tween<double>(begin: 0.0, end: 0.8).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
-    
+
     Future.delayed(widget.delay, () {
       if (mounted) {
         _controller.repeat(reverse: true);

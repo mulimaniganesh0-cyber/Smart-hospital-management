@@ -1,11 +1,13 @@
 // lib/screens/admin/admin_home_screen.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:hospital_resource_management/screens/admin/admin_campaign_verification.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
 import '../login_screen.dart';
 import 'hospital_verification.dart';
+import 'private_driver_verification.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/notification_center.dart';
 
@@ -24,8 +26,27 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     const AdminHospitalsList(),
     const HospitalVerificationScreen(),
     const AdminCampaignVerification(),
+    const PrivateDriverVerificationScreen(),
     const AdminProfile(),
   ];
+
+  Future<void> _showMoreMobileSections() async {
+    final selected = await showModalBottomSheet<int>(
+        context: context,
+        showDragHandle: true,
+        builder: (sheetContext) => SafeArea(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+              ListTile(
+                  leading: const Icon(Icons.local_taxi_outlined),
+                  title: const Text('Driver approvals'),
+                  onTap: () => Navigator.pop(sheetContext, 4)),
+              ListTile(
+                  leading: const Icon(Icons.admin_panel_settings_outlined),
+                  title: const Text('Admin profile'),
+                  onTap: () => Navigator.pop(sheetContext, 5)),
+            ])));
+    if (selected != null && mounted) setState(() => _selectedIndex = selected);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +68,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           selectedIcon: Icon(Icons.campaign),
           label: Text('Campaigns')),
       NavigationRailDestination(
+          icon: Icon(Icons.local_taxi_outlined),
+          selectedIcon: Icon(Icons.local_taxi),
+          label: Text('Drivers')),
+      NavigationRailDestination(
           icon: Icon(Icons.admin_panel_settings_outlined),
           selectedIcon: Icon(Icons.admin_panel_settings),
           label: Text('Profile')),
@@ -60,7 +85,10 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   selectedIndex: _selectedIndex,
                   onDestinationSelected: (index) =>
                       setState(() => _selectedIndex = index),
-                  labelType: NavigationRailLabelType.all,
+                  extended: constraints.maxWidth >= 1300,
+                  labelType: constraints.maxWidth >= 1300
+                      ? NavigationRailLabelType.none
+                      : NavigationRailLabelType.all,
                   leading: const Padding(
                       padding: EdgeInsets.fromLTRB(8, 18, 8, 20),
                       child: Column(children: [
@@ -79,38 +107,25 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         bottomNavigationBar: desktop
             ? null
             : NavigationBar(
-                selectedIndex: _selectedIndex,
+                selectedIndex: _selectedIndex <= 3 ? _selectedIndex : 4,
                 onDestinationSelected: (index) {
-                  setState(() {
-                    _selectedIndex = index;
-                  });
+                  if (index == 4) {
+                    _showMoreMobileSections();
+                  } else {
+                    setState(() => _selectedIndex = index);
+                  }
                 },
                 destinations: const [
                   NavigationDestination(
-                    icon: Icon(Icons.dashboard_outlined),
-                    selectedIcon: Icon(Icons.dashboard),
-                    label: 'Dashboard',
-                  ),
+                      icon: Icon(Icons.dashboard_outlined), label: 'Home'),
                   NavigationDestination(
-                    icon: Icon(Icons.local_hospital_outlined),
-                    selectedIcon: Icon(Icons.local_hospital),
-                    label: 'Hospitals',
-                  ),
+                      icon: Icon(Icons.local_hospital_outlined),
+                      label: 'Hospitals'),
                   NavigationDestination(
-                    icon: Icon(Icons.verified_outlined),
-                    selectedIcon: Icon(Icons.verified),
-                    label: 'Verification',
-                  ),
+                      icon: Icon(Icons.verified_outlined), label: 'Approvals'),
                   NavigationDestination(
-                    icon: Icon(Icons.campaign_outlined),
-                    selectedIcon: Icon(Icons.campaign),
-                    label: 'Camps',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.admin_panel_settings_outlined),
-                    selectedIcon: Icon(Icons.admin_panel_settings),
-                    label: 'Profile',
-                  ),
+                      icon: Icon(Icons.campaign_outlined), label: 'Camps'),
+                  NavigationDestination(icon: Icon(Icons.menu), label: 'More'),
                 ],
               ),
       );
@@ -179,6 +194,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
         });
       }
     }
+  }
+
+  void _openSection(int index) {
+    context.findAncestorStateOfType<_AdminHomeScreenState>()?.setState(() {
+      context.findAncestorStateOfType<_AdminHomeScreenState>()!._selectedIndex =
+          index;
+    });
   }
 
   @override
@@ -256,7 +278,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                       constraints.maxWidth >= 900 ? 4 : 2,
                                   mainAxisSpacing: 16,
                                   crossAxisSpacing: 16,
-                                  childAspectRatio: 1.2,
+                                  childAspectRatio:
+                                      constraints.maxWidth >= 900 ? 1.4 : 0.75,
                                   children: [
                                     AdminMetricCard(
                                       title: 'Total Hospitals',
@@ -264,7 +287,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                               ?.toString() ??
                                           '0',
                                       icon: Icons.local_hospital,
-                                      color: Colors.blue,
+                                      color: AppColors.primary,
                                       change:
                                           '+${_stats['new_hospitals'] ?? 0}',
                                     ),
@@ -274,7 +297,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                               ?.toString() ??
                                           '0',
                                       icon: Icons.pending,
-                                      color: Colors.orange,
+                                      color: AppColors.warning,
                                       change: '',
                                     ),
                                     AdminMetricCard(
@@ -283,7 +306,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                           _stats['total_users']?.toString() ??
                                               '0',
                                       icon: Icons.people,
-                                      color: Colors.green,
+                                      color: AppColors.success,
                                       change: '+${_stats['new_users'] ?? 0}',
                                     ),
                                     AdminMetricCard(
@@ -292,13 +315,113 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                               ?.toString() ??
                                           '0',
                                       icon: Icons.emergency,
-                                      color: Colors.red,
+                                      color: AppColors.error,
                                       change:
                                           '+${_stats['new_emergencies'] ?? 0}',
                                     ),
                                   ],
                                 )),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 20),
+                        LayoutBuilder(builder: (context, constraints) {
+                          final wide = constraints.maxWidth >= 760;
+                          final total = int.tryParse(
+                                  '${_stats['total_hospitals'] ?? 0}') ??
+                              0;
+                          final pending = int.tryParse(
+                                  '${_stats['pending_verification'] ?? 0}') ??
+                              0;
+                          final emergencies = int.tryParse(
+                                  '${_stats['active_emergencies'] ?? 0}') ??
+                              0;
+                          final analytics = Card(
+                              child: Padding(
+                                  padding: const EdgeInsets.all(18),
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Approval pipeline',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleMedium
+                                                ?.copyWith(
+                                                    fontWeight:
+                                                        FontWeight.w700)),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                            '$pending of $total hospitals awaiting review'),
+                                        const SizedBox(height: 10),
+                                        LinearProgressIndicator(
+                                            value: total == 0
+                                                ? 0
+                                                : (pending / total)
+                                                    .clamp(0.0, 1.0),
+                                            minHeight: 8,
+                                            borderRadius:
+                                                BorderRadius.circular(8)),
+                                        const SizedBox(height: 12),
+                                        Row(children: [
+                                          const Icon(Icons.emergency_outlined,
+                                              color: CareGuideColors.danger),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                                '$emergencies active emergency requests'),
+                                          )
+                                        ]),
+                                      ])));
+                          final shortcuts = Card(
+                              child: Padding(
+                                  padding: const EdgeInsets.all(18),
+                                  child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text('Management shortcuts',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleMedium
+                                                ?.copyWith(
+                                                    fontWeight:
+                                                        FontWeight.w700)),
+                                        const SizedBox(height: 8),
+                                        Wrap(
+                                            spacing: 8,
+                                            runSpacing: 8,
+                                            children: [
+                                              OutlinedButton.icon(
+                                                  onPressed: () =>
+                                                      _openSection(1),
+                                                  icon: const Icon(Icons
+                                                      .local_hospital_outlined),
+                                                  label:
+                                                      const Text('Hospitals')),
+                                              OutlinedButton.icon(
+                                                  onPressed: () =>
+                                                      _openSection(2),
+                                                  icon: const Icon(
+                                                      Icons.verified_outlined),
+                                                  label:
+                                                      const Text('Approvals')),
+                                              OutlinedButton.icon(
+                                                  onPressed: () =>
+                                                      _openSection(4),
+                                                  icon: const Icon(Icons
+                                                      .local_taxi_outlined),
+                                                  label: const Text('Drivers')),
+                                            ]),
+                                      ])));
+                          return wide
+                              ? Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                      Expanded(child: analytics),
+                                      const SizedBox(width: 14),
+                                      Expanded(child: shortcuts)
+                                    ])
+                              : Column(children: [analytics, shortcuts]);
+                        }),
+                        const SizedBox(height: 20),
                         const CareGuideSectionHeader(
                             title: 'Recent hospital registrations',
                             subtitle:
@@ -456,20 +579,20 @@ class AdminRecentHospitalCard extends StatelessWidget {
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
                       color: isVerified
-                          ? Colors.green.withValues(alpha: 0.1)
+                          ? AppColors.success.withValues(alpha: 0.1)
                           : isPending
-                              ? Colors.orange.withValues(alpha: 0.1)
-                              : Colors.red.withValues(alpha: 0.1),
+                              ? AppColors.warning.withValues(alpha: 0.1)
+                              : AppColors.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       status,
                       style: TextStyle(
                         color: isVerified
-                            ? Colors.green
+                            ? AppColors.success
                             : isPending
-                                ? Colors.orange
-                                : Colors.red,
+                                ? AppColors.warning
+                                : AppColors.error,
                         fontSize: 12,
                       ),
                     ),
@@ -607,7 +730,7 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.error_outline,
-                          size: 64, color: Colors.red),
+                          size: 64, color: AppColors.error),
                       const SizedBox(height: 16),
                       Text(_errorMessage!),
                       const SizedBox(height: 16),
@@ -727,13 +850,13 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: isVerified
-                          ? Colors.green.shade50
-                          : Colors.orange.shade50,
+                          ? AppColors.success.withValues(alpha: 0.1)
+                          : AppColors.warning.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(
                       isVerified ? Icons.verified : Icons.pending,
-                      color: isVerified ? Colors.green : Colors.orange,
+                      color: isVerified ? AppColors.success : AppColors.warning,
                       size: 24,
                     ),
                   ),
@@ -778,20 +901,20 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: status == 'verified'
-                          ? Colors.green.withValues(alpha: 0.1)
+                          ? AppColors.success.withValues(alpha: 0.1)
                           : status == 'pending'
-                              ? Colors.orange.withValues(alpha: 0.1)
-                              : Colors.red.withValues(alpha: 0.1),
+                              ? AppColors.warning.withValues(alpha: 0.1)
+                              : AppColors.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       status.toUpperCase(),
                       style: TextStyle(
                         color: status == 'verified'
-                            ? Colors.green
+                            ? AppColors.success
                             : status == 'pending'
-                                ? Colors.orange
-                                : Colors.red,
+                                ? AppColors.warning
+                                : AppColors.error,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
@@ -808,19 +931,19 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                       'Beds',
                       hospital['general_beds_available'] ?? 0,
                       hospital['general_beds_total'] ?? 0,
-                      Colors.blue),
+                      AppColors.primary),
                   _buildResourceChip('ICU', hospital['icu_beds_available'] ?? 0,
-                      hospital['icu_beds_total'] ?? 0, Colors.red),
+                      hospital['icu_beds_total'] ?? 0, AppColors.error),
                   _buildResourceChip(
                       'Ventilators',
                       hospital['ventilators_available'] ?? 0,
                       hospital['ventilators_total'] ?? 0,
-                      Colors.green),
+                      AppColors.success),
                   _buildResourceChip(
                       'Oxygen',
                       hospital['oxygen_beds_available'] ?? 0,
                       hospital['oxygen_beds_total'] ?? 0,
-                      Colors.purple),
+                      AppColors.secondary),
                   _buildBloodChip(hospital['blood_units'] ?? 0),
                 ],
               ),
@@ -839,12 +962,13 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.orange.shade50,
+                        color: AppColors.warning.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Text(
                         'No resources',
-                        style: TextStyle(fontSize: 10, color: Colors.orange),
+                        style:
+                            TextStyle(fontSize: 10, color: AppColors.warning),
                       ),
                     ),
                 ],
@@ -902,21 +1026,21 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
+        color: AppColors.error.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade200),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.1)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.water_drop, size: 12, color: Colors.red),
+          const Icon(Icons.water_drop, size: 12, color: AppColors.error),
           const SizedBox(width: 4),
           Text(
             '$units units',
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Colors.red,
+              color: AppColors.error,
             ),
           ),
         ],
@@ -1060,7 +1184,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.error_outline,
-                          size: 64, color: Colors.red),
+                          size: 64, color: AppColors.error),
                       const SizedBox(height: 16),
                       Text(_errorMessage!),
                       const SizedBox(height: 16),
@@ -1131,7 +1255,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                                         0,
                                 field: 'general_beds_total',
                                 availableField: 'general_beds_available',
-                                color: Colors.blue,
+                                color: AppColors.primary,
                                 onUpdate: _updateResource,
                               ),
                               const SizedBox(height: 12),
@@ -1142,7 +1266,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                                     _hospitalData?['icu_beds_available'] ?? 0,
                                 field: 'icu_beds_total',
                                 availableField: 'icu_beds_available',
-                                color: Colors.red,
+                                color: AppColors.error,
                                 onUpdate: _updateResource,
                               ),
                               const SizedBox(height: 12),
@@ -1154,7 +1278,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                                         0,
                                 field: 'ventilators_total',
                                 availableField: 'ventilators_available',
-                                color: Colors.green,
+                                color: AppColors.success,
                                 onUpdate: _updateResource,
                               ),
                               const SizedBox(height: 12),
@@ -1166,7 +1290,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                                         0,
                                 field: 'oxygen_beds_total',
                                 availableField: 'oxygen_beds_available',
-                                color: Colors.purple,
+                                color: AppColors.secondary,
                                 onUpdate: _updateResource,
                               ),
                             ],
@@ -1197,7 +1321,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                                     onPressed: () =>
                                         _showAddBloodDialog(context),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.purple,
+                                      backgroundColor: AppColors.secondary,
                                       foregroundColor: Colors.white,
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 12, vertical: 8),
@@ -1250,13 +1374,17 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                                           horizontal: 12, vertical: 8),
                                       decoration: BoxDecoration(
                                         color: isLow
-                                            ? Colors.red.shade50
-                                            : Colors.green.shade50,
+                                            ? AppColors.error
+                                                .withValues(alpha: 0.1)
+                                            : AppColors.success
+                                                .withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
                                           color: isLow
-                                              ? Colors.red.shade200
-                                              : Colors.green.shade200,
+                                              ? AppColors.error
+                                                  .withValues(alpha: 0.1)
+                                              : AppColors.success
+                                                  .withValues(alpha: 0.1),
                                         ),
                                       ),
                                       child: Row(
@@ -1266,8 +1394,8 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                                             '${stock['blood_group']}: ${stock['units_available']} units',
                                             style: TextStyle(
                                               color: isLow
-                                                  ? Colors.red.shade700
-                                                  : Colors.green.shade700,
+                                                  ? AppColors.error
+                                                  : AppColors.success,
                                               fontWeight: FontWeight.w500,
                                             ),
                                           ),
@@ -1398,9 +1526,10 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
             children: [
               _buildStatItem('Total', total.toString(), Colors.grey),
               const SizedBox(width: 16),
-              _buildStatItem('Available', available.toString(), Colors.green),
+              _buildStatItem(
+                  'Available', available.toString(), AppColors.success),
               const SizedBox(width: 16),
-              _buildStatItem('Occupied', occupied.toString(), Colors.red),
+              _buildStatItem('Occupied', occupied.toString(), AppColors.error),
             ],
           ),
           const SizedBox(height: 8),
@@ -1418,7 +1547,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                       onUpdate,
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       minimumSize: const Size(0, 30),
@@ -1442,7 +1571,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                       onUpdate,
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: AppColors.success,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       minimumSize: const Size(0, 30),
@@ -1583,7 +1712,8 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                 _updateBloodStock(selectedGroup, units);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
             child: const Text('Add'),
           ),
         ],
@@ -1648,7 +1778,7 @@ class AdminProfile extends StatelessWidget {
           children: [
             const CircleAvatar(
               radius: 60,
-              backgroundColor: Color(0xFF0A4D68),
+              backgroundColor: Color(0xFF142D4E),
               child: Icon(Icons.admin_panel_settings,
                   size: 60, color: Colors.white),
             ),
@@ -1719,7 +1849,7 @@ class AdminProfile extends StatelessWidget {
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
+                backgroundColor: AppColors.error,
                 minimumSize: const Size(double.infinity, 50),
               ),
               child: const Text('Logout'),

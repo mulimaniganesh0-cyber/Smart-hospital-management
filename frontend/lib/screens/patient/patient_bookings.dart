@@ -1,5 +1,6 @@
 // lib/screens/patient/patient_bookings.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import '../../providers/patient_provider.dart';
 import '../../services/api_service.dart';
@@ -34,9 +35,14 @@ class PatientBookings extends StatelessWidget {
                 ? CareGuideEmptyState(
                     icon: Icons.calendar_month_outlined,
                     title: 'No appointments yet',
-                    message: 'When you book a doctor visit, its details will appear here.',
+                    message:
+                        'When you book a doctor visit, its details will appear here.',
                     action: ElevatedButton.icon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const PatientNearbyHospitals())),
+                      onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  const PatientNearbyHospitals())),
                       icon: const Icon(Icons.local_hospital_outlined),
                       label: const Text('Find a hospital'),
                     ),
@@ -54,8 +60,10 @@ class PatientBookings extends StatelessWidget {
                         time: booking['appointment_time'] ?? '',
                         status: booking['status'] ?? 'Pending',
                         appointmentId: booking['id'] ?? index,
-                        onCancel: () => _showCancelDialog(context, booking['id'], patientProvider),
-                        onReschedule: () => _showRescheduleDialog(context, booking),
+                        onCancel: () => _showCancelDialog(
+                            context, booking['id'], patientProvider),
+                        onReschedule: () =>
+                            _showRescheduleDialog(context, booking),
                       );
                     },
                   )),
@@ -63,17 +71,18 @@ class PatientBookings extends StatelessWidget {
     );
     // lib/screens/patient/patient_bookings.dart
 // Add this to the widget class
-
   }
 
-  void _showCancelDialog(BuildContext context, int? appointmentId, PatientProvider provider) {
+  void _showCancelDialog(
+      BuildContext context, int? appointmentId, PatientProvider provider) {
     if (appointmentId == null) return;
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Cancel Appointment'),
-        content: const Text('Are you sure you want to cancel this appointment?'),
+        content:
+            const Text('Are you sure you want to cancel this appointment?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -85,7 +94,8 @@ class PatientBookings extends StatelessWidget {
               final success = await provider.cancelBooking(appointmentId);
               if (success && context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Appointment cancelled successfully')),
+                  const SnackBar(
+                      content: Text('Appointment cancelled successfully')),
                 );
               } else if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -100,29 +110,65 @@ class PatientBookings extends StatelessWidget {
     );
   }
 
-  Future<void> _showRescheduleDialog(BuildContext context, Map<String, dynamic> booking) async {
+  Future<void> _showRescheduleDialog(
+      BuildContext context, Map<String, dynamic> booking) async {
     final rawId = booking['id'];
     final appointmentId = rawId is num ? rawId.toInt() : int.tryParse('$rawId');
     if (appointmentId == null) return;
-    final initial = DateTime.tryParse('${booking['appointment_date']}') ?? DateTime.now().add(const Duration(days: 1));
-    final date = await showDatePicker(context: context, initialDate: initial.isAfter(DateTime.now()) ? initial : DateTime.now().add(const Duration(days: 1)), firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
+    final initial = DateTime.tryParse('${booking['appointment_date']}') ??
+        DateTime.now().add(const Duration(days: 1));
+    final date = await showDatePicker(
+        context: context,
+        initialDate: initial.isAfter(DateTime.now())
+            ? initial
+            : DateTime.now().add(const Duration(days: 1)),
+        firstDate: DateTime.now(),
+        lastDate: DateTime.now().add(const Duration(days: 365)));
     if (date == null || !context.mounted) return;
-    final formatted = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-    final slotResult = await ApiService.getAppointmentSlots(appointmentId, formatted);
+    final formatted =
+        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final slotResult =
+        await ApiService.getAppointmentSlots(appointmentId, formatted);
     if (!context.mounted) return;
-    final slots = slotResult['success'] == true ? List<Map<String, dynamic>>.from(slotResult['data'] ?? []) : <Map<String, dynamic>>[];
-    if (slots.isEmpty) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(slotResult['message'] ?? 'No available slots on this date'))); return; }
-    final selected = await showModalBottomSheet<String>(context: context, builder: (sheetContext) => SafeArea(child: ListView(
-      shrinkWrap: true,
-      children: [const ListTile(title: Text('Select an available time')), ...slots.map((slot) => ListTile(title: Text('${slot['time']}'), trailing: const Icon(Icons.chevron_right), onTap: () => Navigator.pop(sheetContext, '${slot['time']}')))],
-    )));
+    final slots = slotResult['success'] == true
+        ? List<Map<String, dynamic>>.from(slotResult['data'] ?? [])
+        : <Map<String, dynamic>>[];
+    if (slots.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+              slotResult['message'] ?? 'No available slots on this date')));
+      return;
+    }
+    final selected = await showModalBottomSheet<String>(
+        context: context,
+        builder: (sheetContext) => SafeArea(
+                child: ListView(
+              shrinkWrap: true,
+              children: [
+                const ListTile(title: Text('Select an available time')),
+                ...slots.map((slot) => ListTile(
+                    title: Text('${slot['time']}'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () =>
+                        Navigator.pop(sheetContext, '${slot['time']}')))
+              ],
+            )));
     if (selected == null || !context.mounted) return;
-    final result = await ApiService.rescheduleAppointment(appointmentId, formatted, selected);
+    final result = await ApiService.rescheduleAppointment(
+        appointmentId, formatted, selected);
     if (!context.mounted) return;
     if (result['success'] == true) {
-      await Provider.of<PatientProvider>(context, listen: false).loadPatientData();
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Appointment rescheduled')));
-    } else { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['message'] ?? 'Unable to reschedule appointment'))); }
+      await Provider.of<PatientProvider>(context, listen: false)
+          .loadPatientData();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Appointment rescheduled')));
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content:
+              Text(result['message'] ?? 'Unable to reschedule appointment')));
+    }
   }
 }
 
@@ -188,7 +234,9 @@ class BookingCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text('Dr. $doctorName', style: const TextStyle(color: CareGuideColors.ink, fontWeight: FontWeight.w600)),
+            Text('Dr. $doctorName',
+                style: const TextStyle(
+                    color: CareGuideColors.ink, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -201,7 +249,8 @@ class BookingCard extends StatelessWidget {
                 Text(time),
               ],
             ),
-            if (status.toLowerCase() == 'confirmed' || status.toLowerCase() == 'pending') ...[
+            if (status.toLowerCase() == 'confirmed' ||
+                status.toLowerCase() == 'pending') ...[
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -209,7 +258,7 @@ class BookingCard extends StatelessWidget {
                     child: OutlinedButton(
                       onPressed: onCancel,
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
+                        foregroundColor: AppColors.error,
                       ),
                       child: const Text('Cancel'),
                     ),
@@ -219,7 +268,7 @@ class BookingCard extends StatelessWidget {
                     child: ElevatedButton(
                       onPressed: onReschedule,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0A4D68),
+                        backgroundColor: const Color(0xFF142D4E),
                       ),
                       child: const Text('Reschedule'),
                     ),

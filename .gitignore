@@ -1,6 +1,7 @@
 .venv/
 node_modules/
 **/.env
+backend/private_uploads/
 **/keystore.properties
 *.jks
 *.keystore

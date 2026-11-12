@@ -1,14 +1,19 @@
 // lib/screens/patient/ambulance_booking.dart
 import 'dart:convert';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hospital_resource_management/providers/auth_provider.dart' show AuthProvider;
+import 'package:hospital_resource_management/theme/app_colors.dart';
+import 'package:hospital_resource_management/providers/auth_provider.dart'
+    show AuthProvider;
 import 'package:provider/provider.dart' show Provider;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../services/api_service.dart';
+import '../../services/location_service.dart';
 import '../../widgets/app_ui.dart';
+import '../../services/socket_service.dart';
 
 class AmbulanceBookingScreen extends StatefulWidget {
   const AmbulanceBookingScreen({super.key});
@@ -32,6 +37,10 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
   Position? _currentPosition;
   String _currentAddress = 'Fetching location...';
   bool _isLocationLoading = true;
+  bool _shareLiveLocation = true;
+  StreamSubscription<Position>? _bookingLocationSubscription;
+  int? _trackingBookingId;
+  DateTime _lastBookingLocationSent = DateTime.fromMillisecondsSinceEpoch(0);
 
   final List<String> _ambulanceTypes = [
     'All Types',
@@ -63,6 +72,57 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
     _selectedAmbulanceType = _ambulanceTypes.first;
     _selectedLocationType = 'live';
     _getCurrentLocation();
+    _listenToBookingStatus();
+  }
+
+  @override
+  void dispose() {
+    _bookingLocationSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _startBookingLocationSharing(int bookingId) async {
+    await _bookingLocationSubscription?.cancel();
+    _trackingBookingId = bookingId;
+    final socket = SocketService.instance;
+    await socket.connect();
+    socket.subscribeAssignment('booking', bookingId);
+    _bookingLocationSubscription = Geolocator.getPositionStream(
+            locationSettings: const LocationSettings(
+                accuracy: LocationAccuracy.high, distanceFilter: 20))
+        .listen((position) {
+      if (!LocationService.isUsablePosition(position)) return;
+      if (_trackingBookingId != bookingId ||
+          DateTime.now().difference(_lastBookingLocationSent) <
+              const Duration(seconds: 5)) {
+        return;
+      }
+      _lastBookingLocationSent = DateTime.now();
+      ApiService.updateBookingPatientLocation(
+          bookingId: bookingId,
+          latitude: position.latitude,
+          longitude: position.longitude,
+          accuracy: position.accuracy,
+          timestamp: position.timestamp);
+    }, onError: (Object error) {
+      debugPrint('Booking location sharing stopped: $error');
+    });
+  }
+
+  Future<void> _listenToBookingStatus() async {
+    final socket = SocketService.instance;
+    await socket.connect();
+    if (!mounted) return;
+    socket.onAmbulanceBookingLifecycle((event) {
+      if (!mounted || event is! Map) return;
+      final update = Map<String, dynamic>.from(event);
+      if (update['id'] == _trackingBookingId &&
+          ['completed', 'cancelled'].contains(update['status'])) {
+        _bookingLocationSubscription?.cancel();
+        _bookingLocationSubscription = null;
+        setState(() => _trackingBookingId = null);
+      }
+    });
   }
 
   Future<void> _getCurrentLocation() async {
@@ -90,11 +150,8 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
         return;
       }
 
-
       // Get current position
-      final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      final position = await LocationService.getFreshPatientLocation();
 
       if (mounted) {
         setState(() {
@@ -145,17 +202,19 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
   String _getPickupAddress() {
     switch (_selectedLocationType) {
       case 'live':
-        return _currentAddress;
+        return _currentPosition == null ? '' : _currentAddress;
       case 'home':
-        return _customAddress.isNotEmpty ? _customAddress : _currentAddress;
-      case 'work':
-        return _customAddress.isNotEmpty ? _customAddress : _currentAddress;
-      case 'custom':
         return _customAddress.isNotEmpty
             ? _customAddress
-            : 'Enter custom address';
+            : (_currentPosition == null ? '' : _currentAddress);
+      case 'work':
+        return _customAddress.isNotEmpty
+            ? _customAddress
+            : (_currentPosition == null ? '' : _currentAddress);
+      case 'custom':
+        return _customAddress.isNotEmpty ? _customAddress : '';
       default:
-        return _currentAddress;
+        return _currentPosition == null ? '' : _currentAddress;
     }
   }
 
@@ -188,12 +247,14 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
           _nearbyAmbulances =
               List<Map<String, dynamic>>.from(response['data'] ?? []);
         } else {
-          _errorMessage = 'Ambulance availability could not be loaded. Please try again.';
+          _errorMessage =
+              'Ambulance availability could not be loaded. Please try again.';
         }
       }
     } catch (e) {
       if (mounted) {
-        _errorMessage = 'Ambulance availability could not be loaded. Please try again.';
+        _errorMessage =
+            'Ambulance availability could not be loaded. Please try again.';
       }
     } finally {
       if (mounted) {
@@ -211,7 +272,7 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Ambulance care'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
@@ -244,13 +305,13 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.red.shade50,
+              color: AppColors.error.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.red.shade200),
+              border: Border.all(color: AppColors.error.withValues(alpha: 0.1)),
             ),
             child: const Row(
               children: [
-                Icon(Icons.emergency, color: Colors.red),
+                Icon(Icons.emergency, color: AppColors.error),
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -268,13 +329,13 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: _currentPosition != null
-                  ? Colors.blue.shade50
-                  : Colors.red.shade50,
+                  ? AppColors.primary.withValues(alpha: 0.1)
+                  : AppColors.error.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: _currentPosition != null
-                    ? Colors.blue.shade200
-                    : Colors.red.shade200,
+                    ? AppColors.primary.withValues(alpha: 0.1)
+                    : AppColors.error.withValues(alpha: 0.1),
               ),
             ),
             child: Row(
@@ -286,8 +347,8 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
                           ? Icons.location_on
                           : Icons.location_off),
                   color: _currentPosition != null
-                      ? Colors.blue.shade700
-                      : Colors.red.shade700,
+                      ? AppColors.primary
+                      : AppColors.error,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -302,7 +363,7 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
                           fontSize: 12,
                           color: _currentPosition != null
                               ? Colors.grey
-                              : Colors.red,
+                              : AppColors.error,
                         ),
                       ),
                       Text(
@@ -326,6 +387,16 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
             ),
           ),
           const SizedBox(height: 24),
+
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+                'Share live pickup location during this active booking'),
+            subtitle: const Text(
+                'The assigned driver and dispatch hospital receive updates until the booking ends. Turn this off to share only the pickup address and initial location.'),
+            value: _shareLiveLocation,
+            onChanged: (value) => setState(() => _shareLiveLocation = value),
+          ),
 
           // Ambulance Type Filter
           const Text(
@@ -463,11 +534,14 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: (_currentPosition == null || _isBooking)
+              onPressed: ((_currentPosition == null &&
+                          _selectedLocationType == 'live') ||
+                      _getPickupAddress().trim().isEmpty ||
+                      _isBooking)
                   ? null
                   : _bookAmbulance,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
+                backgroundColor: AppColors.error,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
               child: _isBooking
@@ -533,7 +607,7 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                const Icon(Icons.gps_fixed, size: 14, color: Colors.green),
+                const Icon(Icons.gps_fixed, size: 14, color: AppColors.success),
                 const SizedBox(width: 8),
                 Text(
                   'Showing ambulances near: ${_currentAddress.split(',').take(2).join(',')}',
@@ -550,14 +624,21 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
                       icon: Icons.local_taxi_outlined,
                       title: 'Ambulances are unavailable',
                       message: _errorMessage!,
-                      action: ElevatedButton.icon(onPressed: _getCurrentLocation, icon: const Icon(Icons.refresh), label: const Text('Try again')),
+                      action: ElevatedButton.icon(
+                          onPressed: _getCurrentLocation,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Try again')),
                     )
                   : _nearbyAmbulances.isEmpty
                       ? CareGuideEmptyState(
                           icon: Icons.local_taxi_outlined,
                           title: 'No ambulances nearby',
-                          message: 'Try refreshing your location or changing the service filter.',
-                          action: OutlinedButton.icon(onPressed: _getCurrentLocation, icon: const Icon(Icons.my_location), label: const Text('Refresh location')),
+                          message:
+                              'Try refreshing your location or changing the service filter.',
+                          action: OutlinedButton.icon(
+                              onPressed: _getCurrentLocation,
+                              icon: const Icon(Icons.my_location),
+                              label: const Text('Refresh location')),
                         )
                       : ListView.builder(
                           padding: const EdgeInsets.all(16),
@@ -584,14 +665,10 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
     double rating = 4.5;
     final dynamic ratingValue = ambulance['rating'];
     if (ratingValue != null) {
-      if (ratingValue is double) {
-        rating = ratingValue;
-      } else if (ratingValue is int) {
+      if (ratingValue is num) {
         rating = ratingValue.toDouble();
       } else if (ratingValue is String) {
         rating = double.tryParse(ratingValue) ?? 4.5;
-      } else if (ratingValue is num) {
-        rating = ratingValue.toDouble();
       }
     }
 
@@ -607,13 +684,14 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color:
-                        available ? Colors.green.shade50 : Colors.red.shade50,
+                    color: available
+                        ? AppColors.success.withValues(alpha: 0.1)
+                        : AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     isPrivate ? Icons.car_repair : Icons.local_hospital,
-                    color: available ? Colors.green : Colors.red,
+                    color: available ? AppColors.success : AppColors.error,
                     size: 30,
                   ),
                 ),
@@ -638,15 +716,17 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: isPrivate
-                                  ? Colors.purple.shade100
-                                  : Colors.blue.shade100,
+                                  ? AppColors.secondary.withValues(alpha: 0.1)
+                                  : AppColors.primary.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               isPrivate ? 'Private' : 'Hospital',
                               style: TextStyle(
                                 fontSize: 10,
-                                color: isPrivate ? Colors.purple : Colors.blue,
+                                color: isPrivate
+                                    ? AppColors.secondary
+                                    : AppColors.primary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -659,7 +739,8 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
                       Text(type, style: const TextStyle(fontSize: 12)),
                       Row(
                         children: [
-                          const Icon(Icons.star, size: 14, color: Colors.amber),
+                          const Icon(Icons.star,
+                              size: 14, color: AppColors.warning),
                           Text(' ${rating.toStringAsFixed(1)}'),
                           const SizedBox(width: 12),
                           const Icon(Icons.location_on, size: 14),
@@ -672,7 +753,11 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    CareGuideStatusBadge(label: available ? 'Available' : 'Busy', tone: available ? CareGuideStatusTone.success : CareGuideStatusTone.danger),
+                    CareGuideStatusBadge(
+                        label: available ? 'Available' : 'Busy',
+                        tone: available
+                            ? CareGuideStatusTone.success
+                            : CareGuideStatusTone.danger),
                     const SizedBox(height: 4),
                     Text(
                       'ETA: $eta',
@@ -693,7 +778,7 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
                     child: ElevatedButton(
                       onPressed: () => _bookSpecificAmbulance(ambulance),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
+                        backgroundColor: AppColors.error,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
                       child: const Text('Book Now'),
@@ -705,7 +790,7 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
               const SizedBox(height: 8),
               const Text(
                 'Currently unavailable. Please try another service.',
-                style: TextStyle(color: Colors.red, fontSize: 12),
+                style: TextStyle(color: AppColors.error, fontSize: 12),
               ),
             ],
           ],
@@ -715,13 +800,20 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
   }
 
   void _bookAmbulance() {
-    if (_currentPosition == null) {
+    if (_currentPosition == null && _selectedLocationType == 'live') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Location not available. Please enable GPS.'),
-          backgroundColor: Colors.red,
+          content: Text(
+              'GPS is unavailable. Select Custom address and enter the pickup address.'),
+          backgroundColor: AppColors.error,
         ),
       );
+      return;
+    }
+    if (_getPickupAddress().trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content:
+              Text('Enter a pickup address before requesting an ambulance.')));
       return;
     }
 
@@ -749,8 +841,10 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
 
       final bookingData = {
         'ambulance_type': _selectedAmbulanceType,
-        'pickup_lat': _currentPosition!.latitude,
-        'pickup_lng': _currentPosition!.longitude,
+        'pickup_lat': _currentPosition?.latitude,
+        'pickup_lng': _currentPosition?.longitude,
+        'pickup_accuracy': _currentPosition?.accuracy,
+        'share_live_location': _shareLiveLocation,
         'pickup_address': _getPickupAddress(),
         'patient_condition': _patientCondition,
         'special_requirements': _specialRequirements,
@@ -765,13 +859,17 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
         if (mounted) {
           setState(() => _isBooking = false);
           if (response['success']) {
+            final bookingId = (response['data']?['id'] as num?)?.toInt();
+            if (_shareLiveLocation && bookingId != null) {
+              _startBookingLocationSharing(bookingId);
+            }
             _showBookingConfirmation(response['tracking_id'] ??
                 'AMB-${DateTime.now().millisecondsSinceEpoch}');
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(response['message'] ?? 'Booking failed'),
-                backgroundColor: Colors.red,
+                backgroundColor: AppColors.error,
               ),
             );
           }
@@ -781,13 +879,20 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
   }
 
   void _bookSpecificAmbulance(Map<String, dynamic> ambulance) {
-    if (_currentPosition == null) {
+    if (_currentPosition == null && _selectedLocationType == 'live') {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Location not available. Please enable GPS.'),
-          backgroundColor: Colors.red,
+          content: Text(
+              'GPS is unavailable. Select Custom address and enter the pickup address.'),
+          backgroundColor: AppColors.error,
         ),
       );
+      return;
+    }
+    if (_getPickupAddress().trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content:
+              Text('Enter a pickup address before requesting an ambulance.')));
       return;
     }
 
@@ -809,8 +914,10 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
 
       final bookingData = {
         'ambulance_id': ambulance['id'],
-        'pickup_lat': _currentPosition!.latitude,
-        'pickup_lng': _currentPosition!.longitude,
+        'pickup_lat': _currentPosition?.latitude,
+        'pickup_lng': _currentPosition?.longitude,
+        'pickup_accuracy': _currentPosition?.accuracy,
+        'share_live_location': _shareLiveLocation,
         'pickup_address': _getPickupAddress(),
         'patient_condition': _patientCondition,
         'special_requirements': _specialRequirements,
@@ -825,6 +932,10 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
         if (mounted) {
           setState(() => _isBooking = false);
           if (response['success']) {
+            final bookingId = (response['data']?['id'] as num?)?.toInt();
+            if (_shareLiveLocation && bookingId != null) {
+              _startBookingLocationSharing(bookingId);
+            }
             _showBookingConfirmation(response['tracking_id'] ??
                 ambulance['id']?.toString() ??
                 'AMB-${DateTime.now().millisecondsSinceEpoch}');
@@ -832,7 +943,7 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(response['message'] ?? 'Booking failed'),
-                backgroundColor: Colors.red,
+                backgroundColor: AppColors.error,
               ),
             );
           }
@@ -855,9 +966,10 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: AppColors.success.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
+                border:
+                    Border.all(color: AppColors.success.withValues(alpha: 0.1)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -879,12 +991,12 @@ class _AmbulanceBookingScreenState extends State<AmbulanceBookingScreen> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: AppColors.warning.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.info_outline, size: 16, color: Colors.orange),
+                  Icon(Icons.info_outline, size: 16, color: AppColors.warning),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(

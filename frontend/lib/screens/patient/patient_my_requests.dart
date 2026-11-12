@@ -26,7 +26,7 @@ class _PatientMyRequestsState extends State<PatientMyRequests> {
       _isLoading = true;
       _errorMessage = null;
     });
-    
+
     try {
       final response = await ApiService.getMyResourceRequests();
       if (response['success'] == true) {
@@ -60,10 +60,17 @@ class _PatientMyRequestsState extends State<PatientMyRequests> {
                   icon: Icons.cloud_off_outlined,
                   title: 'Requests are unavailable',
                   message: _errorMessage!,
-                  action: ElevatedButton.icon(onPressed: _loadRequests, icon: const Icon(Icons.refresh), label: const Text('Try again')),
+                  action: ElevatedButton.icon(
+                      onPressed: _loadRequests,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Try again')),
                 )
               : _requests.isEmpty
-                  ? const CareGuideEmptyState(icon: Icons.assignment_outlined, title: 'No requests yet', message: 'Requests for beds, blood, and other resources will appear here.')
+                  ? const CareGuideEmptyState(
+                      icon: Icons.assignment_outlined,
+                      title: 'No requests yet',
+                      message:
+                          'Requests for beds, blood, and other resources will appear here.')
                   : CareGuidePage(
                       child: ListView.builder(
                       padding: const EdgeInsets.only(bottom: 24),
@@ -81,11 +88,11 @@ class _PatientMyRequestsState extends State<PatientMyRequests> {
     final resourceType = request['resource_type'] ?? 'Resource';
     final quantity = request['quantity'] ?? 1;
     final hospitalName = request['hospital_name'] ?? 'Hospital';
-    
+
     IconData statusIcon;
     String statusText;
     CareGuideStatusTone statusTone;
-    
+
     switch (status.toLowerCase()) {
       case 'fulfilled':
         statusIcon = Icons.check_circle;
@@ -128,7 +135,8 @@ class _PatientMyRequestsState extends State<PatientMyRequests> {
                     color: Theme.of(context).colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(statusIcon, color: Theme.of(context).colorScheme.primary, size: 20),
+                  child: Icon(statusIcon,
+                      color: Theme.of(context).colorScheme.primary, size: 20),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -142,30 +150,37 @@ class _PatientMyRequestsState extends State<PatientMyRequests> {
                           fontSize: 16,
                         ),
                       ),
-                      Text('$hospitalName • Quantity: $quantity', style: const TextStyle(fontSize: 12, color: CareGuideColors.muted)),
+                      Text('$hospitalName • Quantity: $quantity',
+                          style: const TextStyle(
+                              fontSize: 12, color: CareGuideColors.muted)),
                     ],
                   ),
                 ),
                 CareGuideStatusBadge(label: statusText, tone: statusTone),
               ],
             ),
-            if (request['description'] != null && request['description'].isNotEmpty) ...[
+            if (request['description'] != null &&
+                request['description'].isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
                 request['description'],
-                style: const TextStyle(fontSize: 12, color: CareGuideColors.muted),
+                style:
+                    const TextStyle(fontSize: 12, color: CareGuideColors.muted),
               ),
             ],
             const SizedBox(height: 4),
             Text(
               'Submitted ${_formatDate(request['created_at'])}',
-              style: const TextStyle(fontSize: 11, color: CareGuideColors.muted),
+              style:
+                  const TextStyle(fontSize: 11, color: CareGuideColors.muted),
             ),
-            if (status.toLowerCase() == 'fulfilled' && request['fulfilled_at'] != null) ...[
+            if (status.toLowerCase() == 'fulfilled' &&
+                request['fulfilled_at'] != null) ...[
               const SizedBox(height: 4),
               Text(
                 'Fulfilled ${_formatDate(request['fulfilled_at'])}',
-                style: const TextStyle(fontSize: 11, color: CareGuideColors.success),
+                style: const TextStyle(
+                    fontSize: 11, color: CareGuideColors.success),
               ),
             ],
           ],
@@ -180,7 +195,7 @@ class _PatientMyRequestsState extends State<PatientMyRequests> {
       final date = DateTime.parse(dateTime);
       final now = DateTime.now();
       final diff = now.difference(date);
-      
+
       if (diff.inDays > 7) {
         return '${date.day}/${date.month}/${date.year}';
       } else if (diff.inDays > 0) {

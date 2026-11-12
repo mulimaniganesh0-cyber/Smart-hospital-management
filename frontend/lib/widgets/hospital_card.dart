@@ -1,5 +1,6 @@
 // lib/widgets/hospital_card.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import '../models/hospital_model.dart';
 
 class HospitalCard extends StatelessWidget {
@@ -36,12 +37,17 @@ class HospitalCard extends StatelessWidget {
                     ),
                   ),
                   if (hospital.isVerified)
-                    const Icon(Icons.verified, color: Colors.green, size: 16),
+                    const Icon(Icons.verified,
+                        color: AppColors.success, size: 16),
                   const SizedBox(width: 4),
-                  if (hospital.ratingVerified && hospital.googleRating != null) ...[
-                    Text(hospital.googleRating!.toStringAsFixed(1), style: const TextStyle(fontWeight: FontWeight.w500)),
-                    const Icon(Icons.star, color: Colors.amber, size: 16),
-                    if (hospital.googleReviewCount != null) Text(' (${hospital.googleReviewCount})', style: const TextStyle(fontSize: 11)),
+                  if (hospital.ratingVerified &&
+                      hospital.googleRating != null) ...[
+                    Text(hospital.googleRating!.toStringAsFixed(1),
+                        style: const TextStyle(fontWeight: FontWeight.w500)),
+                    const Icon(Icons.star, color: AppColors.warning, size: 16),
+                    if (hospital.googleReviewCount != null)
+                      Text(' (${hospital.googleReviewCount})',
+                          style: const TextStyle(fontSize: 11)),
                   ],
                 ],
               ),
@@ -72,12 +78,12 @@ class HospitalCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.1),
+                        color: AppColors.error.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Text(
                         '24/7 Emergency',
-                        style: TextStyle(fontSize: 10, color: Colors.red),
+                        style: TextStyle(fontSize: 10, color: AppColors.error),
                       ),
                     ),
                   ],
@@ -104,7 +110,8 @@ class HospitalCard extends StatelessWidget {
               LinearProgressIndicator(
                 value: hospital.availableBeds / hospital.totalBeds,
                 backgroundColor: Colors.grey.shade200,
-                valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                valueColor:
+                    const AlwaysStoppedAnimation<Color>(AppColors.success),
                 minHeight: 4,
               ),
               const SizedBox(height: 4),

@@ -1,15 +1,18 @@
 // lib/screens/admin/hospital_verification.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import '../../services/api_service.dart';
 
 class HospitalVerificationScreen extends StatefulWidget {
   const HospitalVerificationScreen({super.key});
 
   @override
-  State<HospitalVerificationScreen> createState() => _HospitalVerificationScreenState();
+  State<HospitalVerificationScreen> createState() =>
+      _HospitalVerificationScreenState();
 }
 
-class _HospitalVerificationScreenState extends State<HospitalVerificationScreen> {
+class _HospitalVerificationScreenState
+    extends State<HospitalVerificationScreen> {
   String _filter = 'all';
   bool _isLoading = false;
   List<Map<String, dynamic>> _hospitals = [];
@@ -59,7 +62,7 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 28),
             SizedBox(width: 12),
             Text('Delete Hospital'),
           ],
@@ -76,9 +79,10 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: AppColors.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade200),
+                border:
+                    Border.all(color: AppColors.error.withValues(alpha: 0.1)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,15 +90,17 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
                   const Text(
                     ' This action cannot be undone!',
                     style: TextStyle(
-                      color: Colors.red,
+                      color: AppColors.error,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text('Hospital: ${hospital['name']}'),
                   Text('Email: ${hospital['email'] ?? 'N/A'}'),
-                  Text('Status: ${hospital['is_verified'] ? 'Verified' : 'Pending'}'),
-                  Text('Resources: ${hospital['general_beds_total'] ?? 0} beds, ${hospital['icu_beds_total'] ?? 0} ICU'),
+                  Text(
+                      'Status: ${hospital['is_verified'] ? 'Verified' : 'Pending'}'),
+                  Text(
+                      'Resources: ${hospital['general_beds_total'] ?? 0} beds, ${hospital['icu_beds_total'] ?? 0} ICU'),
                   if (hospital['phone'] != null)
                     Text('Phone: ${hospital['phone']}'),
                 ],
@@ -118,7 +124,7 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
               _deleteHospital(hospital);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.error,
               foregroundColor: Colors.white,
             ),
             child: const Text('Delete'),
@@ -147,7 +153,7 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
 
     try {
       final response = await ApiService.deleteHospital(hospital['id']);
-      
+
       // Close loading dialog
       if (!context.mounted) return;
       if (!context.mounted) return;
@@ -162,11 +168,11 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(' "${hospital['name']}" deleted successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
             duration: const Duration(seconds: 3),
           ),
         );
-        
+
         // Refresh the list
         await _loadHospitals();
       } else {
@@ -177,7 +183,7 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(response['message'] ?? 'Failed to delete hospital'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -192,7 +198,7 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
         ),
       );
     }
@@ -203,7 +209,7 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Hospital Management'),
-        backgroundColor: const Color(0xFF0A4D68),
+        backgroundColor: const Color(0xFF142D4E),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -232,20 +238,32 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
                     ),
                   ),
                 ),
-                
+
                 // Stats
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildStats('Total', _hospitals.length, Colors.blue),
-                      _buildStats('Verified', _hospitals.where((h) => h['is_verified'] == true).length, Colors.green),
-                      _buildStats('Pending', _hospitals.where((h) => h['is_verified'] == false).length, Colors.orange),
+                      _buildStats(
+                          'Total', _hospitals.length, AppColors.primary),
+                      _buildStats(
+                          'Verified',
+                          _hospitals
+                              .where((h) => h['is_verified'] == true)
+                              .length,
+                          AppColors.success),
+                      _buildStats(
+                          'Pending',
+                          _hospitals
+                              .where((h) => h['is_verified'] == false)
+                              .length,
+                          AppColors.warning),
                     ],
                   ),
                 ),
-                
+
                 // Hospital List
                 Expanded(
                   child: _filteredHospitals.isEmpty
@@ -253,7 +271,8 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.local_hospital, size: 64, color: Colors.grey),
+                              const Icon(Icons.local_hospital,
+                                  size: 64, color: Colors.grey),
                               const SizedBox(height: 16),
                               Text(
                                 'No ${_filter == 'all' ? '' : _filter} hospitals found',
@@ -298,7 +317,7 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
           _filter = value;
         });
       },
-      selectedColor: const Color(0xFF0A4D68).withValues(alpha: 0.2),
+      selectedColor: const Color(0xFF142D4E).withValues(alpha: 0.2),
       backgroundColor: Colors.grey.shade100,
     );
   }
@@ -337,13 +356,15 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
     final icu = hospital['icu_beds_total'] ?? 0;
     final icuAvailable = hospital['icu_beds_available'] ?? 0;
     final blood = hospital['blood_units'] ?? 0;
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: isVerified ? Colors.green.shade200 : Colors.orange.shade200,
+          color: isVerified
+              ? AppColors.success.withValues(alpha: 0.1)
+              : AppColors.warning.withValues(alpha: 0.1),
           width: 1,
         ),
       ),
@@ -358,12 +379,14 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isVerified ? Colors.green.shade50 : Colors.orange.shade50,
+                    color: isVerified
+                        ? AppColors.success.withValues(alpha: 0.1)
+                        : AppColors.warning.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     isVerified ? Icons.verified : Icons.pending,
-                    color: isVerified ? Colors.green : Colors.orange,
+                    color: isVerified ? AppColors.success : AppColors.warning,
                     size: 20,
                   ),
                 ),
@@ -381,21 +404,23 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
                       ),
                       Text(
                         hospital['email'] ?? 'No email',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
                   ),
                 ),
                 // Delete Button
                 IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  icon:
+                      const Icon(Icons.delete_outline, color: AppColors.error),
                   onPressed: () => _confirmDeleteHospital(hospital),
                   tooltip: 'Delete Hospital',
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            
+
             // Details
             Row(
               children: [
@@ -416,9 +441,9 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 8),
-            
+
             // Resources Quick View
             Container(
               padding: const EdgeInsets.all(8),
@@ -435,17 +460,20 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 8),
-            
+
             // Status and Date
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isVerified ? Colors.green.shade100 : Colors.orange.shade100,
+                    color: isVerified
+                        ? AppColors.success.withValues(alpha: 0.1)
+                        : AppColors.warning.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -453,7 +481,7 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: isVerified ? Colors.green.shade700 : Colors.orange.shade700,
+                      color: isVerified ? AppColors.success : AppColors.warning,
                     ),
                   ),
                 ),
@@ -463,18 +491,19 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 8),
-            
+
             // Action Buttons
             Row(
               children: [
                 if (!isVerified)
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () => _verifyHospital(hospital['id'], 'verified'),
+                      onPressed: () =>
+                          _verifyHospital(hospital['id'], 'verified'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
+                        backgroundColor: AppColors.success,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -532,7 +561,7 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(' Hospital verified successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
         await _loadHospitals();
@@ -543,7 +572,7 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(response['message'] ?? 'Verification failed'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -568,11 +597,16 @@ class _HospitalVerificationScreenState extends State<HospitalVerificationScreen>
               _buildDetailRow('Phone', hospital['phone'] ?? 'N/A'),
               _buildDetailRow('Address', hospital['address'] ?? 'N/A'),
               _buildDetailRow('City', hospital['city'] ?? 'N/A'),
-              _buildDetailRow('Status', hospital['is_verified'] ? ' Verified' : ' Pending'),
-              _buildDetailRow('Beds', '${hospital['general_beds_available'] ?? 0}/${hospital['general_beds_total'] ?? 0}'),
-              _buildDetailRow('ICU', '${hospital['icu_beds_available'] ?? 0}/${hospital['icu_beds_total'] ?? 0}'),
-              _buildDetailRow('Blood Units', (hospital['blood_units'] ?? 0).toString()),
-              _buildDetailRow('Registered', hospital['created_at']?.toString().split('T')[0] ?? 'N/A'),
+              _buildDetailRow(
+                  'Status', hospital['is_verified'] ? ' Verified' : ' Pending'),
+              _buildDetailRow('Beds',
+                  '${hospital['general_beds_available'] ?? 0}/${hospital['general_beds_total'] ?? 0}'),
+              _buildDetailRow('ICU',
+                  '${hospital['icu_beds_available'] ?? 0}/${hospital['icu_beds_total'] ?? 0}'),
+              _buildDetailRow(
+                  'Blood Units', (hospital['blood_units'] ?? 0).toString()),
+              _buildDetailRow('Registered',
+                  hospital['created_at']?.toString().split('T')[0] ?? 'N/A'),
             ],
           ),
         ),

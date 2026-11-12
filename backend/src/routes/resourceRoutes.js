@@ -9,8 +9,8 @@ console.log('🔹 Loading resource routes...');
 // ==================== RESOURCE REQUESTS ====================
 
 // Patient routes
-router.post('/request', protect, resourceController.requestResource);
-router.get('/my-requests', protect, resourceController.getMyResourceRequests);
+router.post('/request', protect, authorize('patient'), resourceController.requestResource);
+router.get('/my-requests', protect, authorize('patient'), resourceController.getMyResourceRequests);
 
 // Hospital routes
 router.get('/request/:requestId', protect, resourceController.getResourceRequestDetails);
@@ -28,8 +28,8 @@ router.get('/hospital/:hospital_id/resources', resourceController.getAvailableRe
 // ==================== BLOOD REQUESTS ====================
 
 // Patient blood routes
-router.post('/blood/request', protect, resourceController.requestBlood);
-router.get('/blood/my-requests', protect, resourceController.getMyBloodRequests);
+router.post('/blood/request', protect, authorize('patient'), resourceController.requestBlood);
+router.get('/blood/my-requests', protect, authorize('patient'), resourceController.getMyBloodRequests);
 
 // Hospital blood routes
 router.get('/blood/hospital/requests', protect, authorize('hospital'), resourceController.getHospitalBloodRequests);

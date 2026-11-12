@@ -22,31 +22,34 @@ class PatientProvider extends ChangeNotifier {
   // lib/providers/patient_provider.dart
 // Only update the loadPatientData method
 
-Future<void> loadPatientData() async {
-  // Don't reload if already loading
-  if (_isLoading) return;
-  
-  _isLoading = true;
-  _errorMessage = null;
-  notifyListeners();
+  Future<void> loadPatientData() async {
+    // Don't reload if already loading
+    if (_isLoading) return;
 
-  try {
-    final response = await ApiService.getPatientProfile();
-    if (response['success'] && response['data'] != null) {
-      _patientData = response['data'];
-      _bookings = List<Map<String, dynamic>>.from(_patientData?['bookings'] ?? []);
-      _medicalHistory = List<Map<String, dynamic>>.from(_patientData?['medical_history'] ?? []);
-    } else {
-      _errorMessage = response['message'] ?? 'Failed to load patient data';
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response = await ApiService.getPatientProfile();
+      if (response['success'] && response['data'] != null) {
+        _patientData = response['data'];
+        _bookings =
+            List<Map<String, dynamic>>.from(_patientData?['bookings'] ?? []);
+        _medicalHistory = List<Map<String, dynamic>>.from(
+            _patientData?['medical_history'] ?? []);
+      } else {
+        _errorMessage = response['message'] ?? 'Failed to load patient data';
+      }
+    } catch (e) {
+      _errorMessage = 'Network error: $e';
+      debugPrint('Error loading patient data: $e');
     }
-  } catch (e) {
-    _errorMessage = 'Network error: $e';
-    debugPrint('Error loading patient data: $e');
+
+    _isLoading = false;
+    notifyListeners();
   }
 
-  _isLoading = false;
-  notifyListeners();
-}
   Future<bool> updateProfile({
     String? name,
     String? phone,
@@ -61,10 +64,12 @@ Future<void> loadPatientData() async {
       if (name != null) updates['name'] = name;
       if (phone != null) updates['phone'] = phone;
       if (bloodGroup != null) updates['blood_group'] = bloodGroup;
-      if (emergencyContact != null) updates['emergency_contact'] = emergencyContact;
+      if (emergencyContact != null) {
+        updates['emergency_contact'] = emergencyContact;
+      }
 
       final response = await ApiService.updatePatientProfile(updates);
-      
+
       if (response['success'] == true) {
         await loadPatientData();
         return true;
@@ -79,15 +84,26 @@ Future<void> loadPatientData() async {
     }
   }
 
-  Future<String?> updateEmergencyContact({required String name, required String phone, String? relationship}) async {
+  Future<String?> updateEmergencyContact(
+      {required String name,
+      required String phone,
+      String? relationship}) async {
     _isLoading = true;
     notifyListeners();
     try {
-      final response = await ApiService.updateEmergencyContact({'name': name, 'phone': phone, 'relationship': relationship});
-      if (response['success'] == true) { await loadPatientData(); return null; }
+      final response = await ApiService.updateEmergencyContact(
+          {'name': name, 'phone': phone, 'relationship': relationship});
+      if (response['success'] == true) {
+        await loadPatientData();
+        return null;
+      }
       return response['message'] ?? 'Could not update emergency contact';
-    } catch (_) { return 'Could not update emergency contact'; }
-    finally { _isLoading = false; notifyListeners(); }
+    } catch (_) {
+      return 'Could not update emergency contact';
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<bool> addBooking(Map<String, dynamic> booking) async {
@@ -96,8 +112,7 @@ Future<void> loadPatientData() async {
 
     try {
       final response = await ApiService.createAppointment(booking);
-      debugPrint('Create appointment response: $response');
-      
+
       if (response['success'] == true) {
         await loadPatientData();
         return true;
@@ -118,7 +133,7 @@ Future<void> loadPatientData() async {
 
     try {
       final response = await ApiService.cancelAppointment(appointmentId);
-      
+
       if (response['success'] == true) {
         await loadPatientData();
         return true;
@@ -132,33 +147,34 @@ Future<void> loadPatientData() async {
       notifyListeners();
     }
   }
- // lib/providers/patient_provider.dart
+  // lib/providers/patient_provider.dart
 
 // Remove or comment out any incorrect updateBloodStock calls
 // If you need to update blood stock, use the correct signature:
-Future<bool> updateBloodStock(String bloodGroup, int units, String expiryDate) async {
-  try {
-    final response = await ApiService.updateBloodStock(
-      bloodGroup: bloodGroup,
-      units: units,
-      expiryDate: expiryDate,
-    );
-    return response['success'] == true;
-  } catch (e) {
-    return false;
-  }
-}
-
-Future<List<Map<String, dynamic>>> getResourceRequests() async {
-  try {
-    final response = await ApiService.getPatientResourceRequests();
-    if (response['success'] && response['data'] != null) {
-      return List<Map<String, dynamic>>.from(response['data']);
+  Future<bool> updateBloodStock(
+      String bloodGroup, int units, String expiryDate) async {
+    try {
+      final response = await ApiService.updateBloodStock(
+        bloodGroup: bloodGroup,
+        units: units,
+        expiryDate: expiryDate,
+      );
+      return response['success'] == true;
+    } catch (e) {
+      return false;
     }
-    return [];
-  } catch (e) {
-    debugPrint('Error getting resource requests: $e');
-    return [];
   }
-}
+
+  Future<List<Map<String, dynamic>>> getResourceRequests() async {
+    try {
+      final response = await ApiService.getPatientResourceRequests();
+      if (response['success'] && response['data'] != null) {
+        return List<Map<String, dynamic>>.from(response['data']);
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getting resource requests: $e');
+      return [];
+    }
+  }
 }

@@ -14,6 +14,33 @@ class ApiService {
 
   static String get socketUrl => AppConfig.socketUrl;
 
+  static String canonicalBloodGroup(String value) {
+    final compact =
+        value.trim().toUpperCase().replaceAll(RegExp(r'[\s._]'), '');
+    const bases = ['A', 'B', 'AB', 'O'];
+    for (final base in bases) {
+      if (!compact.startsWith(base)) continue;
+      final suffix = compact.substring(base.length);
+      if (['+', '+VE', 'PLUS', 'POS', 'POSITIVE'].contains(suffix)) {
+        return '$base+';
+      }
+      if (['-', '-VE', 'MINUS', 'NEG', 'NEGATIVE'].contains(suffix)) {
+        return '$base-';
+      }
+    }
+    return value.trim();
+  }
+
+  static Map<String, dynamic> _canonicalBloodPayload(
+      Map<String, dynamic> payload) {
+    final result = Map<String, dynamic>.from(payload);
+    if (result['blood_group'] is String) {
+      result['blood_group'] =
+          canonicalBloodGroup(result['blood_group'] as String);
+    }
+    return result;
+  }
+
   // A missing local backend otherwise lets the platform socket wait for a long
   // time before failing, which makes the sign-in button appear frozen.
   static const Duration _authenticationTimeout = Duration(seconds: 12);
@@ -40,69 +67,118 @@ class ApiService {
   // The app never calculates a token number locally.
   static Future<Map<String, dynamic>> getMyQueueTokens() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/queues/my-tokens'), headers: await _getHeaders());
+      final response = await http.get(Uri.parse('$baseUrl/queues/my-tokens'),
+          headers: await _getHeaders());
       return json.decode(response.body);
-    } catch (e) { return {'success': false, 'message': 'Network error: $e'}; }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
   }
 
-  static Future<Map<String, dynamic>> joinHospitalQueue(Map<String, dynamic> queue) async {
+  static Future<Map<String, dynamic>> joinHospitalQueue(
+      Map<String, dynamic> queue) async {
     try {
-      final created = await http.post(Uri.parse('$baseUrl/queues'), headers: await _getHeaders(), body: json.encode(queue));
+      final created = await http.post(Uri.parse('$baseUrl/queues'),
+          headers: await _getHeaders(), body: json.encode(queue));
       final data = json.decode(created.body) as Map<String, dynamic>;
       if (data['success'] != true) return data;
       final queueId = (data['data'] as Map<String, dynamic>)['id'];
-      final token = await http.post(Uri.parse('$baseUrl/queues/$queueId/tokens'), headers: await _getHeaders(), body: json.encode({'source': 'ONLINE'}));
+      final token = await http.post(
+          Uri.parse('$baseUrl/queues/$queueId/tokens'),
+          headers: await _getHeaders(),
+          body: json.encode({'source': 'ONLINE'}));
       return json.decode(token.body);
-    } catch (e) { return {'success': false, 'message': 'Network error: $e'}; }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
   }
 
-  static Future<Map<String, dynamic>> updateQueueToken(int tokenId, String status) async {
+  static Future<Map<String, dynamic>> updateQueueToken(
+      int tokenId, String status) async {
     try {
-      final response = await http.post(Uri.parse('$baseUrl/queues/tokens/$tokenId/transition'), headers: await _getHeaders(), body: json.encode({'status': status}));
+      final response = await http.post(
+          Uri.parse('$baseUrl/queues/tokens/$tokenId/transition'),
+          headers: await _getHeaders(),
+          body: json.encode({'status': status}));
       return json.decode(response.body);
-    } catch (e) { return {'success': false, 'message': 'Network error: $e'}; }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
   }
 
   static Future<Map<String, dynamic>> validateHospitalQr(String payload) async {
     try {
-      final response = await http.post(Uri.parse('$baseUrl/queues/validate-qr'), headers: await _getHeaders(), body: json.encode({'payload': payload}));
+      final response = await http.post(Uri.parse('$baseUrl/queues/validate-qr'),
+          headers: await _getHeaders(),
+          body: json.encode({'payload': payload}));
       return json.decode(response.body);
-    } catch (_) { return {'success': false, 'message': 'Unable to connect to the hospital server.'}; }
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Unable to connect to the hospital server.'
+      };
+    }
   }
 
-  static Future<Map<String, dynamic>> bookScannedQueueToken(int queueId, String qrPayload) async {
+  static Future<Map<String, dynamic>> bookScannedQueueToken(
+      int queueId, String qrPayload) async {
     try {
-      final response = await http.post(Uri.parse('$baseUrl/queues/$queueId/tokens'), headers: await _getHeaders(), body: json.encode({'source': 'QR', 'qr_payload': qrPayload}));
+      final response = await http.post(
+          Uri.parse('$baseUrl/queues/$queueId/tokens'),
+          headers: await _getHeaders(),
+          body: json.encode({'source': 'QR', 'qr_payload': qrPayload}));
       return json.decode(response.body);
-    } catch (_) { return {'success': false, 'message': 'Unable to connect to the hospital server.'}; }
+    } catch (_) {
+      return {
+        'success': false,
+        'message': 'Unable to connect to the hospital server.'
+      };
+    }
   }
 
   static Future<Map<String, dynamic>> getTodayHospitalQr() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/hospitals/daily-qr'), headers: await _getHeaders());
+      final response = await http.get(Uri.parse('$baseUrl/hospitals/daily-qr'),
+          headers: await _getHeaders());
       return json.decode(response.body);
-    } catch (e) { return {'success': false, 'message': 'Network error: $e'}; }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
   }
 
   static Future<Map<String, dynamic>> getHospitalQueues() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/queues/hospital/current'), headers: await _getHeaders());
+      final response = await http.get(
+          Uri.parse('$baseUrl/queues/hospital/current'),
+          headers: await _getHeaders());
       return json.decode(response.body);
-    } catch (e) { return {'success': false, 'message': 'Network error: $e'}; }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
   }
 
   static Future<Map<String, dynamic>> callNextQueueToken(int queueId) async {
     try {
-      final response = await http.post(Uri.parse('$baseUrl/queues/$queueId/call-next'), headers: await _getHeaders());
+      final response = await http.post(
+          Uri.parse('$baseUrl/queues/$queueId/call-next'),
+          headers: await _getHeaders());
       return json.decode(response.body);
-    } catch (e) { return {'success': false, 'message': 'Network error: $e'}; }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
   }
 
-  static Future<Map<String, dynamic>> queueStaffAction(int tokenId, String action) async {
+  static Future<Map<String, dynamic>> queueStaffAction(
+      int tokenId, String action) async {
     try {
-      final response = await http.post(Uri.parse('$baseUrl/queues/tokens/$tokenId/action'), headers: await _getHeaders(), body: json.encode({'action': action}));
+      final response = await http.post(
+          Uri.parse('$baseUrl/queues/tokens/$tokenId/action'),
+          headers: await _getHeaders(),
+          body: json.encode({'action': action}));
       return json.decode(response.body);
-    } catch (e) { return {'success': false, 'message': 'Network error: $e'}; }
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
   }
 
   // ==================== MEDICAL RECORDS ====================
@@ -147,7 +223,8 @@ class ApiService {
 
   static Future<Map<String, dynamic>> getHealthSummary() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/medical/health-summary'),
+      final response = await http.get(
+          Uri.parse('$baseUrl/medical/health-summary'),
           headers: await _getHeaders());
       return json.decode(response.body);
     } catch (e) {
@@ -208,7 +285,7 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> login(
-      String email, String password, String userType) async {
+      String email, String password) async {
     try {
       final response = await http
           .post(
@@ -217,7 +294,6 @@ class ApiService {
             body: json.encode({
               'email': email,
               'password': password,
-              'user_type': userType,
             }),
           )
           .timeout(_authenticationTimeout);
@@ -253,6 +329,184 @@ class ApiService {
         headers: await _getHeaders(),
       );
       return json.decode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  // ==================== DOCTOR PORTAL ====================
+  static Future<Map<String, dynamic>> getDoctorProfile() =>
+      _doctorGet('/profile');
+  static Future<Map<String, dynamic>> getDoctorAppointments(
+          {int offset = 0, int limit = 25}) =>
+      _doctorGet('/appointments?offset=$offset&limit=$limit');
+  static Future<Map<String, dynamic>> getDoctorPatients() =>
+      _doctorGet('/patients');
+  static Future<Map<String, dynamic>> getDoctorReports() =>
+      _doctorGet('/reports');
+  static Future<Map<String, dynamic>> setDoctorAvailability(bool available) =>
+      _doctorPut('/availability', {'is_available': available});
+  static Future<Map<String, dynamic>> getDoctorAppointmentSchedule() =>
+      _doctorGet('/appointment-schedule');
+  static Future<Map<String, dynamic>> updateDoctorAppointment(
+          int id, String status) =>
+      _doctorPut('/appointments/$id/status', {'status': status});
+  static Future<Map<String, dynamic>> startDoctorConsultation(int id) async {
+    try {
+      final r = await http
+          .post(
+              Uri.parse('$baseUrl/doctor/appointments/$id/consultation/start'),
+              headers: await _getHeaders())
+          .timeout(_authenticationTimeout);
+      return json.decode(r.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getDoctorConsultationContext(
+          int appointmentId) =>
+      _doctorGet('/appointments/$appointmentId/consultation-context');
+
+  static Future<Map<String, dynamic>> getHospitalDoctorSchedule(
+      int doctorId) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/appointments/doctor-schedules/$doctorId'),
+              headers: await _getHeaders())
+          .timeout(_authenticationTimeout);
+      debugPrint(
+          '[AVAILABILITY] GET doctor-schedules/$doctorId status=${response.statusCode} body=${response.body}');
+      final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return {
+        'success': false,
+        'message': 'Unexpected appointment schedule response'
+      };
+    } catch (e) {
+      debugPrint('[AVAILABILITY] GET doctor-schedules/$doctorId failed: $e');
+      return {
+        'success': false,
+        'message': 'Unable to load appointment schedule: $e'
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> saveHospitalDoctorSchedule(
+      int doctorId, List<Map<String, dynamic>> schedules) async {
+    try {
+      final response = await http
+          .put(Uri.parse('$baseUrl/appointments/doctor-schedules/$doctorId'),
+              headers: await _getHeaders(),
+              body: json.encode({'schedules': schedules}))
+          .timeout(_authenticationTimeout);
+      debugPrint(
+          '[AVAILABILITY] PUT doctor-schedules/$doctorId status=${response.statusCode} body=${response.body}');
+      final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return {
+        'success': false,
+        'message': 'Unexpected appointment schedule response'
+      };
+    } catch (e) {
+      debugPrint('[AVAILABILITY] PUT doctor-schedules/$doctorId failed: $e');
+      return {
+        'success': false,
+        'message': 'Unable to save appointment schedule: $e'
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> createPrescription(
+      int appointmentId, List<Map<String, dynamic>> medications,
+      {String? instructions}) async {
+    try {
+      final r = await http
+          .post(Uri.parse('$baseUrl/medical/prescriptions'),
+              headers: await _getHeaders(),
+              body: json.encode({
+                'appointment_id': appointmentId,
+                'medications': medications,
+                'instructions': instructions,
+              }))
+          .timeout(_authenticationTimeout);
+      return json.decode(r.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> _doctorGet(String path) async {
+    try {
+      final r = await http
+          .get(Uri.parse('$baseUrl/doctor$path'), headers: await _getHeaders())
+          .timeout(_authenticationTimeout);
+      return json.decode(r.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> _doctorPut(
+      String path, Map<String, dynamic> body) async {
+    try {
+      final r = await http
+          .put(Uri.parse('$baseUrl/doctor$path'),
+              headers: await _getHeaders(), body: json.encode(body))
+          .timeout(_authenticationTimeout);
+      return json.decode(r.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> saveDoctorReport(
+          int appointmentId, Map<String, dynamic> report,
+          {bool publish = false}) =>
+      _doctorPut('/appointments/$appointmentId/report',
+          {...report, 'publish': publish});
+  static Future<Map<String, dynamic>> saveDoctorPrescription(
+          int appointmentId, List<Map<String, dynamic>> medications,
+          {String? instructions, bool publish = false}) =>
+      _doctorPut('/appointments/$appointmentId/prescription', {
+        'medications': medications,
+        'instructions': instructions,
+        'publish': publish
+      });
+
+  static Future<Map<String, dynamic>> getFamilyMembers() async {
+    try {
+      final r = await http.get(Uri.parse('$baseUrl/family'),
+          headers: await _getHeaders());
+      return json.decode(r.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> addFamilyMember(
+      int patientId, String relationship,
+      {String permission = 'VIEW'}) async {
+    try {
+      final r = await http.post(Uri.parse('$baseUrl/family'),
+          headers: await _getHeaders(),
+          body: json.encode({
+            'member_patient_id': patientId,
+            'relationship': relationship,
+            'permission': permission
+          }));
+      return json.decode(r.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> respondToFamilyRequest(
+      int id, bool accept) async {
+    try {
+      final r = await http.put(Uri.parse('$baseUrl/family/$id/respond'),
+          headers: await _getHeaders(), body: json.encode({'accept': accept}));
+      return json.decode(r.body);
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};
     }
@@ -294,11 +548,41 @@ class ApiService {
 
   // ==================== HOSPITAL ENDPOINTS ====================
 
+  static Future<Map<String, dynamic>> updateHospitalEntrance(
+      int hospitalId, Map<String, dynamic> data) async {
+    try {
+      final response = await http.put(
+          Uri.parse('$baseUrl/hospitals/$hospitalId'),
+          headers: await _getHeaders(),
+          body: json.encode(data));
+      return json.decode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateHospitalProfile(
+      Map<String, dynamic> data) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$baseUrl/hospitals/profile'),
+            headers: await _getHeaders(),
+            body: json.encode(data),
+          )
+          .timeout(_authenticationTimeout);
+      final decoded = json.decode(response.body);
+      return decoded is Map<String, dynamic>
+          ? decoded
+          : {'success': false, 'message': 'Unexpected profile response'};
+    } catch (error) {
+      return {'success': false, 'message': 'Unable to update profile: $error'};
+    }
+  }
+
   static Future<Map<String, dynamic>> updateHospitalResources(
       Map<String, dynamic> resources) async {
     try {
-      debugPrint('Updating resources: $resources');
-
       final payload = {};
       final fieldMap = {
         'generalBeds_total': 'generalBeds_total',
@@ -316,8 +600,6 @@ class ApiService {
         payload[mappedKey] = value;
       }
 
-      debugPrint('Sending payload: $payload');
-
       final response = await http.put(
         Uri.parse('$baseUrl/hospitals/resources'),
         headers: await _getHeaders(),
@@ -325,7 +607,6 @@ class ApiService {
       );
 
       debugPrint('Update resources response: ${response.statusCode}');
-      debugPrint('Update resources body: ${response.body}');
 
       final data = json.decode(response.body);
       return {
@@ -511,6 +792,8 @@ class ApiService {
     required int emergencyId,
     required double latitude,
     required double longitude,
+    double? accuracy,
+    DateTime? timestamp,
   }) async {
     try {
       final response = await http.post(
@@ -520,11 +803,106 @@ class ApiService {
           'emergencyId': emergencyId,
           'location_lat': latitude,
           'location_lng': longitude,
+          'location_accuracy': accuracy,
+          'location_timestamp':
+              (timestamp ?? DateTime.now()).toUtc().toIso8601String(),
         }),
       );
       return json.decode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateBookingPatientLocation(
+      {required int bookingId,
+      required double latitude,
+      required double longitude,
+      double? accuracy,
+      DateTime? timestamp}) async {
+    try {
+      final response = await http
+          .post(Uri.parse('$baseUrl/ambulance/booking/location-update'),
+              headers: await _getHeaders(),
+              body: json.encode({
+                'booking_id': bookingId,
+                'latitude': latitude,
+                'longitude': longitude,
+                'accuracy': accuracy,
+                'timestamp': (timestamp ?? DateTime.now()).toIso8601String()
+              }))
+          .timeout(_authenticationTimeout);
+      return json.decode(response.body) as Map<String, dynamic>;
+    } catch (error) {
+      return {'success': false, 'message': 'Network error: $error'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> registerPrivateDriver(
+      Map<String, dynamic> data) async {
+    try {
+      final response = await http
+          .post(Uri.parse('$baseUrl/auth/drivers/private-registration'),
+              headers: await _getHeaders(), body: json.encode(data))
+          .timeout(_authenticationTimeout);
+      return json.decode(response.body) as Map<String, dynamic>;
+    } catch (error) {
+      return {'success': false, 'message': 'Network error: $error'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> createHospitalDriver(
+          Map<String, dynamic> data) async =>
+      _onboardingRequest('POST', '$baseUrl/roles/drivers', data);
+  static Future<Map<String, dynamic>> getHospitalDrivers() async =>
+      _onboardingRequest('GET', '$baseUrl/roles/drivers');
+  static Future<Map<String, dynamic>> updateHospitalDriverDetails(
+          int id, Map<String, dynamic> data) async =>
+      _onboardingRequest('PUT', '$baseUrl/roles/drivers/$id', data);
+  static Future<Map<String, dynamic>> updateHospitalDriver(
+          int id, String status) async =>
+      _onboardingRequest(
+          'PUT', '$baseUrl/roles/drivers/$id/status', {'status': status});
+  static Future<Map<String, dynamic>> resetHospitalDriverPassword(
+          int id) async =>
+      _onboardingRequest(
+          'POST', '$baseUrl/roles/drivers/$id/password-reset', {});
+  static Future<Map<String, dynamic>> reassignHospitalDriver(
+          int id, int ambulanceId) async =>
+      _onboardingRequest('PUT', '$baseUrl/roles/drivers/$id/ambulance',
+          {'ambulance_id': ambulanceId});
+  static Future<Map<String, dynamic>> getPrivateDriverApplications() async =>
+      _onboardingRequest('GET', '$baseUrl/admin/drivers/private-applications');
+  static Future<Map<String, dynamic>> reviewPrivateDriver(int id, String action,
+          {String? notes}) async =>
+      _onboardingRequest(
+          'PUT',
+          '$baseUrl/admin/drivers/private-applications/$id/review',
+          {'action': action, 'notes': notes});
+
+  static Future<Map<String, dynamic>> _onboardingRequest(
+      String method, String url,
+      [Map<String, dynamic>? data]) async {
+    try {
+      final headers = await _getHeaders();
+      late http.Response response;
+      final uri = Uri.parse(url);
+      if (method == 'GET') {
+        response = await http
+            .get(uri, headers: headers)
+            .timeout(_authenticationTimeout);
+      } else if (method == 'PUT') {
+        response = await http
+            .put(uri, headers: headers, body: json.encode(data ?? {}))
+            .timeout(_authenticationTimeout);
+      } else {
+        response = await http
+            .post(uri, headers: headers, body: json.encode(data ?? {}))
+            .timeout(_authenticationTimeout);
+      }
+      return json.decode(response.body) as Map<String, dynamic>;
+    } catch (error) {
+      return {'success': false, 'message': 'Network error: $error'};
     }
   }
 
@@ -594,12 +972,16 @@ class ApiService {
   }
 
   static Future<Map<String, dynamic>> respondToSosDispatch(
-      int emergencyId, String action, {String? rejectionReason}) async {
+      int emergencyId, String action,
+      {String? rejectionReason}) async {
     try {
       final response = await http.put(
         Uri.parse('$baseUrl/emergency/$emergencyId/dispatch-response'),
         headers: await _getHeaders(),
-        body: json.encode({'action': action, if (rejectionReason != null) 'rejection_reason': rejectionReason}),
+        body: json.encode({
+          'action': action,
+          if (rejectionReason != null) 'rejection_reason': rejectionReason
+        }),
       );
       return json.decode(response.body);
     } catch (e) {
@@ -705,7 +1087,6 @@ class ApiService {
       );
 
       debugPrint('Get all users response status: ${response.statusCode}');
-      debugPrint('Get all users response body: ${response.body}');
 
       final data = json.decode(response.body);
 
@@ -736,7 +1117,6 @@ class ApiService {
       );
 
       debugPrint('Book ambulance response: ${response.statusCode}');
-      debugPrint('Book ambulance body: ${response.body}');
 
       final data = json.decode(response.body);
 
@@ -815,10 +1195,9 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/resources/blood/request'),
         headers: await _getHeaders(),
-        body: json.encode(data),
+        body: json.encode(_canonicalBloodPayload(data)),
       );
       debugPrint('Create blood request response: ${response.statusCode}');
-      debugPrint('Create blood request body: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Create blood request error: $e');
@@ -837,7 +1216,6 @@ class ApiService {
       );
 
       debugPrint('Hospital profile response status: ${response.statusCode}');
-      debugPrint('Hospital profile response body: ${response.body}');
 
       if (response.statusCode == 401) {
         final prefs = await SharedPreferences.getInstance();
@@ -876,9 +1254,6 @@ class ApiService {
       Map<String, dynamic> query) async {
     try {
       final endpoint = Uri.parse('$baseUrl/chatbot/query');
-      debugPrint('[CHATBOT REQUEST] POST $endpoint');
-      debugPrint(
-          '[CHATBOT REQUEST] messageLength=${'${query['message'] ?? ''}'.length}; hasToken=${(await SharedPreferences.getInstance()).getString('token')?.isNotEmpty == true}');
       final response = await http
           .post(
             endpoint,
@@ -886,21 +1261,16 @@ class ApiService {
             body: json.encode(query),
           )
           .timeout(const Duration(seconds: 50));
-      debugPrint('[CHATBOT] Response status: ${response.statusCode}');
-      debugPrint(
-          '[CHATBOT] Response body: ${response.body.length > 2000 ? '${response.body.substring(0, 2000)}…' : response.body}');
       final decoded = json.decode(response.body);
       if (decoded is! Map<String, dynamic>) {
         throw const FormatException('Chatbot response must be a JSON object.');
       }
       return decoded;
-    } catch (error, stackTrace) {
-      debugPrint('[FLUTTER PARSE ERROR] $error');
-      debugPrintStack(stackTrace: stackTrace);
+    } catch (_) {
       return {
         'success': false,
         'error': 'CHATBOT_NETWORK_OR_PARSE_ERROR',
-        'message': 'Network or response error: $error'
+        'message': 'Network or response error. Please try again.'
       };
     }
   }
@@ -911,7 +1281,7 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/resources/blood/request'),
         headers: await _getHeaders(),
-        body: json.encode(requestData),
+        body: json.encode(_canonicalBloodPayload(requestData)),
       );
       return json.decode(response.body);
     } catch (e) {
@@ -960,11 +1330,24 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getDoctorAvailableSlots(int hospitalId, int doctorId, String date) async {
+  static Future<Map<String, dynamic>> getDoctorAvailableSlots(
+      int hospitalId, int doctorId, String date) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/appointments/available-slots').replace(queryParameters: {'hospital_id': '$hospitalId', 'doctor_id': '$doctorId', 'date': date}), headers: await _getHeaders());
+      final response = await http.get(
+          Uri.parse('$baseUrl/appointments/available-slots').replace(
+              queryParameters: {
+                'hospital_id': '$hospitalId',
+                'doctor_id': '$doctorId',
+                'date': date
+              }),
+          headers: await _getHeaders());
       return json.decode(response.body);
-    } catch (e) { return {'success': false, 'message': 'Unable to load available appointment times'}; }
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Unable to load available appointment times'
+      };
+    }
   }
 
   static Future<Map<String, dynamic>> rescheduleAppointment(
@@ -1076,8 +1459,6 @@ class ApiService {
         }
       }
 
-      debugPrint('Sending resource request: $requestData');
-
       final response = await http.post(
         Uri.parse('$baseUrl/resources/request'),
         headers: await _getHeaders(),
@@ -1085,7 +1466,6 @@ class ApiService {
       );
 
       debugPrint('Resource request response status: ${response.statusCode}');
-      debugPrint('Resource request response body: ${response.body}');
 
       return json.decode(response.body);
     } catch (e) {
@@ -1102,7 +1482,6 @@ class ApiService {
       );
       debugPrint(
           'Get hospital requests response status: ${response.statusCode}');
-      debugPrint('Get hospital requests response body: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Error getting hospital requests: $e');
@@ -1117,7 +1496,6 @@ class ApiService {
         headers: await _getHeaders(),
       );
       debugPrint('Get my requests response status: ${response.statusCode}');
-      debugPrint('Get my requests response body: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Error getting my requests: $e');
@@ -1149,7 +1527,6 @@ class ApiService {
           '${prefix}_available': available,
         }),
       );
-      debugPrint('Add resource response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Add resource error: $e');
@@ -1180,7 +1557,6 @@ class ApiService {
         }),
       );
 
-      debugPrint('Free resource response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Free resource error: $e');
@@ -1195,7 +1571,6 @@ class ApiService {
         Uri.parse('$baseUrl/hospitals/$hospitalId/doctors'),
         headers: await _getHeaders(),
       );
-      debugPrint('Get doctors response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Get doctors error: $e');
@@ -1206,8 +1581,6 @@ class ApiService {
   static Future<Map<String, dynamic>> addHospitalStaff(
       Map<String, dynamic> staffData) async {
     try {
-      debugPrint('Adding staff: $staffData');
-
       final response = await http.post(
         Uri.parse('$baseUrl/hospitals/staff'),
         headers: await _getHeaders(),
@@ -1215,7 +1588,6 @@ class ApiService {
       );
 
       debugPrint('Add staff response status: ${response.statusCode}');
-      debugPrint('Add staff response body: ${response.body}');
 
       if (response.statusCode == 201) {
         return json.decode(response.body);
@@ -1258,6 +1630,22 @@ class ApiService {
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
+
+  static Future<Map<String, dynamic>> updateHospitalDoctorStatus(
+      int id, String status) async {
+    try {
+      final response = await http.put(
+          Uri.parse('$baseUrl/hospitals/staff/$id/status'),
+          headers: await _getHeaders(),
+          body: json.encode({'status': status}));
+      return json.decode(response.body) as Map<String, dynamic>;
+    } catch (error) {
+      return {
+        'success': false,
+        'message': 'Unable to update doctor account: $error'
+      };
+    }
+  }
 // lib/services/api_service.dart - Add these methods
 
 // ==================== ADMIN HOSPITAL MANAGEMENT ====================
@@ -1269,7 +1657,6 @@ class ApiService {
         Uri.parse('$baseUrl/admin/hospitals/$hospitalId/resources'),
         headers: await _getHeaders(),
       );
-      debugPrint('Get admin hospital resources response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Get admin hospital resources error: $e');
@@ -1287,7 +1674,6 @@ class ApiService {
         headers: await _getHeaders(),
         body: json.encode(resources),
       );
-      debugPrint('Update admin hospital resources response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Update admin hospital resources error: $e');
@@ -1302,7 +1688,6 @@ class ApiService {
         Uri.parse('$baseUrl/admin/hospitals/$hospitalId/blood-bank'),
         headers: await _getHeaders(),
       );
-      debugPrint('Get admin hospital blood bank response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Get admin hospital blood bank error: $e');
@@ -1320,11 +1705,10 @@ class ApiService {
         Uri.parse('$baseUrl/admin/hospitals/$hospitalId/blood-bank'),
         headers: await _getHeaders(),
         body: json.encode({
-          'blood_group': bloodGroup,
+          'blood_group': canonicalBloodGroup(bloodGroup),
           'units_available': units,
         }),
       );
-      debugPrint('Update admin blood bank response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Update admin blood bank error: $e');
@@ -1425,7 +1809,7 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/blood-bank/add-expiry'),
         headers: await _getHeaders(),
-        body: json.encode(data),
+        body: json.encode(_canonicalBloodPayload(data)),
       );
       return json.decode(response.body);
     } catch (e) {
@@ -1439,7 +1823,7 @@ class ApiService {
       final response = await http.post(
         Uri.parse('$baseUrl/blood-bank/use'),
         headers: await _getHeaders(),
-        body: json.encode(data),
+        body: json.encode(_canonicalBloodPayload(data)),
       );
       return json.decode(response.body);
     } catch (e) {
@@ -1463,7 +1847,6 @@ class ApiService {
   static Future<Map<String, dynamic>> createAppointment(
       Map<String, dynamic> appointmentData) async {
     try {
-      debugPrint('ðŸŸ¢ Creating appointment with data: $appointmentData');
       debugPrint(
           'ðŸŸ¢ Hospital ID being sent: ${appointmentData['hospital_id']}');
 
@@ -1474,7 +1857,6 @@ class ApiService {
       );
 
       debugPrint('ðŸŸ¢ Appointment response status: ${response.statusCode}');
-      debugPrint('ðŸŸ¢ Appointment response body: ${response.body}');
 
       return json.decode(response.body);
     } catch (e) {
@@ -1498,7 +1880,6 @@ class ApiService {
         headers: await _getHeaders(),
         body: json.encode(data),
       );
-      debugPrint('Create campaign response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Create campaign error: $e');
@@ -1514,7 +1895,6 @@ class ApiService {
         headers: await _getHeaders(),
         body: json.encode({'status': status}),
       );
-      debugPrint('Update campaign status response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Update campaign status error: $e');
@@ -1528,7 +1908,6 @@ class ApiService {
         Uri.parse('$baseUrl/campaigns/$campaignId/approve'),
         headers: await _getHeaders(),
       );
-      debugPrint('Approve campaign response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Approve campaign error: $e');
@@ -1542,7 +1921,6 @@ class ApiService {
         Uri.parse('$baseUrl/campaigns/$campaignId/reject'),
         headers: await _getHeaders(),
       );
-      debugPrint('Reject campaign response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Reject campaign error: $e');
@@ -1639,7 +2017,6 @@ class ApiService {
         headers: await _getHeaders(),
         body: json.encode(data),
       );
-      debugPrint('Record donation response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Record donation error: $e');
@@ -1700,6 +2077,43 @@ class ApiService {
       return json.decode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> resetStaffPassword(
+      int staffId, String password) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/roles/staff/$staffId/password'),
+        headers: await _getHeaders(),
+        body: json.encode({'password': password}),
+      );
+      return json.decode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> changePassword(
+      String oldPassword, String newPassword, String confirmation) async {
+    try {
+      final response = await http
+          .post(Uri.parse('$baseUrl/auth/change-password'),
+              headers: await _getHeaders(),
+              body: json.encode({
+                'old_password': oldPassword,
+                'new_password': newPassword,
+                'confirm_password': confirmation
+              }))
+          .timeout(_authenticationTimeout);
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      if (data['success'] == true && data['token'] is String) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', data['token']);
+      }
+      return data;
+    } catch (error) {
+      return {'success': false, 'message': 'Unable to change password: $error'};
     }
   }
 
@@ -1858,15 +2272,22 @@ class ApiService {
 // lib/services/api_service.dart
   static Future<Map<String, dynamic>> getHospitalStaff() async {
     try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/hospitals/staff'),
-        headers: await _getHeaders(),
-      );
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/hospitals/staff'),
+            headers: await _getHeaders(),
+          )
+          .timeout(_authenticationTimeout);
       debugPrint('Get staff response status: ${response.statusCode}');
-      return json.decode(response.body);
+      final decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic>) return decoded;
+      return {
+        'success': false,
+        'message': 'Unexpected staff response from the server',
+      };
     } catch (e) {
       debugPrint('Get staff error: $e');
-      return {'success': false, 'data': []};
+      return {'success': false, 'message': 'Unable to load staff: $e'};
     }
   }
 
@@ -1908,6 +2329,138 @@ class ApiService {
 
 // ==================== HOSPITAL RESOURCES ====================
 
+  static Uri hospitalPhotoImageUri(int hospitalId, int photoId,
+      {bool thumbnail = false}) {
+    return Uri.parse('$baseUrl/hospitals/$hospitalId/photos/$photoId/image')
+        .replace(queryParameters: thumbnail ? {'size': 'thumbnail'} : null);
+  }
+
+  static Uri resolveHospitalPhotoUrl(String imagePath) {
+    final parsed = Uri.parse(imagePath);
+    if (parsed.hasScheme) return parsed;
+    var path = parsed.path;
+    if (path.startsWith('/api/')) path = path.substring(4);
+    if (!path.startsWith('/')) path = '/$path';
+    return Uri.parse('$baseUrl$path')
+        .replace(query: parsed.hasQuery ? parsed.query : null);
+  }
+
+  static Future<Map<String, dynamic>> getHospitalPhotos(int hospitalId,
+      {int limit = 24, int offset = 0}) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            '$baseUrl/hospitals/$hospitalId/photos?limit=$limit&offset=$offset'),
+        headers: await _getHeaders(),
+      );
+      return Map<String, dynamic>.from(json.decode(response.body));
+    } catch (error) {
+      return {'success': false, 'message': 'Unable to load hospital photos.'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getManagedHospitalPhotos() async {
+    try {
+      final response = await http.get(
+          Uri.parse('$baseUrl/hospitals/gallery/manage'),
+          headers: await _getHeaders());
+      return Map<String, dynamic>.from(json.decode(response.body));
+    } catch (error) {
+      return {'success': false, 'message': 'Unable to load hospital photos.'};
+    }
+  }
+
+  static Future<Uint8List?> getManagedHospitalPhotoBytes(int photoId,
+      {bool thumbnail = true}) async {
+    try {
+      final uri = Uri.parse('$baseUrl/hospitals/gallery/photos/$photoId/image')
+          .replace(queryParameters: thumbnail ? {'size': 'thumbnail'} : null);
+      final response = await http.get(uri, headers: await _getHeaders());
+      if (response.statusCode < 200 || response.statusCode >= 300) return null;
+      return response.bodyBytes;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<Map<String, dynamic>> uploadHospitalPhoto({
+    required Uint8List bytes,
+    required String caption,
+    required String category,
+  }) async =>
+      _sendHospitalPhoto(bytes, '$baseUrl/hospitals/gallery/photos',
+          {'caption': caption, 'category': category},
+          method: 'POST');
+
+  static Future<Map<String, dynamic>> replaceHospitalPhoto({
+    required int photoId,
+    required Uint8List bytes,
+  }) async =>
+      _sendHospitalPhoto(
+          bytes, '$baseUrl/hospitals/gallery/photos/$photoId/image', const {},
+          method: 'PUT');
+
+  static Future<Map<String, dynamic>> _sendHospitalPhoto(
+      Uint8List bytes, String url, Map<String, String> fields,
+      {required String method}) async {
+    try {
+      final headers = await _getHeaders();
+      headers.remove('Content-Type');
+      final request = http.MultipartRequest(method, Uri.parse(url))
+        ..headers.addAll(headers)
+        ..fields.addAll(fields)
+        ..files.add(http.MultipartFile.fromBytes('photo', bytes,
+            filename: 'hospital-photo.bin'));
+      final response = await http.Response.fromStream(await request.send());
+      return Map<String, dynamic>.from(json.decode(response.body));
+    } catch (error) {
+      return {
+        'success': false,
+        'message': 'Photo upload failed. Check your connection and try again.'
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateHospitalPhoto(
+      int photoId, Map<String, dynamic> changes) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/hospitals/gallery/photos/$photoId'),
+        headers: await _getHeaders(),
+        body: json.encode(changes),
+      );
+      return Map<String, dynamic>.from(json.decode(response.body));
+    } catch (error) {
+      return {'success': false, 'message': 'Unable to update photo.'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> reorderHospitalPhotos(
+      List<int> photoIds) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/hospitals/gallery/photos/reorder'),
+        headers: await _getHeaders(),
+        body: json.encode({'photo_ids': photoIds}),
+      );
+      return Map<String, dynamic>.from(json.decode(response.body));
+    } catch (error) {
+      return {'success': false, 'message': 'Unable to reorder photos.'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> deleteHospitalPhoto(int photoId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/hospitals/gallery/photos/$photoId'),
+        headers: await _getHeaders(),
+      );
+      return Map<String, dynamic>.from(json.decode(response.body));
+    } catch (error) {
+      return {'success': false, 'message': 'Unable to delete photo.'};
+    }
+  }
+
   static Future<Map<String, dynamic>> getHospitalResources(
       int hospitalId) async {
     try {
@@ -1918,7 +2471,6 @@ class ApiService {
       );
 
       final data = json.decode(response.body);
-      debugPrint('Hospital resources response: $data');
 
       if (data['success'] == true && data['data'] != null) {
         return {
@@ -1946,7 +2498,6 @@ class ApiService {
       );
 
       final data = json.decode(response.body);
-      debugPrint('Update resource request status response: $data');
       return data;
     } catch (e) {
       debugPrint('Error updating resource request status: $e');
@@ -1969,7 +2520,6 @@ class ApiService {
         Uri.parse(url),
         headers: await _getHeaders(),
       );
-      debugPrint('Get all hospitals with resources response: ${response.body}');
       return json.decode(response.body);
     } catch (e) {
       debugPrint('Get all hospitals with resources error: $e');
@@ -2074,6 +2624,137 @@ class ApiService {
       return {'success': false, 'message': 'Network error: $e'};
     }
   }
+
+  static Future<Map<String, dynamic>> getHospitalNavigation(
+      int hospitalId) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$baseUrl/hospitals/$hospitalId/navigation'),
+            headers: await _getHeaders(),
+          )
+          .timeout(_authenticationTimeout);
+      final decoded = json.decode(response.body);
+      return decoded is Map<String, dynamic>
+          ? decoded
+          : {'success': false, 'message': 'Unexpected navigation response'};
+    } catch (error) {
+      return {
+        'success': false,
+        'message': 'Unable to load hospital navigation: $error'
+      };
+    }
+  }
+
+  static Future<Map<String, dynamic>> getDriverProfile() =>
+      _driverGet('/profile');
+  static Future<Map<String, dynamic>> getDriverAssignments() =>
+      _driverGet('/assignments');
+  static Future<Map<String, dynamic>> getDriverTripHistory(
+          {int page = 1, int limit = 20}) =>
+      _driverGet('/history?page=$page&limit=$limit');
+  static Future<Map<String, dynamic>> updateDriverEmergencyStatus(
+          int emergencyId, String status) =>
+      _driverPut('/assignments/$emergencyId/status', {'status': status});
+  static Future<Map<String, dynamic>> updateDriverBookingStatus(
+          int bookingId, String status) =>
+      _driverPut('/bookings/$bookingId/status', {'status': status});
+  static Future<Map<String, dynamic>> updateDriverLocation(
+          double latitude, double longitude,
+          {double? accuracy, DateTime? timestamp}) =>
+      _driverPost('/location', {
+        'latitude': latitude,
+        'longitude': longitude,
+        'accuracy': accuracy,
+        'timestamp': (timestamp ?? DateTime.now()).toIso8601String()
+      });
+  static Future<Map<String, dynamic>> _driverGet(String path) async {
+    try {
+      final response = await http
+          .get(Uri.parse('$baseUrl/driver$path'), headers: await _getHeaders())
+          .timeout(_authenticationTimeout);
+      final data = json.decode(response.body);
+      if (response.statusCode == 401) {
+        return {
+          'success': false,
+          'unauthorized': true,
+          'message': 'Your session has expired. Please sign in again.'
+        };
+      }
+      return data is Map<String, dynamic>
+          ? data
+          : {'success': false, 'message': 'Unexpected driver response'};
+    } catch (error) {
+      return {'success': false, 'message': 'Network error: $error'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> _driverPut(
+      String path, Map<String, dynamic> data) async {
+    try {
+      final response = await http
+          .put(Uri.parse('$baseUrl/driver$path'),
+              headers: await _getHeaders(), body: json.encode(data))
+          .timeout(_authenticationTimeout);
+      final decoded = json.decode(response.body);
+      if (response.statusCode == 401) {
+        return {
+          'success': false,
+          'unauthorized': true,
+          'message': 'Your session has expired. Please sign in again.'
+        };
+      }
+      return decoded is Map<String, dynamic>
+          ? decoded
+          : {'success': false, 'message': 'Unexpected driver response'};
+    } catch (error) {
+      return {'success': false, 'message': 'Network error: $error'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> _driverPost(
+      String path, Map<String, dynamic> data) async {
+    try {
+      final response = await http
+          .post(Uri.parse('$baseUrl/driver$path'),
+              headers: await _getHeaders(), body: json.encode(data))
+          .timeout(_authenticationTimeout);
+      final decoded = json.decode(response.body);
+      if (response.statusCode == 401) {
+        return {
+          'success': false,
+          'unauthorized': true,
+          'message': 'Your session has expired. Please sign in again.'
+        };
+      }
+      return decoded is Map<String, dynamic>
+          ? decoded
+          : {'success': false, 'message': 'Unexpected driver response'};
+    } catch (error) {
+      return {'success': false, 'message': 'Network error: $error'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> getHospitalRoute(
+      int hospitalId, double latitude, double longitude) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/hospitals/$hospitalId/route'),
+            headers: await _getHeaders(),
+            body: json.encode({
+              'origin': {'latitude': latitude, 'longitude': longitude}
+            }),
+          )
+          .timeout(_authenticationTimeout);
+      final decoded = json.decode(response.body);
+      return decoded is Map<String, dynamic>
+          ? decoded
+          : {'success': false, 'message': 'Unexpected route response'};
+    } catch (error) {
+      return {'success': false, 'message': 'Unable to calculate route: $error'};
+    }
+  }
 // lib/services/api_service.dart
 
 // ==================== ADMIN HOSPITAL MANAGEMENT ====================
@@ -2089,7 +2770,6 @@ class ApiService {
       );
 
       final data = json.decode(response.body);
-      debugPrint('Verify hospital response: $data');
       return data;
     } catch (e) {
       debugPrint('Verify hospital error: $e');
@@ -2106,7 +2786,6 @@ class ApiService {
       );
 
       final data = json.decode(response.body);
-      debugPrint('Delete hospital response: $data');
       return data;
     } catch (e) {
       debugPrint('Delete hospital error: $e');
@@ -2115,21 +2794,16 @@ class ApiService {
   }
 // lib/services/api_service.dart - Add this method
 
-  static Future<Map<String, dynamic>> deleteHospitalAmbulance(
+  static Future<Map<String, dynamic>> deactivateHospitalAmbulance(
       int ambulanceId) async {
     try {
-      final headers = await _getHeaders();
-      final response = await http.delete(
-        Uri.parse('$baseUrl/ambulance/$ambulanceId'),
-        headers: headers,
+      final response = await http.put(
+        Uri.parse('$baseUrl/ambulance/$ambulanceId/deactivate'),
+        headers: await _getHeaders(),
       );
-
-      final data = json.decode(response.body);
-      debugPrint('Delete ambulance response: $data');
-      return data;
-    } catch (e) {
-      debugPrint('Delete ambulance error: $e');
-      return {'success': false, 'message': 'Network error: $e'};
+      return json.decode(response.body);
+    } catch (_) {
+      return {'success': false, 'message': 'Unable to reach the server.'};
     }
   }
 
@@ -2141,7 +2815,7 @@ class ApiService {
         Uri.parse('$baseUrl/blood-bank/use'),
         headers: headers,
         body: json.encode({
-          'blood_group': bloodGroup,
+          'blood_group': canonicalBloodGroup(bloodGroup),
           'units_required': units,
         }),
       );
@@ -2228,7 +2902,7 @@ class ApiService {
         Uri.parse('$baseUrl/blood-bank/add-expiry'),
         headers: headers,
         body: json.encode({
-          'blood_group': bloodGroup,
+          'blood_group': canonicalBloodGroup(bloodGroup),
           'units': units,
           'expiry_date': expiryDate,
         }),
@@ -2337,6 +3011,7 @@ class ApiService {
     required String bloodGroup,
     required int units,
     required String expiryDate,
+    int? batchId,
   }) async {
     try {
       final headers = await _getHeaders();
@@ -2344,9 +3019,10 @@ class ApiService {
         Uri.parse('$baseUrl/blood-bank/stock'),
         headers: headers,
         body: json.encode({
-          'blood_group': bloodGroup,
+          'blood_group': canonicalBloodGroup(bloodGroup),
           'units': units,
           'expiry_date': expiryDate,
+          if (batchId != null) 'batch_id': batchId,
         }),
       );
 
@@ -2365,7 +3041,7 @@ class ApiService {
       final headers = await _getHeaders();
       final response = await http.delete(
         Uri.parse(
-            '$baseUrl/blood-bank/stock/${Uri.encodeComponent(bloodGroup)}'),
+            '$baseUrl/blood-bank/stock/${Uri.encodeComponent(canonicalBloodGroup(bloodGroup))}'),
         headers: headers,
       );
 

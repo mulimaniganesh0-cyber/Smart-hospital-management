@@ -1,5 +1,6 @@
 // src/controllers/hospitalController.js
 const { pool } = require('../config/database');
+const { RESOURCE_FIELDS, validateResourceUpdate } = require('../services/hospitalResourceValidation');
 
 // src/controllers/hospitalController.js - Update getHospitalProfile
 
@@ -83,105 +84,41 @@ exports.getHospitalProfile = async (req, res) => {
 };
 
 exports.updateResources = async (req, res) => {
+  const client = await pool.connect();
   try {
-    const userId = req.user.id;
-    const resources = req.body;
-    
-    console.log('Update resources request:', resources);
-    
-    const hospitalResult = await pool.query(
-      'SELECT id FROM hospitals WHERE user_id = $1',
-      [userId]
-    );
-    
-    if (hospitalResult.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Hospital not found' 
-      });
-    }
-    
+    const hospitalResult = await client.query('SELECT id FROM hospitals WHERE user_id=$1', [req.user.id]);
+    if (!hospitalResult.rowCount) return res.status(404).json({ success: false, message: 'Hospital not found' });
     const hospitalId = hospitalResult.rows[0].id;
-    
-    const updates = [];
+
+    await client.query('BEGIN');
+    await client.query('INSERT INTO hospital_resources(hospital_id) VALUES($1) ON CONFLICT(hospital_id) DO NOTHING', [hospitalId]);
+    const existing = await client.query('SELECT * FROM hospital_resources WHERE hospital_id=$1 FOR UPDATE', [hospitalId]);
+    const current = existing.rows[0];
+    const checked = validateResourceUpdate(req.body, current);
+    if (checked.error) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: checked.error });
+    }
+
     const values = [];
-    let paramIndex = 1;
-    
-    const fieldMap = {
-      'generalBeds_total': 'general_beds_total',
-      'generalBeds_available': 'general_beds_available',
-      'icuBeds_total': 'icu_beds_total',
-      'icuBeds_available': 'icu_beds_available',
-      'ventilators_total': 'ventilators_total',
-      'ventilators_available': 'ventilators_available',
-      'oxygenBeds_total': 'oxygen_supported_beds_total',
-      'oxygenBeds_available': 'oxygen_supported_beds_available',
-    };
-    
-    for (const [key, value] of Object.entries(resources)) {
-      const dbField = fieldMap[key];
-      if (dbField) {
-        updates.push(`${dbField} = $${paramIndex}`);
-        values.push(value);
-        paramIndex++;
-      }
-    }
-    
-    if (updates.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'No valid fields to update' 
-      });
-    }
-    
+    const updates = checked.entries.map(([key, value], index) => {
+      values.push(value);
+      return `${RESOURCE_FIELDS[key]}=$${index + 1}`;
+    });
     values.push(hospitalId);
-    
-    const query = `
-      UPDATE hospital_resources 
-      SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
-      WHERE hospital_id = $${paramIndex}
-      RETURNING *
-    `;
-    
-    const updateResult = await pool.query(query, values);
-    
-    if (updateResult.rows.length === 0) {
-      const insertResult = await pool.query(
-        `INSERT INTO hospital_resources (hospital_id, general_beds_total, general_beds_available, icu_beds_total, icu_beds_available, ventilators_total, ventilators_available, oxygen_supported_beds_total, oxygen_supported_beds_available)
-         VALUES ($1, COALESCE($2, 0), COALESCE($3, 0), COALESCE($4, 0), COALESCE($5, 0), COALESCE($6, 0), COALESCE($7, 0), COALESCE($8, 0), COALESCE($9, 0))
-         RETURNING *`,
-        [hospitalId, 
-         resources.generalBeds_total || 0, 
-         resources.generalBeds_available || 0,
-         resources.icuBeds_total || 0,
-         resources.icuBeds_available || 0,
-         resources.ventilators_total || 0,
-         resources.ventilators_available || 0,
-         resources.oxygenBeds_total || 0,
-         resources.oxygenBeds_available || 0
-        ]
-      );
-      
-      return res.json({
-        success: true,
-        message: 'Resources created successfully',
-        data: insertResult.rows[0],
-      });
-    }
-    
-    res.json({
-      success: true,
-      message: 'Resources updated successfully',
-      data: updateResult.rows[0],
-    });
+    const result = await client.query(`UPDATE hospital_resources SET ${updates.join(', ')}, updated_at=CURRENT_TIMESTAMP
+      WHERE hospital_id=$${values.length} RETURNING *`, values);
+    await client.query('COMMIT');
+
+    const io = req.app.get('io');
+    const payload = { hospitalId, resources: result.rows[0], updatedAt: result.rows[0].updated_at };
+    io?.to(`hospital_${hospitalId}`).emit('resources-changed', payload);
+    return res.json({ success: true, message: 'Resources updated successfully', data: result.rows[0] });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Update resources error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error', 
-      error: error.message 
-    });
-  }
+    return res.status(500).json({ success: false, message: 'Server error' });
+  } finally { client.release(); }
 };
 
 exports.getNearbyHospitals = async (req, res) => {
@@ -234,6 +171,9 @@ exports.getNearbyHospitals = async (req, res) => {
       SELECT 
         h.id,
         h.name,
+        (SELECT '/api/hospitals/' || p.hospital_id || '/photos/' || p.id || '/image?size=thumbnail'
+         FROM hospital_photos p WHERE p.hospital_id = h.id AND p.is_cover = TRUE AND p.is_published = TRUE
+         ORDER BY p.id LIMIT 1) AS cover_photo_url,
         h.address,
         h.city,
         h.phone,
@@ -243,7 +183,7 @@ exports.getNearbyHospitals = async (req, res) => {
         (SELECT ROUND(AVG(r.rating)::numeric, 1) FROM hospital_reviews r WHERE r.hospital_id=h.id AND r.is_visible=true) patient_rating,
         (SELECT COUNT(*) FROM hospital_reviews r WHERE r.hospital_id=h.id AND r.is_visible=true) patient_review_count,
         h.is_verified, h.specialties, h.emergency_available,
-        h.latitude, h.longitude, h.entrance_latitude, h.entrance_longitude,
+        h.latitude, h.longitude, h.entrance_latitude, h.entrance_longitude, h.entrance_address, h.entrance_verified,
         COALESCE(hr.general_beds_total, 0) as total_beds,
         COALESCE(hr.general_beds_available, 0) as available_beds,
         COALESCE(hr.icu_beds_total, 0) as icu_beds,
@@ -255,7 +195,8 @@ exports.getNearbyHospitals = async (req, res) => {
         COALESCE(bb.total_units, 0) AS blood_units,
         COALESCE(hr.updated_at, h.created_at) as last_updated,
         ${haversineFormula} as distance,
-        (SELECT COUNT(*) FROM doctors d WHERE d.hospital_id = h.id AND d.availability_status = true) as doctor_count,
+        (SELECT COUNT(*) FROM doctors d WHERE d.hospital_id = h.id
+          AND COALESCE(d.is_active,true) AND COALESCE(d.availability_status,true))::int AS doctor_count,
         (SELECT COUNT(*) FROM appointments a WHERE a.hospital_id = h.id AND a.status = 'pending' AND a.appointment_date = CURRENT_DATE) * 15 as waiting_time
       FROM hospitals h
       LEFT JOIN hospital_resources hr ON h.id = hr.hospital_id
@@ -297,6 +238,8 @@ exports.getNearbyHospitals = async (req, res) => {
         longitude: parseFloat(hospital.longitude),
         entrance_latitude: hospital.entrance_latitude == null ? null : parseFloat(hospital.entrance_latitude),
         entrance_longitude: hospital.entrance_longitude == null ? null : parseFloat(hospital.entrance_longitude),
+        entrance_address: hospital.entrance_address,
+        entrance_verified: Boolean(hospital.entrance_verified),
         total_beds: parseInt(hospital.total_beds),
         available_beds: parseInt(hospital.available_beds),
         icu_beds: parseInt(hospital.icu_beds),
@@ -342,13 +285,16 @@ exports.getAllHospitals = async (req, res) => {
       SELECT 
         h.id,
         h.name,
+        (SELECT '/api/hospitals/' || p.hospital_id || '/photos/' || p.id || '/image?size=thumbnail'
+         FROM hospital_photos p WHERE p.hospital_id = h.id AND p.is_cover = TRUE AND p.is_published = TRUE
+         ORDER BY p.id LIMIT 1) AS cover_photo_url,
         h.address,
         h.city,
         h.state,
         h.latitude,
         h.longitude,
         h.entrance_latitude,
-        h.entrance_longitude,
+        h.entrance_longitude, h.entrance_address, h.entrance_verified,
         h.phone,
         h.email,
         h.google_rating, h.google_review_count, h.google_place_id, h.google_maps_url,
@@ -365,6 +311,8 @@ exports.getAllHospitals = async (req, res) => {
         COALESCE(hr.oxygen_supported_beds_total, 0) as oxygen_beds_total,
         COALESCE(hr.oxygen_supported_beds_available, 0) as oxygen_beds_available,
         COALESCE((SELECT SUM(bb.units_available) FROM blood_bank bb WHERE bb.hospital_id = h.id), 0) as blood_units,
+        (SELECT COUNT(*) FROM doctors d WHERE d.hospital_id=h.id
+          AND COALESCE(d.is_active,true) AND COALESCE(d.availability_status,true))::int AS doctor_count,
         COALESCE(hr.updated_at, h.created_at) as last_updated
       FROM hospitals h
       LEFT JOIN hospital_resources hr ON h.id = hr.hospital_id
@@ -532,15 +480,18 @@ exports.getHospitalStaff = async (req, res) => {
     const hospitalId = hospitalResult.rows[0].id;
     
     const result = await pool.query(
-      `SELECT id, name, specialization as designation, department,
+      `SELECT d.id, d.id AS doctor_id, 'doctor' AS role, d.user_id, d.name, d.specialization as designation, d.department,
               qualification, experience_years,
-              email, phone,
-              (COALESCE(is_active, true) AND COALESCE(availability_status, true)) AS is_available,
-              COALESCE(is_active, true) AS is_active,
-              COALESCE(availability_status, true) AS availability_status
-       FROM doctors 
-       WHERE hospital_id = $1 
-       ORDER BY name`,
+              COALESCE(NULLIF(d.email, ''), u.email) AS email,
+              COALESCE(NULLIF(d.phone, ''), u.phone) AS phone,
+              (COALESCE(d.is_active, true) AND COALESCE(d.availability_status, true)) AS is_available,
+              COALESCE(d.is_active, true) AS is_active,
+              COALESCE(d.availability_status, true) AS availability_status,
+              d.account_activation_status,u.password_reset_required,u.account_status
+       FROM doctors d
+       LEFT JOIN users u ON u.id = d.user_id
+       WHERE d.hospital_id = $1
+       ORDER BY d.name`,
       [hospitalId]
     );
     
@@ -610,7 +561,6 @@ exports.addHospitalStaff = async (req, res) => {
   ]
 );
     
-    console.log('Staff added:', result.rows[0]);
     
     res.status(201).json({
       success: true,
@@ -628,12 +578,29 @@ exports.addHospitalStaff = async (req, res) => {
 };
 // Update hospital staff
 exports.updateHospitalStaff = async (req, res) => {
+  const client = await pool.connect();
   try {
     const userId = req.user.id;
     const { staffId } = req.params;
-    const { designation, department, qualification, experience_years, phone, is_available } = req.body;
+    const {
+      designation,
+      department,
+      qualification,
+      experience_years,
+      phone,
+      email,
+      is_available,
+    } = req.body;
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : null;
+    const normalizedPhone=typeof phone==='string'?phone.trim().replace(/[ ()-]/g,''):null;
+    const phoneDigits=normalizedPhone?.replace(/\D/g,'')||'';
+    if (email != null &&
+        (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail))) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid email address.' });
+    }
+    if(phone!=null&&(!/^\+?[0-9 ()-]{8,20}$/.test(phone)||phoneDigits.length<8||phoneDigits.length>15))return res.status(400).json({success:false,message:'Please provide a valid mobile number.'});
     
-    const hospitalResult = await pool.query(
+    const hospitalResult = await client.query(
       'SELECT id FROM hospitals WHERE user_id = $1',
       [userId]
     );
@@ -646,47 +613,106 @@ exports.updateHospitalStaff = async (req, res) => {
     }
     
     const hospitalId = hospitalResult.rows[0].id;
-    
+
+    await client.query('BEGIN');
+    const staffResult = await client.query(
+      'SELECT user_id FROM doctors WHERE id = $1 AND hospital_id = $2 FOR UPDATE',
+      [staffId, hospitalId]
+    );
+    if (staffResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Staff not found' });
+    }
+
+    const linkedUserId = staffResult.rows[0].user_id;
+    if(linkedUserId!=null&&normalizedPhone!=null){
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[phoneDigits]);
+      const duplicatePhone=await client.query("SELECT id FROM users WHERE id<>$1 AND regexp_replace(COALESCE(phone,''),'[^0-9]','','g')=$2 LIMIT 1",[linkedUserId,phoneDigits]);
+      if(duplicatePhone.rowCount){await client.query('ROLLBACK');return res.status(409).json({success:false,message:'This mobile number is already registered.'});}
+    }
+    if (normalizedEmail != null) {
+      const existingAccount = await client.query(
+        'SELECT id FROM users WHERE lower(email) = lower($1) AND id <> $2',
+        [normalizedEmail, linkedUserId ?? -1]
+      );
+      if (existingAccount.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({
+          success: false,
+          message: 'This email address is already registered.',
+        });
+      }
+    }
+
     // Since the table has specialization but not designation,
-    // we store designation in specialization column
-    const result = await pool.query(
+    // we store designation in specialization column.
+    const result = await client.query(
       `UPDATE doctors
        SET specialization = COALESCE($1, specialization),
            department = COALESCE($2, department),
            qualification = COALESCE($3, qualification),
            experience_years = COALESCE($4, experience_years),
            phone = COALESCE($5, phone),
-           availability_status = COALESCE($6, availability_status),
-           is_active = COALESCE($6, is_active),
+           email = COALESCE($6, email),
+           availability_status = COALESCE($7, availability_status),
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $7 AND hospital_id = $8
+       WHERE id = $8 AND hospital_id = $9
        RETURNING id, name, specialization AS designation, department, qualification,
                  experience_years, email, phone,
                  (COALESCE(is_active, true) AND COALESCE(availability_status, true)) AS is_available,
                  COALESCE(is_active, true) AS is_active,
                  COALESCE(availability_status, true) AS availability_status`,
-      [designation, department, qualification, experience_years, phone, is_available, staffId, hospitalId]
+      [designation, department, qualification, experience_years, normalizedPhone,
+        normalizedEmail, is_available, staffId, hospitalId]
     );
-    
-    if (result.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Staff not found' 
-      });
+
+    if (linkedUserId != null && (normalizedEmail != null || normalizedPhone != null)) {
+      await client.query(
+        'UPDATE users SET email = COALESCE($1,email), phone = COALESCE($2,phone) WHERE id = $3',
+        [normalizedEmail, normalizedPhone, linkedUserId]
+      );
     }
-    
+
+    await client.query('COMMIT');
     res.json({
       success: true,
       message: 'Staff updated successfully',
       data: result.rows[0],
     });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Update staff error:', error);
+    if (error.code === '23505') {
+      return res.status(409).json({
+        success: false,
+        message: 'This email address is already registered.',
+      });
+    }
     res.status(500).json({ 
       success: false, 
       message: 'Server error', 
       error: error.message 
     });
+  } finally {
+    client.release();
+  }
+};
+
+// Contact fields are owned by the authenticated hospital, so callers can
+// never choose a different hospital ID in the update request.
+exports.updateHospitalProfile = async (req, res) => {
+  try {
+    const { name, address, phone, email } = req.body ?? {};
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : null;
+    const normalizedPhone = typeof phone === 'string' ? phone.trim() : null;
+    if (email != null && (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail))) return res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
+    if (phone != null && normalizedPhone && !/^[+0-9][0-9\s-]{7,19}$/.test(normalizedPhone)) return res.status(400).json({ success: false, message: 'Please enter a valid mobile number.' });
+    const result = await pool.query(`UPDATE hospitals SET name=COALESCE($1,name), address=COALESCE($2,address), phone=COALESCE($3,phone), email=COALESCE($4,email), updated_at=CURRENT_TIMESTAMP WHERE user_id=$5 RETURNING id,name,address,phone,email,city,state,pincode,is_verified`, [typeof name === 'string' ? name.trim() : null, typeof address === 'string' ? address.trim() : null, normalizedPhone, normalizedEmail, req.user.id]);
+    if (!result.rowCount) return res.status(404).json({ success: false, message: 'Hospital not found' });
+    res.json({ success: true, message: 'Hospital profile updated successfully', data: result.rows[0] });
+  } catch (error) {
+    console.error('Update hospital profile error:', error);
+    res.status(500).json({ success: false, message: 'Unable to update hospital profile' });
   }
 };
 
@@ -713,7 +739,7 @@ exports.deleteHospitalStaff = async (req, res) => {
     const result = await pool.query(
       `UPDATE doctors SET is_active = false, availability_status = false,
          updated_at = CURRENT_TIMESTAMP
-       WHERE id = $1 AND hospital_id = $2 RETURNING *`,
+       WHERE id = $1 AND hospital_id = $2 RETURNING user_id`,
       [staffId, hospitalId]
     );
     
@@ -723,6 +749,7 @@ exports.deleteHospitalStaff = async (req, res) => {
         message: 'Staff not found' 
       });
     }
+    if(result.rows[0].user_id!=null){await pool.query("UPDATE users SET account_status='DEACTIVATED',token_version=COALESCE(token_version,0)+1,updated_at=CURRENT_TIMESTAMP WHERE id=$1",[result.rows[0].user_id]);req.app.get('io')?.in(`user_${result.rows[0].user_id}`).disconnectSockets(true);}
     
     res.json({
       success: true,
@@ -736,6 +763,20 @@ exports.deleteHospitalStaff = async (req, res) => {
       error: error.message 
     });
   }
+};
+
+exports.updateHospitalDoctorStatus = async (req,res) => {
+  const status=String(req.body?.status||'').toLowerCase();
+  if(!['active','deactivated'].includes(status))return res.status(400).json({success:false,message:'Status must be active or deactivated'});
+  try {
+    const hospital=(await pool.query('SELECT id FROM hospitals WHERE user_id=$1',[req.user.id])).rows[0];
+    if(!hospital)return res.status(404).json({success:false,message:'Hospital not found'});
+    const result=await pool.query(`UPDATE doctors d SET is_active=$1,account_activation_status=$2,updated_at=CURRENT_TIMESTAMP FROM users u WHERE d.id=$3 AND d.hospital_id=$4 AND d.user_id=u.id RETURNING d.user_id`,[status==='active',status==='active'?'ACTIVE':'DEACTIVATED',Number(req.params.staffId),hospital.id]);
+    if(!result.rowCount)return res.status(404).json({success:false,message:'Doctor account not found'});
+    await pool.query(`UPDATE users SET account_status=$1,token_version=COALESCE(token_version,0)+1,updated_at=CURRENT_TIMESTAMP WHERE id=$2`,[status==='active'?'ACTIVE':'DEACTIVATED',result.rows[0].user_id]);
+    req.app.get('io')?.in(`user_${result.rows[0].user_id}`).disconnectSockets(true);
+    return res.json({success:true,message:`Doctor account ${status}`,data:{doctor_id:Number(req.params.staffId),account_status:status.toUpperCase()}});
+  } catch(_){return res.status(500).json({success:false,message:'Unable to update doctor account status'});}
 };
 // src/controllers/hospitalController.js - Add this method
 
@@ -902,13 +943,81 @@ exports.getDashboardStats = async (req, res) => {
 exports.updateHospitalLocation = async (req, res) => {
   try {
     const hospitalId = Number(req.params.hospitalId);
-    const { address, area, city, state, country, pincode, latitude, longitude, departments, specialties, services, emergency_available } = req.body;
+    const { address, area, city, state, country, pincode, latitude, longitude, departments, specialties, services, emergency_available, entrance_latitude, entrance_longitude, entrance_address, entrance_verified } = req.body;
     const lat = Number(latitude); const lng = Number(longitude);
     if (!Number.isInteger(hospitalId) || !Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return res.status(400).json({ success: false, message: 'A valid confirmed location is required' });
-    const result = await pool.query(`UPDATE hospitals SET address=COALESCE($1,address), area=COALESCE($2,area), city=COALESCE($3,city), state=COALESCE($4,state), country=COALESCE($5,country), pincode=COALESCE($6,pincode), latitude=$7, longitude=$8, departments=COALESCE($9,departments), specialties=COALESCE($10,specialties), services=COALESCE($11,services), emergency_available=COALESCE($12,emergency_available), updated_at=CURRENT_TIMESTAMP WHERE id=$13 AND user_id=$14 RETURNING *`, [address, area, city, state, country, pincode, lat, lng, Array.isArray(departments) ? departments : null, Array.isArray(specialties) ? specialties : null, Array.isArray(services) ? services : null, typeof emergency_available === 'boolean' ? emergency_available : null, hospitalId, req.user.id]);
+    const entranceLat = entrance_latitude == null ? null : Number(entrance_latitude); const entranceLng = entrance_longitude == null ? null : Number(entrance_longitude);
+    if ((entranceLat == null) !== (entranceLng == null) || (entranceLat != null && (!Number.isFinite(entranceLat) || !Number.isFinite(entranceLng) || entranceLat < -90 || entranceLat > 90 || entranceLng < -180 || entranceLng > 180))) return res.status(400).json({ success:false,message:'Provide valid front-gate latitude and longitude together' });
+    const result = await pool.query(`UPDATE hospitals SET address=COALESCE($1,address), area=COALESCE($2,area), city=COALESCE($3,city), state=COALESCE($4,state), country=COALESCE($5,country), pincode=COALESCE($6,pincode), latitude=$7, longitude=$8, departments=COALESCE($9,departments), specialties=COALESCE($10,specialties), services=COALESCE($11,services), emergency_available=COALESCE($12,emergency_available), entrance_latitude=COALESCE($13,entrance_latitude), entrance_longitude=COALESCE($14,entrance_longitude), entrance_address=COALESCE($15,entrance_address), entrance_verified=CASE WHEN $16::boolean=true AND $13 IS NOT NULL AND $14 IS NOT NULL THEN true WHEN $16::boolean=false THEN false ELSE entrance_verified END, entrance_verified_at=CASE WHEN $16::boolean=true AND $13 IS NOT NULL AND $14 IS NOT NULL THEN CURRENT_TIMESTAMP ELSE entrance_verified_at END, updated_at=CURRENT_TIMESTAMP WHERE id=$17 AND user_id=$18 RETURNING *`, [address, area, city, state, country, pincode, lat, lng, Array.isArray(departments) ? departments : null, Array.isArray(specialties) ? specialties : null, Array.isArray(services) ? services : null, typeof emergency_available === 'boolean' ? emergency_available : null, entranceLat, entranceLng, entrance_address || null, entrance_verified === true ? true : entrance_verified === false ? false : null, hospitalId, req.user.id]);
     if (!result.rowCount) return res.status(404).json({ success: false, message: 'Hospital not found' });
     res.json({ success: true, data: result.rows[0] });
   } catch (error) { res.status(500).json({ success: false, message: 'Unable to update hospital location' }); }
+};
+
+// Returns cached navigation metadata without making a Google request for each
+// patient visit. Location verification is performed separately by admins/jobs.
+exports.getHospitalNavigation = async (req, res) => {
+  try {
+    const hospitalId = Number(req.params.hospitalId);
+    if (!Number.isInteger(hospitalId) || hospitalId <= 0) return res.status(400).json({ success: false, message: 'Valid hospital ID is required' });
+    const result = await pool.query(`SELECT id, name, latitude, longitude, google_place_id, google_formatted_address,
+      entrance_latitude, entrance_longitude, entrance_address, entrance_verified, navigation_point_token, navigation_point_name,
+      navigation_point_type, navigation_verified, location_verified, location_source, location_updated_at
+      FROM hospitals WHERE id=$1 AND (is_verified=true OR directory_visible=true)`, [hospitalId]);
+    if (!result.rowCount) return res.status(404).json({ success: false, message: 'Hospital not found' });
+    const hospital = result.rows[0];
+    const entrance = (hospital.navigation_verified || hospital.entrance_verified) &&
+      hospital.entrance_latitude != null && hospital.entrance_longitude != null;
+    // A token without its corresponding cached coordinate can still be used by
+    // the Routes endpoint, but cannot safely be handed to an external Maps URL.
+    const navigationPoint = hospital.navigation_verified &&
+      hospital.navigation_point_token && entrance;
+    const verifiedPlace = hospital.location_verified && Boolean(hospital.google_place_id);
+    const destination = navigationPoint
+      ? { type: hospital.navigation_point_type || 'MAIN_ENTRANCE', name: hospital.navigation_point_name || hospital.entrance_address || 'Hospital entrance', latitude: Number(hospital.entrance_latitude), longitude: Number(hospital.entrance_longitude), token: hospital.navigation_point_token }
+      : entrance
+      ? { type: 'VERIFIED_MANUAL_ENTRANCE', name: hospital.entrance_address || 'Verified hospital entrance', latitude: Number(hospital.entrance_latitude), longitude: Number(hospital.entrance_longitude), token: null }
+      : verifiedPlace
+        ? { type: 'GOOGLE_PLACE', name: hospital.google_formatted_address || hospital.name, place_id: hospital.google_place_id }
+        : { type: 'HOSPITAL_COORDINATES', name: hospital.name, latitude: Number(hospital.latitude), longitude: Number(hospital.longitude) };
+    res.json({ success: true, hospital: { id: hospital.id, name: hospital.name, google_place_id: hospital.google_place_id, latitude: Number(hospital.latitude), longitude: Number(hospital.longitude), location_verified: Boolean(hospital.location_verified), location_source: hospital.location_source, location_updated_at: hospital.location_updated_at, navigation: destination } });
+  } catch (error) {
+    console.error('Get hospital navigation error:', error);
+    res.status(500).json({ success: false, message: 'Unable to load hospital navigation' });
+  }
+};
+
+// Routes API keys remain on the server. This endpoint is deliberately
+// authenticated because it can incur Google Maps billing.
+exports.getHospitalRoute = async (req, res) => {
+  try {
+    const hospitalId = Number(req.params.hospitalId);
+    const latitude = Number(req.body?.origin?.latitude);
+    const longitude = Number(req.body?.origin?.longitude);
+    if (!Number.isInteger(hospitalId) || !Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return res.status(400).json({ success: false, message: 'A valid live origin is required' });
+    const key = process.env.GOOGLE_MAPS_API_KEY;
+    if (!key) return res.status(503).json({ success: false, message: 'Server-side Google Routes is not configured.' });
+    const result = await pool.query(`SELECT id, name, latitude, longitude, google_place_id, entrance_latitude, entrance_longitude, entrance_address, entrance_verified, navigation_point_token, navigation_point_name, navigation_point_type, navigation_verified, location_verified FROM hospitals WHERE id=$1 AND (is_verified=true OR directory_visible=true)`, [hospitalId]);
+    if (!result.rowCount) return res.status(404).json({ success: false, message: 'Hospital not found' });
+    const hospital = result.rows[0];
+    const navigationPoint = hospital.navigation_verified && hospital.navigation_point_token;
+    const entrance = (hospital.navigation_verified || hospital.entrance_verified) && hospital.entrance_latitude != null && hospital.entrance_longitude != null;
+    const destination = navigationPoint
+      ? { navigationPointToken: hospital.navigation_point_token }
+      : entrance
+      ? { location: { latLng: { latitude: Number(hospital.entrance_latitude), longitude: Number(hospital.entrance_longitude) } } }
+      : hospital.location_verified && hospital.google_place_id
+        ? { placeId: hospital.google_place_id }
+        : { location: { latLng: { latitude: Number(hospital.latitude), longitude: Number(hospital.longitude) } } };
+    const googleResponse = await fetch('https://routes.googleapis.com/directions/v2:computeRoutes', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Goog-Api-Key': key, 'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline' }, body: JSON.stringify({ origin: { location: { latLng: { latitude, longitude } } }, destination, travelMode: 'DRIVE', routingPreference: 'TRAFFIC_AWARE' }) });
+    const data = await googleResponse.json();
+    if (!googleResponse.ok || !data.routes?.length) return res.status(502).json({ success: false, message: data.error?.message || 'Unable to calculate route' });
+    const route = data.routes[0];
+    res.json({ success: true, distance_meters: route.distanceMeters, duration: route.duration, encoded_polyline: route.polyline?.encodedPolyline || null, destination: { name: entrance ? (hospital.navigation_point_name || hospital.entrance_address || 'Hospital entrance') : hospital.name, type: navigationPoint ? (hospital.navigation_point_type || 'MAIN_ENTRANCE') : entrance ? 'VERIFIED_MANUAL_ENTRANCE' : hospital.location_verified && hospital.google_place_id ? 'GOOGLE_PLACE' : 'HOSPITAL_COORDINATES' } });
+  } catch (error) {
+    console.error('Get hospital route error:', error);
+    res.status(500).json({ success: false, message: 'Unable to calculate route' });
+  }
 };
 
 // Public directory detail.  Only approved hospitals are visible to patients.
@@ -920,7 +1029,10 @@ exports.getHospitalDetails = async (req, res) => {
     }
     const result = await pool.query(`
       SELECT h.id, h.name, h.address, h.city, h.state, h.pincode, h.phone, h.email,
-             h.latitude, h.longitude, h.google_rating, h.google_review_count, h.google_place_id, h.google_maps_url,
+             (SELECT '/api/hospitals/' || p.hospital_id || '/photos/' || p.id || '/image'
+              FROM hospital_photos p WHERE p.hospital_id = h.id AND p.is_cover = TRUE AND p.is_published = TRUE
+              ORDER BY p.id LIMIT 1) AS cover_photo_url,
+             h.latitude, h.longitude, h.entrance_latitude, h.entrance_longitude, h.entrance_address, h.entrance_verified, h.google_rating, h.google_review_count, h.google_place_id, h.google_maps_url,
              h.rating_source, h.rating_verified, h.rating_last_updated, h.is_verified, h.specialties, h.services, h.emergency_available,
              (SELECT ROUND(AVG(r.rating)::numeric, 1) FROM hospital_reviews r WHERE r.hospital_id=h.id AND r.is_visible=true) patient_rating,
              (SELECT COUNT(*) FROM hospital_reviews r WHERE r.hospital_id=h.id AND r.is_visible=true) patient_review_count,

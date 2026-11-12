@@ -2,42 +2,52 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/api_service.dart';
+import '../../services/location_service.dart';
 import '../../services/socket_service.dart';
 
 class PatientEmergencyRequest extends StatefulWidget {
   const PatientEmergencyRequest({super.key});
 
   @override
-  State<PatientEmergencyRequest> createState() => _PatientEmergencyRequestState();
+  State<PatientEmergencyRequest> createState() =>
+      _PatientEmergencyRequestState();
 }
 
-class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with SingleTickerProviderStateMixin {
+class _PatientEmergencyRequestState extends State<PatientEmergencyRequest>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _formKey = GlobalKey<FormState>();
-  
+
   String _emergencyType = 'Medical';
   String _severity = 'High';
   String _description = '';
   bool _isRequesting = false;
-  
+
   double? _currentLat;
   double? _currentLng;
-  double? _locationAccuracy;
   bool _isLocating = false;
   String _locationStatus = 'Fetching location...';
 
   int? _activeEmergencyId;
   Map<String, dynamic>? _activeEmergencyData;
   StreamSubscription<Position>? _positionSubscription;
-  
+
   List<Map<String, dynamic>> _sosHistory = [];
   bool _isLoadingHistory = false;
 
-  final List<String> _emergencyTypes = ['Medical', 'Accident', 'Cardiac', 'Stroke', 'Trauma', 'Other'];
+  final List<String> _emergencyTypes = [
+    'Medical',
+    'Accident',
+    'Cardiac',
+    'Stroke',
+    'Trauma',
+    'Other'
+  ];
   final List<String> _severityLevels = ['High', 'Medium', 'Low'];
 
   @override
@@ -58,10 +68,12 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
       if (!mounted || event is! Map) return;
       final update = Map<String, dynamic>.from(event);
       if (_activeEmergencyId != null && update['id'] == _activeEmergencyId) {
-        setState(() => _activeEmergencyData = {...?_activeEmergencyData, ...update});
+        setState(
+            () => _activeEmergencyData = {...?_activeEmergencyData, ...update});
       }
       _loadSosHistory();
     }
+
     socket.onEmergencyStatusUpdate(apply);
     socket.onEmergencyLifecycle(apply);
   }
@@ -92,12 +104,7 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
         return;
       }
 
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (!mounted) return;
-      }
-
+      final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.deniedForever) {
         setState(() {
           _isLocating = false;
@@ -107,34 +114,12 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
         return;
       }
 
-      if (permission == LocationPermission.denied) {
-        setState(() {
-          _isLocating = false;
-          _locationStatus = 'Location permission denied.';
-        });
-        return;
-      }
-
-      Position? position;
-      try {
-        position = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
-      } catch (_) {
-        // An approximate/last-known fix is still materially safer than making
-        // a patient wait indefinitely before an SOS can be persisted.
-        position = await Geolocator.getLastKnownPosition();
-      }
-      if (position == null) {
-        throw StateError('No current or recent location is available');
-      }
-      // `position` is captured by the setState callback below. Keep a
-      // non-null local after the guard so Dart's flow analysis remains valid.
-      final resolvedPosition = position;
+      final resolvedPosition = await LocationService.getFreshPatientLocation();
 
       if (mounted) {
         setState(() {
           _currentLat = resolvedPosition.latitude;
           _currentLng = resolvedPosition.longitude;
-          _locationAccuracy = resolvedPosition.accuracy;
           _isLocating = false;
           _locationStatus = 'Live GPS Location Acquired';
         });
@@ -154,7 +139,8 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Location Services Disabled'),
-        content: const Text('Please enable GPS location services to pinpoint your location during emergencies.'),
+        content: const Text(
+            'Please enable GPS location services to pinpoint your location during emergencies.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -177,7 +163,8 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Location Permission Required'),
-        content: const Text('Location permission is permanently denied. Please enable it in App Settings to allow emergency SOS location sharing.'),
+        content: const Text(
+            'Location permission is permanently denied. Please enable it in App Settings to allow emergency SOS location sharing.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -204,8 +191,10 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
       distanceFilter: 5,
     );
 
-    _positionSubscription = Geolocator.getPositionStream(locationSettings: locationSettings).listen(
-      (Position position) {
+    _positionSubscription =
+        Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+        (Position position) {
+        if (!LocationService.isUsablePosition(position)) return;
         if (mounted) {
           setState(() {
             _currentLat = position.latitude;
@@ -218,15 +207,9 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
           emergencyId: emergencyId,
           latitude: position.latitude,
           longitude: position.longitude,
+          accuracy: position.accuracy,
+          timestamp: position.timestamp,
         );
-
-        // Send via Socket.io
-        SocketService.instance.emitEmergencyLocation({
-          'emergencyId': emergencyId,
-          'latitude': position.latitude,
-          'longitude': position.longitude,
-          'timestamp': DateTime.now().toIso8601String(),
-        });
       },
       onError: (err) {
         debugPrint('Location stream error: $err');
@@ -235,16 +218,47 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
   }
 
   Future<void> _confirmAndSendEmergencyRequest() async {
-    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-      title: const Text('Activate Emergency SOS?'),
-      content: const Text('This will alert your registered emergency contact and nearby eligible hospitals.'),
-      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('CANCEL')), ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white), onPressed: () => Navigator.pop(context, true), child: const Text('SEND SOS'))],
-    ));
+    final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+              title: const Text('Activate Emergency SOS?'),
+              content: const Text(
+                  'This will alert your registered emergency contact and nearby eligible hospitals.'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('CANCEL')),
+                ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                        foregroundColor: Colors.white),
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('SEND SOS'))
+              ],
+            ));
     if (confirmed == true) await _sendEmergencyRequest();
   }
 
   Future<void> _sendEmergencyRequest() async {
     if (!_formKey.currentState!.validate()) return;
+
+    Position freshPosition;
+    try {
+      freshPosition = await LocationService.getFreshPatientLocation();
+    } on PatientLocationException catch (error) {
+      if (mounted) {
+        setState(() => _locationStatus = error.message);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _currentLat = freshPosition.latitude;
+      _currentLng = freshPosition.longitude;
+      _locationStatus = 'Fresh location acquired';
+    });
 
     setState(() => _isRequesting = true);
 
@@ -252,11 +266,11 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
       'emergency_type': _emergencyType,
       'severity': _severity.toLowerCase(),
       'description': _description,
-      'location_lat': _currentLat,
-      'location_lng': _currentLng,
-      'location_accuracy': _locationAccuracy,
-      'location_timestamp': DateTime.now().toIso8601String(),
-      'timestamp': DateTime.now().toIso8601String(),
+      'location_lat': freshPosition.latitude,
+      'location_lng': freshPosition.longitude,
+      'location_accuracy': freshPosition.accuracy,
+      'location_timestamp': freshPosition.timestamp.toUtc().toIso8601String(),
+      'timestamp': freshPosition.timestamp.toUtc().toIso8601String(),
     };
 
     try {
@@ -278,8 +292,9 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('🚨 Emergency SOS created. We are contacting nearby eligible hospitals.'),
-              backgroundColor: Colors.green,
+              content: Text(
+                  '🚨 Emergency SOS created. We are contacting nearby eligible hospitals.'),
+              backgroundColor: AppColors.success,
               duration: Duration(seconds: 4),
             ),
           );
@@ -292,8 +307,9 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
           setState(() => _isRequesting = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(response['message'] ?? 'Request queued offline. Will retry automatically.'),
-              backgroundColor: Colors.orange,
+              content: Text(response['message'] ??
+                  'Request queued offline. Will retry automatically.'),
+              backgroundColor: AppColors.warning,
             ),
           );
         }
@@ -304,8 +320,9 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
         setState(() => _isRequesting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Network unavailable. SOS request saved offline & will retry when connected.'),
-            backgroundColor: Colors.orange,
+            content: Text(
+                'Network unavailable. SOS request saved offline & will retry when connected.'),
+            backgroundColor: AppColors.warning,
           ),
         );
       }
@@ -355,7 +372,7 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Emergency ended. Live location sharing stopped.'),
-            backgroundColor: Colors.blue,
+            backgroundColor: AppColors.primary,
           ),
         );
       }
@@ -372,10 +389,15 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
       if (res['success'] == true && res['data'] != null) {
         setState(() {
           _sosHistory = List<Map<String, dynamic>>.from(res['data']);
-          final active = _sosHistory.where((item) => !['completed', 'resolved', 'cancelled'].contains(item['status'])).toList();
+          final active = _sosHistory
+              .where((item) => !['completed', 'resolved', 'cancelled']
+                  .contains(item['status']))
+              .toList();
           if (_activeEmergencyId == null && active.isNotEmpty) {
             _activeEmergencyData = active.first;
             _activeEmergencyId = active.first['id'] as int?;
+            SocketService.instance
+                .subscribeAssignment('emergency', _activeEmergencyId!);
           }
         });
       }
@@ -391,7 +413,7 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Emergency SOS Dashboard'),
-        backgroundColor: Colors.red.shade700,
+        backgroundColor: AppColors.error,
         foregroundColor: Colors.white,
         bottom: TabBar(
           controller: _tabController,
@@ -430,22 +452,32 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [Colors.red.shade50, Colors.orange.shade50]),
+                gradient: LinearGradient(colors: [
+                  AppColors.error.withValues(alpha: 0.1),
+                  AppColors.warning.withValues(alpha: 0.1)
+                ]),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.red.shade200),
+                border:
+                    Border.all(color: AppColors.error.withValues(alpha: 0.1)),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 28),
+                    decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: BorderRadius.circular(12)),
+                    child: const Icon(Icons.warning_amber_rounded,
+                        color: Colors.white, size: 28),
                   ),
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
                       'SOS alerts your registered emergency contact and contacts eligible nearby hospitals one at a time until one accepts.',
-                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 13),
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.error,
+                          fontSize: 13),
                     ),
                   ),
                 ],
@@ -454,11 +486,18 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
             const SizedBox(height: 20),
 
             // Emergency Type
-            _buildDropdown('Emergency Type', _emergencyTypes, _emergencyType, (v) => setState(() => _emergencyType = v!), Icons.medical_services),
+            _buildDropdown(
+                'Emergency Type',
+                _emergencyTypes,
+                _emergencyType,
+                (v) => setState(() => _emergencyType = v!),
+                Icons.medical_services),
             const SizedBox(height: 16),
 
             // Severity Level
-            _buildDropdown('Severity Level', _severityLevels, _severity, (v) => setState(() => _severity = v!), Icons.warning, isSeverity: true),
+            _buildDropdown('Severity Level', _severityLevels, _severity,
+                (v) => setState(() => _severity = v!), Icons.warning,
+                isSeverity: true),
             const SizedBox(height: 16),
 
             // Description
@@ -469,9 +508,12 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
                 labelText: 'Describe Emergency Details',
                 prefixIcon: Icon(Icons.description),
                 border: OutlineInputBorder(),
-                hintText: 'Describe patient condition, symptoms, or location notes',
+                hintText:
+                    'Describe patient condition, symptoms, or location notes',
               ),
-              validator: (v) => v == null || v.isEmpty ? 'Please describe the emergency condition' : null,
+              validator: (v) => v == null || v.isEmpty
+                  ? 'Please describe the emergency condition'
+                  : null,
             ),
             const SizedBox(height: 20),
 
@@ -479,15 +521,20 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade200),
+                border:
+                    Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
               ),
               child: Row(
                 children: [
                   Icon(
-                    _currentLat == null ? Icons.location_searching : Icons.my_location,
-                    color: _currentLat == null ? Colors.orange : Colors.green,
+                    _currentLat == null
+                        ? Icons.location_searching
+                        : Icons.my_location,
+                    color: _currentLat == null
+                        ? AppColors.warning
+                        : AppColors.success,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -498,22 +545,28 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
                           _locationStatus,
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: _currentLat == null ? Colors.orange.shade800 : Colors.green.shade800,
+                            color: _currentLat == null
+                                ? AppColors.warning
+                                : AppColors.success,
                           ),
                         ),
                         if (_currentLat != null)
                           Text(
                             'Lat: ${_currentLat!.toStringAsFixed(4)}, Lng: ${_currentLng!.toStringAsFixed(4)}',
-                            style: TextStyle(fontSize: 11, color: Colors.grey[700]),
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey[700]),
                           ),
                       ],
                     ),
                   ),
                   if (_isLocating)
-                    const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2))
                   else
                     IconButton(
-                      icon: const Icon(Icons.refresh, color: Colors.blue),
+                      icon: const Icon(Icons.refresh, color: AppColors.primary),
                       onPressed: _checkLocationPermissionAndFetch,
                     ),
                 ],
@@ -526,19 +579,30 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
               width: double.infinity,
               height: 54,
               child: ElevatedButton.icon(
-                onPressed: _isRequesting ? null : _confirmAndSendEmergencyRequest,
+                onPressed:
+                    _isRequesting ? null : _confirmAndSendEmergencyRequest,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
+                  backgroundColor: AppColors.error,
                   foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
                   elevation: 4,
                 ),
                 icon: _isRequesting
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2))
                     : const Icon(Icons.sos, size: 28),
                 label: Text(
-                  _isRequesting ? 'BROADCASTING SOS...' : 'SEND EMERGENCY SOS NOW',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1),
+                  _isRequesting
+                      ? 'BROADCASTING SOS...'
+                      : 'SEND EMERGENCY SOS NOW',
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1),
                 ),
               ),
             ),
@@ -557,9 +621,9 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
       child: Column(
         children: [
           // Active Alert Banner
-          Card(
-            color: Colors.red.shade900,
-            child: const Padding(
+          const Card(
+            color: AppColors.error,
+            child: Padding(
               padding: EdgeInsets.all(16),
               child: Row(
                 children: [
@@ -569,9 +633,16 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('ACTIVE EMERGENCY BROADCAST', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text('ACTIVE EMERGENCY BROADCAST',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16)),
                         SizedBox(height: 2),
-                        Text('Continuously sharing live GPS location with emergency network...', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                        Text(
+                            'Continuously sharing live GPS location with emergency network...',
+                            style:
+                                TextStyle(color: Colors.white70, fontSize: 12)),
                       ],
                     ),
                   ),
@@ -584,10 +655,18 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
           // Assigned Hospital Card
           Card(
             child: ListTile(
-              leading: const CircleAvatar(backgroundColor: Colors.blue, child: Icon(Icons.local_hospital, color: Colors.white)),
-              title: Text(hospital?['name'] ?? 'Searching for hospital assistance'),
-              subtitle: Text(hospital?['phone'] != null ? 'Phone: ${hospital['phone']}' : 'A hospital has not accepted yet.'),
-              trailing: Icon(hospital == null ? Icons.hourglass_top : Icons.check_circle, color: hospital == null ? Colors.orange : Colors.green),
+              leading: const CircleAvatar(
+                  backgroundColor: AppColors.primary,
+                  child: Icon(Icons.local_hospital, color: Colors.white)),
+              title: Text(
+                  hospital?['name'] ?? 'Searching for hospital assistance'),
+              subtitle: Text(hospital?['phone'] != null
+                  ? 'Phone: ${hospital['phone']}'
+                  : 'A hospital has not accepted yet.'),
+              trailing: Icon(
+                  hospital == null ? Icons.hourglass_top : Icons.check_circle,
+                  color:
+                      hospital == null ? AppColors.warning : AppColors.success),
             ),
           ),
           const SizedBox(height: 12),
@@ -601,19 +680,26 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.airport_shuttle, color: Colors.red, size: 28),
+                      const Icon(Icons.airport_shuttle,
+                          color: AppColors.error, size: 28),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              ambulance != null ? 'Ambulance Dispatched (${ambulance['vehicle_number']})' : 'Searching for Available Ambulance...',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                              ambulance != null
+                                  ? 'Ambulance Dispatched (${ambulance['vehicle_number']})'
+                                  : 'Searching for Available Ambulance...',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 15),
                             ),
                             Text(
-                              ambulance != null ? 'Driver: ${ambulance['driver_name']} • ${ambulance['driver_phone'] ?? ''}' : 'Hospital dispatch team is assigning a vehicle',
-                              style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                              ambulance != null
+                                  ? 'Driver: ${ambulance['driver_name']} • ${ambulance['driver_phone'] ?? ''}'
+                                  : 'Hospital dispatch team is assigning a vehicle',
+                              style: TextStyle(
+                                  color: Colors.grey[700], fontSize: 12),
                             ),
                           ],
                         ),
@@ -621,13 +707,21 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const LinearProgressIndicator(color: Colors.red, backgroundColor: Colors.redAccent),
+                  const LinearProgressIndicator(
+                      color: AppColors.error,
+                      backgroundColor: Colors.redAccent),
                   const SizedBox(height: 8),
-                  Row(
+                  const Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Live GPS Sync: Active', style: TextStyle(color: Colors.green.shade700, fontSize: 12, fontWeight: FontWeight.bold)),
-                      const Text('ETA will appear when supplied by the dispatch team', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      Text('Live GPS Sync: Active',
+                          style: TextStyle(
+                              color: AppColors.success,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold)),
+                      Text('ETA will appear when supplied by the dispatch team',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 12)),
                     ],
                   ),
                 ],
@@ -669,7 +763,8 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
             const SizedBox(height: 12),
             const Text('No previous SOS emergency records'),
             const SizedBox(height: 12),
-            ElevatedButton(onPressed: _loadSosHistory, child: const Text('Refresh')),
+            ElevatedButton(
+                onPressed: _loadSosHistory, child: const Text('Refresh')),
           ],
         ),
       );
@@ -682,16 +777,19 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
         itemCount: _sosHistory.length,
         itemBuilder: (context, index) {
           final item = _sosHistory[index];
-          final isResolved = item['status'] == 'completed' || item['status'] == 'resolved';
+          final isResolved =
+              item['status'] == 'completed' || item['status'] == 'resolved';
 
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: isResolved ? Colors.green.shade100 : Colors.red.shade100,
+                backgroundColor: isResolved
+                    ? AppColors.success.withValues(alpha: 0.1)
+                    : AppColors.error.withValues(alpha: 0.1),
                 child: Icon(
                   isResolved ? Icons.check : Icons.warning,
-                  color: isResolved ? Colors.green : Colors.red,
+                  color: isResolved ? AppColors.success : AppColors.error,
                 ),
               ),
               title: Text(item['emergency_type'] ?? 'Emergency'),
@@ -706,20 +804,44 @@ class _PatientEmergencyRequestState extends State<PatientEmergencyRequest> with 
     );
   }
 
-  Widget _buildDropdown(String label, List<String> items, String value, Function(String?) onChanged, IconData icon, {bool isSeverity = false}) {
+  Widget _buildDropdown(String label, List<String> items, String value,
+      Function(String?) onChanged, IconData icon,
+      {bool isSeverity = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        Text(label,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(12)),
+          decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(12)),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: value,
               isExpanded: true,
-              items: items.map((e) => DropdownMenuItem(value: e, child: isSeverity ? Row(children: [Container(width: 12, height: 12, decoration: BoxDecoration(color: e == 'High' ? Colors.red : e == 'Medium' ? Colors.orange : Colors.green, shape: BoxShape.circle)), const SizedBox(width: 8), Text(e)]) : Text(e))).toList(),
+              items: items
+                  .map((e) => DropdownMenuItem(
+                      value: e,
+                      child: isSeverity
+                          ? Row(children: [
+                              Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                      color: e == 'High'
+                                          ? AppColors.error
+                                          : e == 'Medium'
+                                              ? AppColors.warning
+                                              : AppColors.success,
+                                      shape: BoxShape.circle)),
+                              const SizedBox(width: 8),
+                              Text(e)
+                            ])
+                          : Text(e)))
+                  .toList(),
               onChanged: onChanged,
             ),
           ),

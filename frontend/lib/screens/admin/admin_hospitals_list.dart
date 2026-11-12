@@ -1,5 +1,6 @@
 // lib/screens/admin/admin_hospitals_list.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import '../../services/api_service.dart';
 import 'admin_hospital_detail.dart';
 
@@ -62,25 +63,36 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
 
   List<Map<String, dynamic>> get _filteredHospitals {
     var filtered = _hospitals;
-    
+
     if (_searchQuery.isNotEmpty) {
-      filtered = filtered.where((h) =>
-        (h['name'] ?? '').toLowerCase().contains(_searchQuery.toLowerCase()) ||
-        (h['city'] ?? '').toLowerCase().contains(_searchQuery.toLowerCase()) ||
-        (h['email'] ?? '').toLowerCase().contains(_searchQuery.toLowerCase())
-      ).toList();
+      filtered = filtered
+          .where((h) =>
+              (h['name'] ?? '')
+                  .toLowerCase()
+                  .contains(_searchQuery.toLowerCase()) ||
+              (h['city'] ?? '')
+                  .toLowerCase()
+                  .contains(_searchQuery.toLowerCase()) ||
+              (h['email'] ?? '')
+                  .toLowerCase()
+                  .contains(_searchQuery.toLowerCase()))
+          .toList();
     }
-    
+
     if (_filterStatus != 'all') {
       if (_filterStatus == 'verified') {
         filtered = filtered.where((h) => h['is_verified'] == true).toList();
       } else if (_filterStatus == 'pending') {
-        filtered = filtered.where((h) => h['verification_status'] == 'pending').toList();
+        filtered = filtered
+            .where((h) => h['verification_status'] == 'pending')
+            .toList();
       } else if (_filterStatus == 'rejected') {
-        filtered = filtered.where((h) => h['verification_status'] == 'rejected').toList();
+        filtered = filtered
+            .where((h) => h['verification_status'] == 'rejected')
+            .toList();
       }
     }
-    
+
     return filtered;
   }
 
@@ -105,7 +117,8 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const Icon(Icons.error_outline,
+                          size: 64, color: AppColors.error),
                       const SizedBox(height: 16),
                       Text(_errorMessage!),
                       const SizedBox(height: 16),
@@ -146,7 +159,8 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                                     ),
                                     filled: true,
                                     fillColor: Colors.grey.shade50,
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16),
                                   ),
                                   onChanged: (value) {
                                     setState(() => _searchQuery = value);
@@ -155,7 +169,8 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                               ),
                               const SizedBox(width: 12),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
                                 decoration: BoxDecoration(
                                   color: Colors.grey.shade50,
                                   borderRadius: BorderRadius.circular(12),
@@ -164,10 +179,17 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                                   child: DropdownButton<String>(
                                     value: _filterStatus,
                                     items: const [
-                                      DropdownMenuItem(value: 'all', child: Text('All')),
-                                      DropdownMenuItem(value: 'verified', child: Text('Verified')),
-                                      DropdownMenuItem(value: 'pending', child: Text('Pending')),
-                                      DropdownMenuItem(value: 'rejected', child: Text('Rejected')),
+                                      DropdownMenuItem(
+                                          value: 'all', child: Text('All')),
+                                      DropdownMenuItem(
+                                          value: 'verified',
+                                          child: Text('Verified')),
+                                      DropdownMenuItem(
+                                          value: 'pending',
+                                          child: Text('Pending')),
+                                      DropdownMenuItem(
+                                          value: 'rejected',
+                                          child: Text('Rejected')),
                                     ],
                                     onChanged: (value) {
                                       setState(() => _filterStatus = value!);
@@ -183,19 +205,21 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                             children: [
                               Text(
                                 '${filteredHospitals.length} hospitals found',
-                                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                style: TextStyle(
+                                    color: Colors.grey[600], fontSize: 12),
                               ),
                               if (_hospitals.isNotEmpty)
                                 Text(
                                   'Page $_currentPage of $_totalPages',
-                                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                                  style: TextStyle(
+                                      color: Colors.grey[600], fontSize: 12),
                                 ),
                             ],
                           ),
                         ],
                       ),
                     ),
-                    
+
                     // Hospital List
                     Expanded(
                       child: filteredHospitals.isEmpty
@@ -203,7 +227,8 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.local_hospital, size: 64, color: Colors.grey[400]),
+                                  Icon(Icons.local_hospital,
+                                      size: 64, color: Colors.grey[400]),
                                   const SizedBox(height: 16),
                                   Text(
                                     'No hospitals found',
@@ -212,7 +237,8 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                                   const SizedBox(height: 8),
                                   Text(
                                     'Try adjusting your search or filters',
-                                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                                    style: TextStyle(
+                                        color: Colors.grey[500], fontSize: 12),
                                   ),
                                 ],
                               ),
@@ -226,7 +252,7 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                               },
                             ),
                     ),
-                    
+
                     // Pagination
                     if (_totalPages > 1)
                       Container(
@@ -257,7 +283,8 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                             ),
                             Text(
                               'Page $_currentPage of $_totalPages',
-                              style: const TextStyle(fontWeight: FontWeight.w500),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w500),
                             ),
                             IconButton(
                               icon: const Icon(Icons.chevron_right),
@@ -281,7 +308,7 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
   Widget _buildHospitalCard(Map<String, dynamic> hospital) {
     final isVerified = hospital['is_verified'] ?? false;
     final status = hospital['verification_status'] ?? 'pending';
-    
+
     // Safely convert values to int
     final generalBedsTotal = _toInt(hospital['general_beds_total']);
     final generalBedsAvailable = _toInt(hospital['general_beds_available']);
@@ -292,8 +319,9 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
     final oxygenBedsTotal = _toInt(hospital['oxygen_beds_total']);
     final oxygenBedsAvailable = _toInt(hospital['oxygen_beds_available']);
     final bloodUnits = _toInt(hospital['blood_units']);
-    
-    final hasResources = generalBedsTotal > 0 || icuBedsTotal > 0 || ventilatorsTotal > 0;
+
+    final hasResources =
+        generalBedsTotal > 0 || icuBedsTotal > 0 || ventilatorsTotal > 0;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -322,12 +350,14 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: isVerified ? Colors.green.shade50 : Colors.orange.shade50,
+                      color: isVerified
+                          ? AppColors.success.withValues(alpha: 0.1)
+                          : AppColors.warning.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
                       isVerified ? Icons.verified : Icons.pending,
-                      color: isVerified ? Colors.green : Colors.orange,
+                      color: isVerified ? AppColors.success : AppColors.warning,
                       size: 24,
                     ),
                   ),
@@ -347,20 +377,24 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                         ),
                         Row(
                           children: [
-                            const Icon(Icons.location_on, size: 14, color: Colors.grey),
+                            const Icon(Icons.location_on,
+                                size: 14, color: Colors.grey),
                             const SizedBox(width: 4),
                             Text(
                               hospital['city'] ?? 'Location not set',
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.grey),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(width: 12),
-                            const Icon(Icons.phone, size: 14, color: Colors.grey),
+                            const Icon(Icons.phone,
+                                size: 14, color: Colors.grey),
                             const SizedBox(width: 4),
                             Text(
                               hospital['phone'] ?? 'N/A',
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                              style: const TextStyle(
+                                  fontSize: 12, color: Colors.grey),
                             ),
                           ],
                         ),
@@ -368,23 +402,24 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: status == 'verified'
-                          ? Colors.green.withValues(alpha: 0.1)
+                          ? AppColors.success.withValues(alpha: 0.1)
                           : status == 'pending'
-                              ? Colors.orange.withValues(alpha: 0.1)
-                              : Colors.red.withValues(alpha: 0.1),
+                              ? AppColors.warning.withValues(alpha: 0.1)
+                              : AppColors.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       status.toUpperCase(),
                       style: TextStyle(
                         color: status == 'verified'
-                            ? Colors.green
+                            ? AppColors.success
                             : status == 'pending'
-                                ? Colors.orange
-                                : Colors.red,
+                                ? AppColors.warning
+                                : AppColors.error,
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
@@ -399,34 +434,34 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                     label: 'Beds',
                     available: generalBedsAvailable,
                     total: generalBedsTotal,
-                    color: Colors.blue,
+                    color: AppColors.primary,
                   ),
                   const SizedBox(width: 16),
                   _buildResourceIndicator(
                     label: 'ICU',
                     available: icuBedsAvailable,
                     total: icuBedsTotal,
-                    color: Colors.red,
+                    color: AppColors.error,
                   ),
                   const SizedBox(width: 16),
                   _buildResourceIndicator(
                     label: 'Ventilators',
                     available: ventilatorsAvailable,
                     total: ventilatorsTotal,
-                    color: Colors.green,
+                    color: AppColors.success,
                   ),
                   const SizedBox(width: 16),
                   _buildResourceIndicator(
                     label: 'Oxygen',
                     available: oxygenBedsAvailable,
                     total: oxygenBedsTotal,
-                    color: Colors.purple,
+                    color: AppColors.secondary,
                   ),
                   const SizedBox(width: 16),
                   _buildResourceIndicator(
                     label: 'Blood',
                     available: bloodUnits,
-                    color: Colors.red,
+                    color: AppColors.error,
                   ),
                 ],
               ),
@@ -440,14 +475,16 @@ class _AdminHospitalsListState extends State<AdminHospitalsList> {
                   ),
                   if (!hasResources)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.orange.shade50,
+                        color: AppColors.warning.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Text(
                         'No resources',
-                        style: TextStyle(fontSize: 10, color: Colors.orange),
+                        style:
+                            TextStyle(fontSize: 10, color: AppColors.warning),
                       ),
                     ),
                 ],

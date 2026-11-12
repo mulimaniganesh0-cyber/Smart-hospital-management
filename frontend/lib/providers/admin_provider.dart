@@ -40,7 +40,7 @@ class AdminProvider extends ChangeNotifier {
 
     try {
       final response = await ApiService.deleteHospital(hospitalId);
-      
+
       if (response['success'] == true) {
         _hospitals.removeWhere((h) => h['id'] == hospitalId);
         _isLoading = false;

@@ -29,7 +29,8 @@ class PatientModel {
       bloodGroup: json['blood_group'] ?? '',
       emergencyContact: json['emergency_contact'] ?? '',
       bookings: List<Map<String, dynamic>>.from(json['bookings'] ?? []),
-      medicalHistory: List<Map<String, dynamic>>.from(json['medical_history'] ?? []),
+      medicalHistory:
+          List<Map<String, dynamic>>.from(json['medical_history'] ?? []),
     );
   }
 

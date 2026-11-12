@@ -1,5 +1,6 @@
 // lib/screens/hospital/hospital_campaigns.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import '../../services/api_service.dart';
 
 class HospitalCampaigns extends StatefulWidget {
@@ -15,7 +16,14 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
   String? _errorMessage;
   String _selectedFilter = 'all';
 
-  final List<String> _filters = ['all', 'pending', 'approved', 'active', 'completed', 'cancelled'];
+  final List<String> _filters = [
+    'all',
+    'pending',
+    'approved',
+    'active',
+    'completed',
+    'cancelled'
+  ];
 
   @override
   void initState() {
@@ -55,7 +63,7 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Blood Donation Camps'),
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -75,7 +83,8 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const Icon(Icons.error_outline,
+                          size: 64, color: AppColors.error),
                       const SizedBox(height: 16),
                       Text(_errorMessage!),
                       const SizedBox(height: 16),
@@ -97,9 +106,11 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
                         itemCount: _filters.length,
                         itemBuilder: (context, index) {
                           final filter = _filters[index];
-                          final count = _campaigns.where((c) => 
-                            filter == 'all' ? true : c['status'] == filter
-                          ).length;
+                          final count = _campaigns
+                              .where((c) => filter == 'all'
+                                  ? true
+                                  : c['status'] == filter)
+                              .length;
                           return Padding(
                             padding: const EdgeInsets.only(right: 8),
                             child: FilterChip(
@@ -108,17 +119,20 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
                               onSelected: (selected) {
                                 setState(() => _selectedFilter = filter);
                               },
-                              selectedColor: Colors.red.shade100,
+                              selectedColor:
+                                  AppColors.error.withValues(alpha: 0.1),
                               labelStyle: TextStyle(
                                 fontSize: 11,
-                                fontWeight: _selectedFilter == filter ? FontWeight.bold : FontWeight.normal,
+                                fontWeight: _selectedFilter == filter
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
                               ),
                             ),
                           );
                         },
                       ),
                     ),
-                    
+
                     // Campaigns List
                     Expanded(
                       child: _filteredCampaigns.isEmpty
@@ -126,7 +140,8 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.campaign, size: 64, color: Colors.grey),
+                                  Icon(Icons.campaign,
+                                      size: 64, color: Colors.grey),
                                   SizedBox(height: 16),
                                   Text('No campaigns found'),
                                   Text(
@@ -140,7 +155,8 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
                               padding: const EdgeInsets.all(16),
                               itemCount: _filteredCampaigns.length,
                               itemBuilder: (context, index) {
-                                return _buildCampaignCard(_filteredCampaigns[index]);
+                                return _buildCampaignCard(
+                                    _filteredCampaigns[index]);
                               },
                             ),
                     ),
@@ -153,22 +169,22 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
     final status = campaign['status'] ?? 'pending';
     final isPending = status == 'pending';
     final isActive = status == 'active' || status == 'approved';
-    
+
     Color statusColor;
     switch (status) {
       case 'approved':
       case 'active':
-        statusColor = Colors.green;
+        statusColor = AppColors.success;
         break;
       case 'pending':
-        statusColor = Colors.orange;
+        statusColor = AppColors.warning;
         break;
       case 'completed':
-        statusColor = Colors.blue;
+        statusColor = AppColors.primary;
         break;
       case 'cancelled':
       case 'rejected':
-        statusColor = Colors.red;
+        statusColor = AppColors.error;
         break;
       default:
         statusColor = Colors.grey;
@@ -188,10 +204,11 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.bloodtype, color: Colors.red, size: 24),
+                  child: const Icon(Icons.bloodtype,
+                      color: AppColors.error, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -213,7 +230,8 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -267,17 +285,19 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
                   _buildStatItem(
                     'Target',
                     campaign['target_donors']?.toString() ?? '0',
-                    Colors.blue,
+                    AppColors.primary,
                   ),
                   _buildStatItem(
                     'Registered',
                     campaign['registered_donors']?.toString() ?? '0',
-                    Colors.green,
+                    AppColors.success,
                   ),
                   _buildStatItem(
                     'Remaining',
-                    ((campaign['target_donors'] ?? 0) - (campaign['registered_donors'] ?? 0)).toString(),
-                    Colors.orange,
+                    ((campaign['target_donors'] ?? 0) -
+                            (campaign['registered_donors'] ?? 0))
+                        .toString(),
+                    AppColors.warning,
                   ),
                 ],
               ),
@@ -286,18 +306,20 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
             Wrap(
               spacing: 4,
               runSpacing: 4,
-              children: (campaign['blood_groups_needed'] as List? ?? ['A+', 'A-', 'B+', 'B-', 'O+', 'O-'])
+              children: (campaign['blood_groups_needed'] as List? ??
+                      ['A+', 'A-', 'B+', 'B-', 'O+', 'O-'])
                   .map((group) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.red.shade100,
+                          color: AppColors.error.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           group,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 10,
-                            color: Colors.red.shade700,
+                            color: AppColors.error,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -310,9 +332,10 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () => _updateCampaignStatus(campaign['id'], 'active'),
+                      onPressed: () =>
+                          _updateCampaignStatus(campaign['id'], 'active'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
+                        backgroundColor: AppColors.success,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 8),
                       ),
@@ -322,9 +345,10 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () => _updateCampaignStatus(campaign['id'], 'cancelled'),
+                      onPressed: () =>
+                          _updateCampaignStatus(campaign['id'], 'cancelled'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
+                        backgroundColor: AppColors.error,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 8),
                       ),
@@ -338,9 +362,10 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () => _updateCampaignStatus(campaign['id'], 'completed'),
+                      onPressed: () =>
+                          _updateCampaignStatus(campaign['id'], 'completed'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
+                        backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 8),
                       ),
@@ -350,16 +375,19 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => _updateCampaignStatus(campaign['id'], 'cancelled'),
+                      onPressed: () =>
+                          _updateCampaignStatus(campaign['id'], 'cancelled'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
+                        foregroundColor: AppColors.error,
                       ),
                       child: const Text('Cancel'),
                     ),
                   ),
                 ],
               ),
-            if (status == 'completed' || status == 'cancelled' || status == 'rejected')
+            if (status == 'completed' ||
+                status == 'cancelled' ||
+                status == 'rejected')
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -407,50 +435,53 @@ class _HospitalCampaignsState extends State<HospitalCampaigns> {
 
   // lib/screens/hospital/hospital_campaigns.dart - Update the _updateCampaignStatus method
 
-Future<void> _updateCampaignStatus(int campaignId, String status) async {
-  final confirm = await showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text('Update Campaign Status'),
-      content: Text('Are you sure you want to mark this campaign as $status?'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(context, true),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: status == 'cancelled' ? Colors.red : Colors.green,
+  Future<void> _updateCampaignStatus(int campaignId, String status) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Update Campaign Status'),
+        content:
+            Text('Are you sure you want to mark this campaign as $status?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
           ),
-          child: Text(status.toUpperCase()),
-        ),
-      ],
-    ),
-  );
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor:
+                  status == 'cancelled' ? AppColors.error : AppColors.success,
+            ),
+            child: Text(status.toUpperCase()),
+          ),
+        ],
+      ),
+    );
 
-  if (confirm == true && mounted) {
-    final response = await ApiService.updateCampaignStatus(campaignId, status);
-    if (mounted) {
-      if (response['success']) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Campaign status updated to $status'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        _loadCampaigns();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response['message'] ?? 'Failed to update status'),
-            backgroundColor: Colors.red,
-          ),
-        );
+    if (confirm == true && mounted) {
+      final response =
+          await ApiService.updateCampaignStatus(campaignId, status);
+      if (mounted) {
+        if (response['success']) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Campaign status updated to $status'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          _loadCampaigns();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response['message'] ?? 'Failed to update status'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
       }
     }
   }
-}
 
   void _showCreateCampaignDialog(BuildContext context) {
     final nameController = TextEditingController();
@@ -461,14 +492,23 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
     final contactPhoneController = TextEditingController();
     // Use TextEditingController with initial value for target donors
     final targetDonorsController = TextEditingController(text: '50');
-    
+
     DateTime? startDate;
     DateTime? endDate;
     TimeOfDay? startTime;
     TimeOfDay? endTime;
     int targetDonors = 50;
     List<String> selectedBloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-'];
-    final List<String> allBloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    final List<String> allBloodGroups = [
+      'A+',
+      'A-',
+      'B+',
+      'B-',
+      'AB+',
+      'AB-',
+      'O+',
+      'O-'
+    ];
 
     showDialog(
       context: context,
@@ -525,21 +565,24 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
                             context: context,
                             initialDate: DateTime.now(),
                             firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                            lastDate:
+                                DateTime.now().add(const Duration(days: 365)),
                           );
                           if (date != null) {
                             setState(() => startDate = date);
                           }
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 16),
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.grey.shade300),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.calendar_today, color: Colors.red),
+                              const Icon(Icons.calendar_today,
+                                  color: AppColors.error),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -547,7 +590,9 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
                                       ? 'Start: ${startDate!.day}/${startDate!.month}/${startDate!.year}'
                                       : 'Start Date *',
                                   style: TextStyle(
-                                    color: startDate != null ? Colors.black : Colors.grey,
+                                    color: startDate != null
+                                        ? Colors.black
+                                        : Colors.grey,
                                   ),
                                 ),
                               ),
@@ -562,23 +607,27 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
                         onTap: () async {
                           final date = await showDatePicker(
                             context: context,
-                            initialDate: startDate ?? DateTime.now().add(const Duration(days: 7)),
+                            initialDate: startDate ??
+                                DateTime.now().add(const Duration(days: 7)),
                             firstDate: startDate ?? DateTime.now(),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                            lastDate:
+                                DateTime.now().add(const Duration(days: 365)),
                           );
                           if (date != null) {
                             setState(() => endDate = date);
                           }
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 16),
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.grey.shade300),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.calendar_today, color: Colors.red),
+                              const Icon(Icons.calendar_today,
+                                  color: AppColors.error),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -586,7 +635,9 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
                                       ? 'End: ${endDate!.day}/${endDate!.month}/${endDate!.year}'
                                       : 'End Date *',
                                   style: TextStyle(
-                                    color: endDate != null ? Colors.black : Colors.grey,
+                                    color: endDate != null
+                                        ? Colors.black
+                                        : Colors.grey,
                                   ),
                                 ),
                               ),
@@ -612,14 +663,16 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
                           }
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 16),
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.grey.shade300),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.access_time, color: Colors.red),
+                              const Icon(Icons.access_time,
+                                  color: AppColors.error),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -627,7 +680,9 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
                                       ? 'Start: ${startTime!.format(context)}'
                                       : 'Start Time *',
                                   style: TextStyle(
-                                    color: startTime != null ? Colors.black : Colors.grey,
+                                    color: startTime != null
+                                        ? Colors.black
+                                        : Colors.grey,
                                   ),
                                 ),
                               ),
@@ -649,14 +704,16 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
                           }
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 16),
                           decoration: BoxDecoration(
                             border: Border.all(color: Colors.grey.shade300),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.access_time, color: Colors.red),
+                              const Icon(Icons.access_time,
+                                  color: AppColors.error),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
@@ -664,7 +721,9 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
                                       ? 'End: ${endTime!.format(context)}'
                                       : 'End Time *',
                                   style: TextStyle(
-                                    color: endTime != null ? Colors.black : Colors.grey,
+                                    color: endTime != null
+                                        ? Colors.black
+                                        : Colors.grey,
                                   ),
                                 ),
                               ),
@@ -738,8 +797,8 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
                           }
                         });
                       },
-                      selectedColor: Colors.red.shade100,
-                      checkmarkColor: Colors.red,
+                      selectedColor: AppColors.error.withValues(alpha: 0.1),
+                      checkmarkColor: AppColors.error,
                     );
                   }).toList(),
                 ),
@@ -763,7 +822,7 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Please fill all required fields'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppColors.error,
                     ),
                   );
                   return;
@@ -780,8 +839,10 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
                   'city': cityController.text,
                   'start_date': startDate!.toIso8601String().split('T')[0],
                   'end_date': endDate!.toIso8601String().split('T')[0],
-                  'start_time': '${startTime!.hour.toString().padLeft(2, '0')}:${startTime!.minute.toString().padLeft(2, '0')}:00',
-                  'end_time': '${endTime!.hour.toString().padLeft(2, '0')}:${endTime!.minute.toString().padLeft(2, '0')}:00',
+                  'start_time':
+                      '${startTime!.hour.toString().padLeft(2, '0')}:${startTime!.minute.toString().padLeft(2, '0')}:00',
+                  'end_time':
+                      '${endTime!.hour.toString().padLeft(2, '0')}:${endTime!.minute.toString().padLeft(2, '0')}:00',
                   'target_donors': targetDonors,
                   'blood_groups_needed': selectedBloodGroups,
                   'contact_person': contactPersonController.text,
@@ -793,7 +854,7 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(' Campaign created successfully!'),
-                      backgroundColor: Colors.green,
+                      backgroundColor: AppColors.success,
                     ),
                   );
                   _loadCampaigns();
@@ -801,14 +862,15 @@ Future<void> _updateCampaignStatus(int campaignId, String status) async {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(response['message'] ?? 'Failed to create campaign'),
-                      backgroundColor: Colors.red,
+                      content: Text(
+                          response['message'] ?? 'Failed to create campaign'),
+                      backgroundColor: AppColors.error,
                     ),
                   );
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
+                backgroundColor: AppColors.error,
               ),
               child: const Text('Create Campaign'),
             ),

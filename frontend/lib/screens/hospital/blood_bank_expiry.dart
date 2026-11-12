@@ -1,12 +1,14 @@
 // lib/screens/hospital/blood_bank_expiry.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import '../../services/api_service.dart';
 
 class BloodBankExpiryManagement extends StatefulWidget {
   const BloodBankExpiryManagement({super.key});
 
   @override
-  State<BloodBankExpiryManagement> createState() => _BloodBankExpiryManagementState();
+  State<BloodBankExpiryManagement> createState() =>
+      _BloodBankExpiryManagementState();
 }
 
 class _BloodBankExpiryManagementState extends State<BloodBankExpiryManagement> {
@@ -24,44 +26,45 @@ class _BloodBankExpiryManagementState extends State<BloodBankExpiryManagement> {
 
   // lib/screens/hospital/blood_bank_expiry.dart - Update _loadData method
 
-Future<void> _loadData() async {
-  if (!context.mounted) return;
-  
-  setState(() {
-    _isLoading = true;
-    _errorMessage = null;
-  });
-
-  try {
-    final response = await ApiService.getBloodStockWithExpiry();
-    debugPrint('Blood stock response: $response');
-    
+  Future<void> _loadData() async {
     if (!context.mounted) return;
-    
-    if (response['success'] && response['data'] != null) {
-      setState(() {
-        _bloodStock = List<Map<String, dynamic>>.from(response['data']['blood_stock'] ?? []);
-        _notifications = List<Map<String, dynamic>>.from(response['data']['notifications'] ?? []);
-        _summary = response['data']['summary'] ?? {};
-      });
-    } else {
-      setState(() {
-        _errorMessage = response['message'] ?? 'Failed to load blood stock';
-      });
-    }
-  } catch (e) {
-    debugPrint('Error loading blood stock: $e');
-    if (mounted) {
-      setState(() {
-        _errorMessage = 'Network error: $e';
-      });
-    }
-  } finally {
-    if (mounted) {
-      setState(() => _isLoading = false);
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await ApiService.getBloodStockWithExpiry();
+
+      if (!context.mounted) return;
+
+      if (response['success'] && response['data'] != null) {
+        setState(() {
+          _bloodStock = List<Map<String, dynamic>>.from(
+              response['data']['blood_stock'] ?? []);
+          _notifications = List<Map<String, dynamic>>.from(
+              response['data']['notifications'] ?? []);
+          _summary = response['data']['summary'] ?? {};
+        });
+      } else {
+        setState(() {
+          _errorMessage = response['message'] ?? 'Failed to load blood stock';
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading blood stock: $e');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Network error: $e';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
-}
 
   // Fixed _showNotifications method with proper context
   void _showNotifications(BuildContext context) {
@@ -99,15 +102,17 @@ Future<void> _loadData() async {
                                   ? Icons.warning_amber
                                   : Icons.info,
                               color: notif['notification_type'] == 'critical'
-                                  ? Colors.red
-                                  : Colors.orange,
+                                  ? AppColors.error
+                                  : AppColors.warning,
                             ),
                             title: Text(notif['message'] ?? ''),
                             subtitle: Text(
-                              notif['created_at']?.toString().split('T')[0] ?? '',
+                              notif['created_at']?.toString().split('T')[0] ??
+                                  '',
                             ),
                             trailing: notif['is_read'] == false
-                                ? const Icon(Icons.circle, color: Colors.red, size: 12)
+                                ? const Icon(Icons.circle,
+                                    color: AppColors.error, size: 12)
                                 : null,
                           ),
                         );
@@ -135,7 +140,7 @@ Future<void> _loadData() async {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Blood Bank Management'),
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -154,7 +159,8 @@ Future<void> _loadData() async {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const Icon(Icons.error_outline,
+                          size: 64, color: AppColors.error),
                       const SizedBox(height: 16),
                       Text(_errorMessage!),
                       const SizedBox(height: 16),
@@ -169,7 +175,7 @@ Future<void> _loadData() async {
                   children: [
                     // Summary Cards
                     _buildSummaryCards(),
-                    
+
                     // Add Blood Button
                     Padding(
                       padding: const EdgeInsets.all(12),
@@ -178,13 +184,13 @@ Future<void> _loadData() async {
                         icon: const Icon(Icons.add),
                         label: const Text('Add Blood Stock'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
+                          backgroundColor: AppColors.error,
                           foregroundColor: Colors.white,
                           minimumSize: const Size(double.infinity, 50),
                         ),
                       ),
                     ),
-                    
+
                     // Blood Stock List
                     Expanded(
                       child: _bloodStock.isEmpty
@@ -192,7 +198,8 @@ Future<void> _loadData() async {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.inventory, size: 64, color: Colors.grey),
+                                  Icon(Icons.inventory,
+                                      size: 64, color: Colors.grey),
                                   SizedBox(height: 16),
                                   Text('No blood stock available'),
                                 ],
@@ -222,10 +229,10 @@ Future<void> _loadData() async {
       color: Colors.grey.shade50,
       child: Row(
         children: [
-          _buildSummaryCard('Total', total.toString(), Colors.blue),
-          _buildSummaryCard('Good', good.toString(), Colors.green),
-          _buildSummaryCard('Warning', warning.toString(), Colors.orange),
-          _buildSummaryCard('Critical', critical.toString(), Colors.red),
+          _buildSummaryCard('Total', total.toString(), AppColors.primary),
+          _buildSummaryCard('Good', good.toString(), AppColors.success),
+          _buildSummaryCard('Warning', warning.toString(), AppColors.warning),
+          _buildSummaryCard('Critical', critical.toString(), AppColors.error),
         ],
       ),
     );
@@ -264,25 +271,25 @@ Future<void> _loadData() async {
   Widget _buildBloodCard(Map<String, dynamic> blood) {
     final status = blood['status'] ?? 'good';
     final daysRemaining = blood['days_remaining']?.toInt() ?? 0;
-    
+
     Color statusColor;
     String statusLabel;
-    
+
     switch (status) {
       case 'expired':
         statusColor = Colors.grey;
         statusLabel = 'Expired';
         break;
       case 'critical':
-        statusColor = Colors.red;
+        statusColor = AppColors.error;
         statusLabel = 'Critical';
         break;
       case 'warning':
-        statusColor = Colors.orange;
+        statusColor = AppColors.warning;
         statusLabel = 'Warning';
         break;
       default:
-        statusColor = Colors.green;
+        statusColor = AppColors.success;
         statusLabel = 'Good';
     }
 
@@ -323,14 +330,16 @@ Future<void> _loadData() async {
                         ),
                         Text(
                           'Batch: ${blood['batch_number'] ?? 'N/A'}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.grey[600]),
                         ),
                       ],
                     ),
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -350,7 +359,8 @@ Future<void> _loadData() async {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildStat('Units', blood['units_available']?.toString() ?? '0'),
+                _buildStat(
+                    'Units', blood['units_available']?.toString() ?? '0'),
                 _buildStat('Donor', blood['donor_name'] ?? 'Unknown'),
                 _buildStat('Days Left', daysRemaining.toString()),
               ],
@@ -367,7 +377,7 @@ Future<void> _loadData() async {
                   ElevatedButton(
                     onPressed: () => _useBlood(context, blood),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppColors.error,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       minimumSize: const Size(80, 32),
@@ -449,14 +459,15 @@ Future<void> _loadData() async {
                   }
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.grey.shade300),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.explore, color: Colors.red),
+                      const Icon(Icons.explore, color: AppColors.error),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -464,7 +475,8 @@ Future<void> _loadData() async {
                               ? 'Expiry Date: ${expiryDate!.day}/${expiryDate!.month}/${expiryDate!.year}'
                               : 'Select Expiry Date *',
                           style: TextStyle(
-                            color: expiryDate != null ? Colors.black : Colors.grey,
+                            color:
+                                expiryDate != null ? Colors.black : Colors.grey,
                           ),
                         ),
                       ),
@@ -490,7 +502,7 @@ Future<void> _loadData() async {
               }
 
               Navigator.pop(context);
-              
+
               final response = await ApiService.addBloodWithExpiry({
                 'blood_group': selectedGroup,
                 'units': units,
@@ -505,7 +517,7 @@ Future<void> _loadData() async {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text(' Blood added successfully'),
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppColors.success,
                   ),
                 );
                 _loadData();
@@ -514,13 +526,13 @@ Future<void> _loadData() async {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(response['message'] ?? 'Failed to add blood'),
-                    backgroundColor: Colors.red,
+                    backgroundColor: AppColors.error,
                   ),
                 );
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.error,
             ),
             child: const Text('Add Blood'),
           ),
@@ -567,7 +579,7 @@ Future<void> _loadData() async {
               }
 
               Navigator.pop(context);
-              
+
               final response = await ApiService.useBloodUnits({
                 'blood_group': blood['blood_group'],
                 'units_required': units,
@@ -579,7 +591,7 @@ Future<void> _loadData() async {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text(' Blood units used successfully'),
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppColors.success,
                   ),
                 );
                 _loadData();
@@ -588,13 +600,13 @@ Future<void> _loadData() async {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(response['message'] ?? 'Failed to use blood'),
-                    backgroundColor: Colors.red,
+                    backgroundColor: AppColors.error,
                   ),
                 );
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.error,
             ),
             child: const Text('Use Blood'),
           ),

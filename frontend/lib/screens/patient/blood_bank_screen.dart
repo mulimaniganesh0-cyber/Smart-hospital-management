@@ -1,5 +1,6 @@
 // lib/screens/patient/blood_bank_screen.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../widgets/app_ui.dart';
 
@@ -18,7 +19,15 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
   String? _errorMessage;
 
   final List<String> _bloodGroups = [
-    'All', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-',
+    'All',
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'AB+',
+    'AB-',
+    'O+',
+    'O-',
   ];
 
   /// Normalizes PostgreSQL numeric values, which may be encoded as strings.
@@ -47,10 +56,10 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
     try {
       final response = await ApiService.getAllBloodBanks();
       if (!mounted) return;
-      
+
       if (response['success'] == true) {
         final allBanks = response['all_banks'] ?? [];
-        
+
         // Group by hospital
         final Map<int, Map<String, dynamic>> hospitalMap = {};
         for (var bank in allBanks) {
@@ -65,22 +74,26 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
               'blood_groups': <Map<String, dynamic>>[],
             };
           }
-          final bloodGroups = hospitalMap[hospitalId]!['blood_groups'] as List<Map<String, dynamic>>;
+          final bloodGroups = hospitalMap[hospitalId]!['blood_groups']
+              as List<Map<String, dynamic>>;
           bloodGroups.add({
             'blood_group': bank['blood_group'] ?? '',
             'units_available': _parseInt(bank['units_available']),
-            'minimum_threshold': _parseInt(bank['minimum_threshold'], fallback: 10),
+            'minimum_threshold':
+                _parseInt(bank['minimum_threshold'], fallback: 10),
           });
         }
-        
+
         _hospitals = hospitalMap.values.toList();
         _applyFilter();
       } else {
-        _errorMessage = 'Blood availability could not be loaded. Please try again.';
+        _errorMessage =
+            'Blood availability could not be loaded. Please try again.';
       }
     } catch (e) {
       if (!mounted) return;
-      _errorMessage = 'Blood availability could not be loaded. Please check your connection and try again.';
+      _errorMessage =
+          'Blood availability could not be loaded. Please check your connection and try again.';
     } finally {
       if (mounted) {
         setState(() {
@@ -95,10 +108,11 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
       _filteredHospitals = _hospitals;
     } else {
       _filteredHospitals = _hospitals.where((hospital) {
-        final bloodGroups = hospital['blood_groups'] as List<Map<String, dynamic>>;
-        return bloodGroups.any((bg) => 
-          bg['blood_group'] == _selectedBloodGroup && _parseInt(bg['units_available']) > 0
-        );
+        final bloodGroups =
+            hospital['blood_groups'] as List<Map<String, dynamic>>;
+        return bloodGroups.any((bg) =>
+            bg['blood_group'] == _selectedBloodGroup &&
+            _parseInt(bg['units_available']) > 0);
       }).toList();
     }
   }
@@ -122,7 +136,10 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
                   icon: Icons.bloodtype_outlined,
                   title: 'Blood availability is unavailable',
                   message: _errorMessage!,
-                  action: ElevatedButton.icon(onPressed: _loadBloodBanks, icon: const Icon(Icons.refresh), label: const Text('Try again')),
+                  action: ElevatedButton.icon(
+                      onPressed: _loadBloodBanks,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Try again')),
                 )
               : Column(
                   children: [
@@ -132,17 +149,21 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
                           ? CareGuideEmptyState(
                               icon: Icons.bloodtype_outlined,
                               title: 'No matching blood stock',
-                              message: _selectedBloodGroup == 'All' ? 'No blood-bank stock has been recorded yet.' : 'No $_selectedBloodGroup units are currently available.',
+                              message: _selectedBloodGroup == 'All'
+                                  ? 'No blood-bank stock has been recorded yet.'
+                                  : 'No $_selectedBloodGroup units are currently available.',
                             )
                           : CareGuidePage(
-                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                              padding:
+                                  const EdgeInsets.fromLTRB(16, 12, 16, 24),
                               child: ListView.builder(
-                              padding: EdgeInsets.zero,
-                              itemCount: _filteredHospitals.length,
-                              itemBuilder: (context, index) {
-                                return _buildHospitalCard(_filteredHospitals[index]);
-                              },
-                            )),
+                                padding: EdgeInsets.zero,
+                                itemCount: _filteredHospitals.length,
+                                itemBuilder: (context, index) {
+                                  return _buildHospitalCard(
+                                      _filteredHospitals[index]);
+                                },
+                              )),
                     ),
                   ],
                 ),
@@ -166,7 +187,8 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            const Text('Choose blood group', style: TextStyle(fontWeight: FontWeight.w700)),
+            const Text('Choose blood group',
+                style: TextStyle(fontWeight: FontWeight.w700)),
             ..._bloodGroups.map((group) {
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
@@ -196,7 +218,7 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
       final units = _parseInt(bg['units_available']);
       return sum + units;
     });
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -209,10 +231,11 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Icon(Icons.local_hospital, color: Colors.red, size: 24),
+                  child: const Icon(Icons.local_hospital,
+                      color: AppColors.error, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -228,12 +251,17 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
                       ),
                       Text(
                         hospital['address'] ?? '',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
                   ),
                 ),
-                CareGuideStatusBadge(label: '$totalUnits units', tone: totalUnits > 0 ? CareGuideStatusTone.success : CareGuideStatusTone.neutral),
+                CareGuideStatusBadge(
+                    label: '$totalUnits units',
+                    tone: totalUnits > 0
+                        ? CareGuideStatusTone.success
+                        : CareGuideStatusTone.neutral),
               ],
             ),
             const SizedBox(height: 12),
@@ -242,19 +270,29 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
               runSpacing: 8,
               children: bloodGroups.map((bg) {
                 final units = _parseInt(bg['units_available']);
-                final minThreshold = _parseInt(bg['minimum_threshold'], fallback: 10);
+                final minThreshold =
+                    _parseInt(bg['minimum_threshold'], fallback: 10);
                 final isLow = units < minThreshold;
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: units == 0 ? const Color(0xFFFEE4E2) : isLow ? const Color(0xFFFFEDD5) : const Color(0xFFDCFCE7),
+                    color: units == 0
+                        ? const Color(0xFFFEE4E2)
+                        : isLow
+                            ? const Color(0xFFFFEDD5)
+                            : const Color(0xFFDCFCE7),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
                     '${bg['blood_group']}: $units units',
                     style: TextStyle(
                       fontSize: 12,
-                      color: units == 0 ? CareGuideColors.danger : isLow ? CareGuideColors.warning : CareGuideColors.success,
+                      color: units == 0
+                          ? CareGuideColors.danger
+                          : isLow
+                              ? CareGuideColors.warning
+                              : CareGuideColors.success,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -266,7 +304,8 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
               children: [
                 const Icon(Icons.phone, size: 14, color: Colors.grey),
                 const SizedBox(width: 4),
-                Text(hospital['phone'] ?? 'N/A', style: const TextStyle(fontSize: 12)),
+                Text(hospital['phone'] ?? 'N/A',
+                    style: const TextStyle(fontSize: 12)),
                 const SizedBox(width: 16),
                 Expanded(
                   child: ElevatedButton(
@@ -287,12 +326,16 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
     );
   }
 
-  void _showRequestBloodDialog(BuildContext context, Map<String, dynamic> hospital) {
-    String selectedGroup = _selectedBloodGroup == 'All' ? 'A+' : _selectedBloodGroup;
+  void _showRequestBloodDialog(
+      BuildContext context, Map<String, dynamic> hospital) {
+    String selectedGroup =
+        _selectedBloodGroup == 'All' ? 'A+' : _selectedBloodGroup;
     int requiredUnits = 1;
     final TextEditingController patientNameController = TextEditingController();
-    final TextEditingController hospitalAddressController = TextEditingController();
-    final allBloodGroups = hospital['blood_groups'] as List<Map<String, dynamic>>;
+    final TextEditingController hospitalAddressController =
+        TextEditingController();
+    final allBloodGroups =
+        hospital['blood_groups'] as List<Map<String, dynamic>>;
     final bloodGroups = <Map<String, dynamic>>[];
     final seenGroups = <String>{};
     for (final group in allBloodGroups) {
@@ -301,7 +344,8 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
     }
 
     // Set initial selected group
-    if (!bloodGroups.any((group) => group['blood_group'] == selectedGroup) && bloodGroups.isNotEmpty) {
+    if (!bloodGroups.any((group) => group['blood_group'] == selectedGroup) &&
+        bloodGroups.isNotEmpty) {
       selectedGroup = bloodGroups[0]['blood_group'] ?? 'A+';
     }
 
@@ -323,7 +367,8 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
                   items: bloodGroups.map<DropdownMenuItem<String>>((bg) {
                     return DropdownMenuItem<String>(
                       value: bg['blood_group'] as String? ?? '',
-                      child: Text('${bg['blood_group']} (${bg['units_available']} units)'),
+                      child: Text(
+                          '${bg['blood_group']} (${bg['units_available']} units)'),
                     );
                   }).toList(),
                   onChanged: (value) {
@@ -364,12 +409,13 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.local_hospital, color: Colors.blue, size: 16),
+                      const Icon(Icons.local_hospital,
+                          color: AppColors.primary, size: 16),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -377,7 +423,7 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: Colors.blue,
+                            color: AppColors.primary,
                           ),
                         ),
                       ),
@@ -394,16 +440,18 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
               ElevatedButton(
                 onPressed: () async {
                   // Validate inputs
-                  if (patientNameController.text.isEmpty || hospitalAddressController.text.isEmpty) {
+                  if (patientNameController.text.isEmpty ||
+                      hospitalAddressController.text.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please fill all required fields')),
+                      const SnackBar(
+                          content: Text('Please fill all required fields')),
                     );
                     return;
                   }
-                  
+
                   // Close dialog
                   Navigator.pop(context);
-                  
+
                   // Send request to the specific hospital only
                   final response = await ApiService.requestBlood({
                     'hospital_id': hospital['id'],
@@ -412,13 +460,14 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
                     'patient_name': patientNameController.text,
                     'hospital_address': hospitalAddressController.text,
                   });
-                  
+
                   if (response['success'] == true && mounted) {
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Blood request submitted successfully to the selected hospital'),
-                        backgroundColor: Colors.green,
+                        content: Text(
+                            'Blood request submitted successfully to the selected hospital'),
+                        backgroundColor: AppColors.success,
                       ),
                     );
                     _loadBloodBanks();
@@ -426,14 +475,15 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(response['message'] ?? 'Request failed. Please try again.'),
-                        backgroundColor: Colors.red,
+                        content: Text(response['message'] ??
+                            'Request failed. Please try again.'),
+                        backgroundColor: AppColors.error,
                       ),
                     );
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
+                  backgroundColor: AppColors.error,
                 ),
                 child: const Text('Submit Request'),
               ),

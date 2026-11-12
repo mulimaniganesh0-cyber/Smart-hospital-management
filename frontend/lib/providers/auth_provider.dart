@@ -23,14 +23,20 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _loadUser() async {
     final prefs = await SharedPreferences.getInstance();
     final userJson = prefs.getString('user');
-    if (userJson != null) {
+    final token = prefs.getString('token');
+    if (userJson != null && token != null && token.isNotEmpty) {
       try {
         _currentUser = UserModel.fromJson(json.decode(userJson));
         await SocketService.instance.connect();
         notifyListeners();
       } catch (e) {
         debugPrint('Error loading user: $e');
+        await prefs.remove('user');
+        await prefs.remove('token');
       }
+    } else if (userJson != null || token != null) {
+      await prefs.remove('user');
+      await prefs.remove('token');
     }
   }
 
@@ -56,8 +62,6 @@ class AuthProvider extends ChangeNotifier {
         'additional_data': additionalData,
       });
 
-      debugPrint('Signup response: $response');
-
       if (response['success'] == true) {
         _isLoading = false;
         notifyListeners();
@@ -77,21 +81,16 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> login(String email, String password, String userType) async {
+  Future<bool> login(String email, String password) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      debugPrint('AuthProvider login called with: $email, $userType');
-
-      final response = await ApiService.login(email, password, userType);
-
-      debugPrint('API Response: $response');
+      final response = await ApiService.login(email, password);
 
       if (response['success'] == true) {
         final userData = response['user'];
-        debugPrint('User data received: $userData');
 
         // Ensure userData has all required fields
         final user = UserModel(
@@ -99,7 +98,11 @@ class AuthProvider extends ChangeNotifier {
           name: userData['name'] ?? '',
           email: userData['email'] ?? '',
           phone: userData['phone'] ?? '',
-          userType: userData['user_type'] ?? userType,
+          userType: userData['user_type'] ?? '',
+          additionalData: {
+            'password_reset_required':
+                userData['password_reset_required'] == true
+          },
         );
 
         _currentUser = user;

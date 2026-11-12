@@ -1,5 +1,6 @@
 // lib/screens/admin/admin_dashboard.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import '../../services/api_service.dart';
 import '../../widgets/app_ui.dart';
 
@@ -35,13 +36,16 @@ class _AdminDashboardState extends State<AdminDashboard> {
         _stats = statsResponse['data'] ?? {};
       }
 
-      final hospitalsResponse = await ApiService.getAllHospitalsWithResources(page: 1, limit: 5);
+      final hospitalsResponse =
+          await ApiService.getAllHospitalsWithResources(page: 1, limit: 5);
       if (!mounted) return;
       if (hospitalsResponse['success'] == true) {
-        _recentHospitals = List<Map<String, dynamic>>.from(hospitalsResponse['data'] ?? []);
+        _recentHospitals =
+            List<Map<String, dynamic>>.from(hospitalsResponse['data'] ?? []);
       }
     } catch (e) {
-      _errorMessage = 'The system overview could not be loaded. Please try again.';
+      _errorMessage =
+          'The system overview could not be loaded. Please try again.';
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -68,71 +72,95 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     icon: Icons.cloud_off_outlined,
                     title: 'Dashboard unavailable',
                     message: _errorMessage!,
-                    action: ElevatedButton.icon(onPressed: _loadDashboardData, icon: const Icon(Icons.refresh), label: const Text('Try again')),
+                    action: ElevatedButton.icon(
+                        onPressed: _loadDashboardData,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Try again')),
                   )
-                : CareGuidePage(child: SingleChildScrollView(
+                : CareGuidePage(
+                    child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const CareGuideSectionHeader(title: 'System overview', subtitle: 'Live operational data across CareGuide'),
+                        const CareGuideSectionHeader(
+                            title: 'System overview',
+                            subtitle: 'Live operational data across CareGuide'),
                         const SizedBox(height: 16),
-                        LayoutBuilder(builder: (context, constraints) => GridView.count(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: constraints.maxWidth >= 800 ? 4 : 2,
-                          mainAxisSpacing: 16,
-                          crossAxisSpacing: 16,
-                          childAspectRatio: 1.2,
-                          children: [
-                            AdminMetricCard(
-                              title: 'Total Hospitals',
-                              value: _stats['total_hospitals']?.toString() ?? '0',
-                              icon: Icons.local_hospital,
-                              color: Colors.blue,
-                              change: '+${_stats['new_hospitals'] ?? 0}',
-                            ),
-                            AdminMetricCard(
-                              title: 'Pending Verification',
-                              value: _stats['pending_verification']?.toString() ?? '0',
-                              icon: Icons.pending,
-                              color: Colors.orange,
-                              change: '',
-                            ),
-                            AdminMetricCard(
-                              title: 'Total Users',
-                              value: _stats['total_users']?.toString() ?? '0',
-                              icon: Icons.people,
-                              color: Colors.green,
-                              change: '+${_stats['new_users'] ?? 0}',
-                            ),
-                            AdminMetricCard(
-                              title: 'Emergency Requests',
-                              value: _stats['active_emergencies']?.toString() ?? '0',
-                              icon: Icons.emergency,
-                              color: Colors.red,
-                              change: '+${_stats['new_emergencies'] ?? 0}',
-                            ),
-                          ],
-                        )),
+                        LayoutBuilder(
+                            builder: (context, constraints) => GridView.count(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  crossAxisCount:
+                                      constraints.maxWidth >= 800 ? 4 : 2,
+                                  mainAxisSpacing: 16,
+                                  crossAxisSpacing: 16,
+                                  childAspectRatio: 1.2,
+                                  children: [
+                                    AdminMetricCard(
+                                      title: 'Total Hospitals',
+                                      value: _stats['total_hospitals']
+                                              ?.toString() ??
+                                          '0',
+                                      icon: Icons.local_hospital,
+                                      color: CareGuideColors.navy,
+                                      change:
+                                          '+${_stats['new_hospitals'] ?? 0}',
+                                    ),
+                                    AdminMetricCard(
+                                      title: 'Pending Verification',
+                                      value: _stats['pending_verification']
+                                              ?.toString() ??
+                                          '0',
+                                      icon: Icons.pending,
+                                      color: CareGuideColors.warning,
+                                      change: '',
+                                    ),
+                                    AdminMetricCard(
+                                      title: 'Total Users',
+                                      value:
+                                          _stats['total_users']?.toString() ??
+                                              '0',
+                                      icon: Icons.people,
+                                      color: CareGuideColors.success,
+                                      change: '+${_stats['new_users'] ?? 0}',
+                                    ),
+                                    AdminMetricCard(
+                                      title: 'Emergency Requests',
+                                      value: _stats['active_emergencies']
+                                              ?.toString() ??
+                                          '0',
+                                      icon: Icons.emergency,
+                                      color: CareGuideColors.danger,
+                                      change:
+                                          '+${_stats['new_emergencies'] ?? 0}',
+                                    ),
+                                  ],
+                                )),
                         const SizedBox(height: 24),
-                        const CareGuideSectionHeader(title: 'Recent hospital registrations'),
+                        const CareGuideSectionHeader(
+                            title: 'Recent hospital registrations'),
                         const SizedBox(height: 12),
                         if (_recentHospitals.isEmpty)
                           const Card(
                             child: Padding(
                               padding: EdgeInsets.all(16),
-                              child: Center(child: Text('No recent registrations')),
+                              child: Center(
+                                  child: Text('No recent registrations')),
                             ),
                           )
                         else
                           ..._recentHospitals.map((hospital) {
                             return AdminRecentHospitalCard(
                               name: hospital['name'] ?? 'Unknown Hospital',
-                              registrationDate: hospital['created_at']?.toString().split('T')[0] ?? 'Unknown',
+                              registrationDate: hospital['created_at']
+                                      ?.toString()
+                                      .split('T')[0] ??
+                                  'Unknown',
                               location: hospital['city'] ?? 'Unknown',
-                              status: hospital['verification_status'] ?? 'pending',
+                              status:
+                                  hospital['verification_status'] ?? 'pending',
                               onTap: () {
                                 // Navigate to hospital detail
                               },
@@ -165,51 +193,54 @@ class AdminMetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: '$title: $value',
-      child: Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.shade100,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+        label: '$title: $value',
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.shade100,
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const Spacer(),
+              Text(
+                value,
+                style:
+                    const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+              Text(
+                change,
+                style: TextStyle(
+                  color: change.startsWith('+')
+                      ? AppColors.success
+                      : AppColors.error,
+                  fontSize: 11,
+                ),
+              ),
+            ],
           ),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(color: Colors.grey[600], fontSize: 12),
-          ),
-          Text(
-            change,
-            style: TextStyle(
-              color: change.startsWith('+') ? Colors.green : Colors.red,
-              fontSize: 11,
-            ),
-          ),
-        ],
-      ),
-    ));
+        ));
   }
 }
 
@@ -232,13 +263,14 @@ class AdminRecentHospitalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPending = status.toLowerCase() == 'pending';
-    final tone = isPending ? CareGuideStatusTone.warning : CareGuideStatusTone.success;
-    
+    final tone =
+        isPending ? CareGuideStatusTone.warning : CareGuideStatusTone.success;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: isPending ? Colors.orange : Colors.green,
+          backgroundColor: isPending ? AppColors.warning : AppColors.success,
           child: Icon(
             isPending ? Icons.pending : Icons.check,
             color: Colors.white,

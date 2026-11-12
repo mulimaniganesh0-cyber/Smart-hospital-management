@@ -1,5 +1,6 @@
 // lib/screens/patient/patient_campaigns.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import '../../services/api_service.dart';
 
 class PatientCampaigns extends StatefulWidget {
@@ -33,7 +34,8 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
 
       if (campaignsResponse['success']) {
         setState(() {
-          _campaigns = List<Map<String, dynamic>>.from(campaignsResponse['data']);
+          _campaigns =
+              List<Map<String, dynamic>>.from(campaignsResponse['data']);
         });
       }
 
@@ -42,7 +44,8 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
 
       if (registrationsResponse['success']) {
         setState(() {
-          _myRegistrations = List<Map<String, dynamic>>.from(registrationsResponse['data']);
+          _myRegistrations =
+              List<Map<String, dynamic>>.from(registrationsResponse['data']);
         });
       }
     } catch (e) {
@@ -67,7 +70,7 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Blood Donation Camps'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
           bottom: const TabBar(
             tabs: [
               Tab(text: ' Available Camps', icon: Icon(Icons.campaign)),
@@ -88,7 +91,8 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                        const Icon(Icons.error_outline,
+                            size: 64, color: AppColors.error),
                         const SizedBox(height: 16),
                         Text(_errorMessage!),
                         const SizedBox(height: 16),
@@ -132,12 +136,14 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
       itemCount: _campaigns.length,
       itemBuilder: (context, index) {
         final campaign = _campaigns[index];
-        final isRegistered = _myRegistrations.any((r) => r['campaign_id'] == campaign['id']);
-        
+        final isRegistered =
+            _myRegistrations.any((r) => r['campaign_id'] == campaign['id']);
+
         return Card(
           margin: const EdgeInsets.only(bottom: 16),
           elevation: 2,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -146,7 +152,7 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                 // Hospital & Status
                 Row(
                   children: [
-                    const Icon(Icons.local_hospital, color: Colors.red),
+                    const Icon(Icons.local_hospital, color: AppColors.error),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -155,18 +161,21 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: campaign['status'] == 'active' 
-                            ? Colors.green.withValues(alpha: 0.1) 
-                            : Colors.blue.withValues(alpha: 0.1),
+                        color: campaign['status'] == 'active'
+                            ? AppColors.success.withValues(alpha: 0.1)
+                            : AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         campaign['status']?.toUpperCase() ?? 'ACTIVE',
                         style: TextStyle(
                           fontSize: 10,
-                          color: campaign['status'] == 'active' ? Colors.green : Colors.blue,
+                          color: campaign['status'] == 'active'
+                              ? AppColors.success
+                              : AppColors.primary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -205,7 +214,8 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                    const Icon(Icons.calendar_today,
+                        size: 14, color: Colors.grey),
                     const SizedBox(width: 4),
                     Text(
                       '${campaign['start_date']?.toString().split('T')[0] ?? ''} - ${campaign['end_date']?.toString().split('T')[0] ?? ''}',
@@ -228,14 +238,15 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                         children: [
                           Text(
                             'Donors Registered',
-                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey[600]),
                           ),
                           Text(
                             '${campaign['registered_donors'] ?? 0}/${campaign['target_donors'] ?? 50}',
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
-                              color: Colors.red,
+                              color: AppColors.error,
                             ),
                           ),
                         ],
@@ -244,21 +255,24 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
-                          value: ((campaign['registered_donors'] ?? 0) / (campaign['target_donors'] ?? 50))
+                          value: ((campaign['registered_donors'] ?? 0) /
+                                  (campaign['target_donors'] ?? 50))
                               .clamp(0.0, 1.0),
                           backgroundColor: Colors.grey.shade200,
-                          color: Colors.red,
+                          color: AppColors.error,
                           minHeight: 6,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          const Icon(Icons.bloodtype, size: 14, color: Colors.red),
+                          const Icon(Icons.bloodtype,
+                              size: 14, color: AppColors.error),
                           const SizedBox(width: 4),
                           Text(
                             'Blood Groups Needed:',
-                            style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.grey[600]),
                           ),
                         ],
                       ),
@@ -266,45 +280,52 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                       Wrap(
                         spacing: 4,
                         runSpacing: 4,
-                        children: (campaign['blood_groups_needed'] as List? ?? [])
-                            .map((group) => Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.red.shade100,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    group,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: Colors.red.shade700,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ))
-                            .toList(),
+                        children:
+                            (campaign['blood_groups_needed'] as List? ?? [])
+                                .map((group) => Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.error
+                                            .withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        group,
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          color: AppColors.error,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ))
+                                .toList(),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 12),
                 // Action Buttons
-                if (campaign['status'] == 'active' || campaign['status'] == 'approved')
+                if (campaign['status'] == 'active' ||
+                    campaign['status'] == 'approved')
                   isRegistered
                       ? Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: Colors.green.shade50,
+                            color: AppColors.success.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green.shade200),
+                            border: Border.all(
+                                color:
+                                    AppColors.success.withValues(alpha: 0.1)),
                           ),
                           child: const Row(
                             children: [
-                              Icon(Icons.check_circle, color: Colors.green, size: 16),
+                              Icon(Icons.check_circle,
+                                  color: AppColors.success, size: 16),
                               SizedBox(width: 8),
                               Text(
                                 'You are registered for this camp',
-                                style: TextStyle(color: Colors.green),
+                                style: TextStyle(color: AppColors.success),
                               ),
                             ],
                           ),
@@ -312,9 +333,10 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                       : SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: () => _showRegistrationDialog(context, campaign),
+                            onPressed: () =>
+                                _showRegistrationDialog(context, campaign),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
+                              backgroundColor: AppColors.error,
                               foregroundColor: Colors.white,
                             ),
                             child: const Text('Register Now'),
@@ -352,20 +374,20 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
       itemBuilder: (context, index) {
         final reg = _myRegistrations[index];
         final status = reg['status'] ?? 'registered';
-        
+
         Color statusColor;
         switch (status) {
           case 'donated':
-            statusColor = Colors.green;
+            statusColor = AppColors.success;
             break;
           case 'checked_in':
-            statusColor = Colors.blue;
+            statusColor = AppColors.primary;
             break;
           case 'cancelled':
-            statusColor = Colors.red;
+            statusColor = AppColors.error;
             break;
           default:
-            statusColor = Colors.orange;
+            statusColor = AppColors.warning;
         }
 
         return Card(
@@ -388,7 +410,8 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
                       decoration: BoxDecoration(
                         color: statusColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(20),
@@ -422,7 +445,7 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                       _showCancelRegistrationDialog(context, reg['id']);
                     },
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
+                      foregroundColor: AppColors.error,
                     ),
                     child: const Text('Cancel Registration'),
                   ),
@@ -430,18 +453,19 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade50,
+                      color: AppColors.success.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.green.shade200),
+                      border: Border.all(
+                          color: AppColors.success.withValues(alpha: 0.1)),
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.bloodtype, color: Colors.green),
+                        Icon(Icons.bloodtype, color: AppColors.success),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             ' Thank you for donating! You saved a life.',
-                            style: TextStyle(color: Colors.green),
+                            style: TextStyle(color: AppColors.success),
                           ),
                         ),
                       ],
@@ -455,7 +479,8 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
     );
   }
 
-  void _showRegistrationDialog(BuildContext context, Map<String, dynamic> campaign) {
+  void _showRegistrationDialog(
+      BuildContext context, Map<String, dynamic> campaign) {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
     final emailController = TextEditingController();
@@ -512,7 +537,8 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                   items: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
                       .map((g) => DropdownMenuItem(value: g, child: Text(g)))
                       .toList(),
-                  onChanged: (value) => setState(() => selectedBloodGroup = value!),
+                  onChanged: (value) =>
+                      setState(() => selectedBloodGroup = value!),
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -547,8 +573,10 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                   onTap: () async {
                     final date = await showDatePicker(
                       context: context,
-                      initialDate: DateTime.now().subtract(const Duration(days: 180)),
-                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+                      initialDate:
+                          DateTime.now().subtract(const Duration(days: 180)),
+                      firstDate:
+                          DateTime.now().subtract(const Duration(days: 365)),
                       lastDate: DateTime.now(),
                     );
                     if (!context.mounted) return;
@@ -558,14 +586,16 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                     }
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 16),
                     decoration: BoxDecoration(
                       border: Border.all(color: Colors.grey.shade300),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.calendar_today, color: Colors.red),
+                        const Icon(Icons.calendar_today,
+                            color: AppColors.error),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
@@ -573,7 +603,9 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                                 ? 'Last Donation: ${lastDonationDate!.day}/${lastDonationDate!.month}/${lastDonationDate!.year}'
                                 : 'Last Donation Date (Optional)',
                             style: TextStyle(
-                              color: lastDonationDate != null ? Colors.black : Colors.grey,
+                              color: lastDonationDate != null
+                                  ? Colors.black
+                                  : Colors.grey,
                             ),
                           ),
                         ),
@@ -584,7 +616,7 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                 const SizedBox(height: 12),
                 const Text(
                   ' Please ensure you meet eligibility criteria before registering.',
-                  style: TextStyle(fontSize: 12, color: Colors.orange),
+                  style: TextStyle(fontSize: 12, color: AppColors.warning),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -604,7 +636,7 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Please fill all required fields'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppColors.error,
                     ),
                   );
                   return;
@@ -620,7 +652,8 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                   'blood_group': selectedBloodGroup,
                   'age': int.tryParse(ageController.text) ?? 0,
                   'weight': double.tryParse(weightController.text) ?? 0.0,
-                  'last_donation_date': lastDonationDate?.toIso8601String().split('T')[0],
+                  'last_donation_date':
+                      lastDonationDate?.toIso8601String().split('T')[0],
                   'medical_conditions': '',
                 });
 
@@ -628,8 +661,9 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text(' Successfully registered for blood donation camp!'),
-                      backgroundColor: Colors.green,
+                      content: Text(
+                          ' Successfully registered for blood donation camp!'),
+                      backgroundColor: AppColors.success,
                     ),
                   );
                   _loadData();
@@ -637,14 +671,15 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(response['message'] ?? 'Registration failed'),
-                      backgroundColor: Colors.red,
+                      content:
+                          Text(response['message'] ?? 'Registration failed'),
+                      backgroundColor: AppColors.error,
                     ),
                   );
                 }
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
+                backgroundColor: AppColors.error,
               ),
               child: const Text('Register Now'),
             ),
@@ -659,7 +694,8 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Cancel Registration'),
-        content: const Text('Are you sure you want to cancel your registration?'),
+        content:
+            const Text('Are you sure you want to cancel your registration?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -672,13 +708,13 @@ class _PatientCampaignsState extends State<PatientCampaigns> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Registration cancelled'),
-                  backgroundColor: Colors.orange,
+                  backgroundColor: AppColors.warning,
                 ),
               );
               _loadData();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.error,
             ),
             child: const Text('Yes, Cancel'),
           ),

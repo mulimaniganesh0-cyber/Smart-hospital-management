@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
@@ -9,6 +10,9 @@ import 'signup_screen.dart';
 import 'patient/patient_home_screen.dart' as patient;
 import 'hospital/hospital_home_screen.dart' as hospital;
 import 'admin/admin_home_screen.dart' as admin;
+import 'doctor/doctor_dashboard_screen.dart';
+import 'driver/ambulance_driver_dashboard.dart';
+import 'private_ambulance_registration_screen.dart';
 
 class LandingScreen extends StatefulWidget {
   const LandingScreen({super.key});
@@ -129,7 +133,7 @@ class _LandingScreenState extends State<LandingScreen>
     final isDesktop = size.width > 900;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0B132B), // Deep Space Blue
+      backgroundColor: const Color(0xFF142D4E), // Deep Space Blue
       body: Stack(
         children: [
           // Background Gradient decoration
@@ -140,8 +144,8 @@ class _LandingScreenState extends State<LandingScreen>
                   center: Alignment(0.6, -0.6),
                   radius: 1.5,
                   colors: [
-                    Color(0xFF1C2541),
-                    Color(0xFF0B132B),
+                    Color(0xFF244562),
+                    Color(0xFF142D4E),
                   ],
                 ),
               ),
@@ -200,6 +204,7 @@ class _LandingScreenState extends State<LandingScreen>
   // ==================== NAVIGATION / HEADER ====================
 
   Widget _buildHeader(bool isDesktop) {
+    final isCompact = MediaQuery.of(context).size.width < 600;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       decoration: BoxDecoration(
@@ -207,8 +212,8 @@ class _LandingScreenState extends State<LandingScreen>
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFF0B132B).withValues(alpha: 0.9),
-            const Color(0xFF0B132B).withValues(alpha: 0.0),
+            const Color(0xFF142D4E).withValues(alpha: 0.9),
+            const Color(0xFF142D4E).withValues(alpha: 0.0),
           ],
         ),
       ),
@@ -222,7 +227,7 @@ class _LandingScreenState extends State<LandingScreen>
                 scale: _pulseAnimation,
                 child: const Icon(
                   Icons.local_hospital,
-                  color: Color(0xFF48CAE4),
+                  color: Color(0xFF0D9488),
                   size: 32,
                 ),
               ),
@@ -240,7 +245,7 @@ class _LandingScreenState extends State<LandingScreen>
           ),
 
           // Quick links (Desktop only)
-          if (isDesktop)
+          if (isDesktop && MediaQuery.of(context).size.width >= 1500)
             Expanded(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -253,8 +258,9 @@ class _LandingScreenState extends State<LandingScreen>
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 8),
-                        foregroundColor:
-                            isSelected ? const Color(0xFF48CAE4) : Colors.white70,
+                        foregroundColor: isSelected
+                            ? const Color(0xFF0D9488)
+                            : Colors.white70,
                       ),
                       child: Text(
                         _sections[index]['title'],
@@ -269,21 +275,31 @@ class _LandingScreenState extends State<LandingScreen>
               ),
             ),
 
-          // Access Portal CTA
-          ElevatedButton(
-            onPressed: () => _scrollToPage(5),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0077B6),
-              foregroundColor: Colors.white,
-              elevation: 4,
-              shadowColor: const Color(0xFF0096C7).withValues(alpha: 0.4),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30),
+          if (isCompact)
+            IconButton(
+              tooltip: 'Access Dashboard',
+              onPressed: () => _scrollToPage(5),
+              icon: const Icon(Icons.login_rounded, color: Colors.white),
+            )
+          else
+            SizedBox(
+              width: 190,
+              child: ElevatedButton(
+                onPressed: () => _scrollToPage(5),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF142D4E),
+                  foregroundColor: Colors.white,
+                  elevation: 4,
+                  shadowColor: const Color(0xFF142D4E).withValues(alpha: 0.4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+                child: const Text('Access Dashboard'),
               ),
             ),
-            child: const Text('Access Dashboard'),
-          ),
         ],
       ),
     );
@@ -307,11 +323,12 @@ class _LandingScreenState extends State<LandingScreen>
                 height: size,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: isSelected ? const Color(0xFF48CAE4) : Colors.white24,
+                  color: isSelected ? const Color(0xFF0D9488) : Colors.white24,
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: const Color(0xFF48CAE4).withValues(alpha: 0.6),
+                            color:
+                                const Color(0xFF0D9488).withValues(alpha: 0.6),
                             blurRadius: 10,
                             spreadRadius: 2,
                           )
@@ -343,23 +360,14 @@ class _LandingScreenState extends State<LandingScreen>
                   children: [
                     const SizedBox(height: 60),
                     // Main Tagline
-                    ShaderMask(
-                      shaderCallback: (bounds) => const LinearGradient(
-                        colors: [
-                          Color(0xFF90E0EF),
-                          Color(0xFF00B4D8),
-                          Color(0xFF0077B6)
-                        ],
-                      ).createShader(bounds),
-                      child: Text(
-                        'Revolutionizing Hospital Resource Coordination',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.outfit(
-                          fontSize: isDesktop ? 54 : 36,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          height: 1.2,
-                        ),
+                    Text(
+                      'Revolutionizing Hospital Resource Coordination',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.outfit(
+                        fontSize: isDesktop ? 54 : 36,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.2,
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -381,8 +389,8 @@ class _LandingScreenState extends State<LandingScreen>
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.04),
                         borderRadius: BorderRadius.circular(20),
-                        border:
-                            Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                        border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.08)),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.3),
@@ -397,14 +405,14 @@ class _LandingScreenState extends State<LandingScreen>
                         alignment: WrapAlignment.center,
                         children: [
                           _buildHeroMetric('142+', 'Hospitals Connected',
-                              Icons.local_hospital, const Color(0xFF48CAE4)),
+                              Icons.local_hospital, const Color(0xFF0D9488)),
                           _buildHeroMetric('2.1 Min', 'Avg Response Time',
-                              Icons.flash_on, const Color(0xFFFFB703)),
+                              Icons.flash_on, const Color(0xFFE5A33D)),
                           _buildHeroMetric(
                               '98.7%',
                               'Successful Dispatches',
                               Icons.check_circle_outline,
-                              const Color(0xFF2A9D8F)),
+                              const Color(0xFF0D9488)),
                         ],
                       ),
                     ),
@@ -507,7 +515,7 @@ class _LandingScreenState extends State<LandingScreen>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF48CAE4).withValues(alpha: 0.1),
+                        color: const Color(0xFF0D9488).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(30),
                       ),
                       child: Text(
@@ -515,7 +523,7 @@ class _LandingScreenState extends State<LandingScreen>
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFF48CAE4),
+                          color: const Color(0xFF0D9488),
                         ),
                       ),
                     ),
@@ -557,7 +565,8 @@ class _LandingScreenState extends State<LandingScreen>
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.03),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    border:
+                        Border.all(color: Colors.white.withValues(alpha: 0.08)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -581,12 +590,12 @@ class _LandingScreenState extends State<LandingScreen>
 
                       // General Beds Tracker
                       _buildSliderIndicator('General Beds Occupancy',
-                          _simulatedBeds, const Color(0xFF48CAE4)),
+                          _simulatedBeds, const Color(0xFF0D9488)),
                       Slider(
                         value: _simulatedBeds,
                         min: 0,
                         max: 100,
-                        activeColor: const Color(0xFF48CAE4),
+                        activeColor: const Color(0xFF0D9488),
                         inactiveColor: Colors.white12,
                         onChanged: (val) {
                           setState(() {
@@ -598,12 +607,12 @@ class _LandingScreenState extends State<LandingScreen>
 
                       // ICU Occupancy
                       _buildSliderIndicator('ICU Beds Occupancy', _simulatedICU,
-                          const Color(0xFFFFB703)),
+                          const Color(0xFFE5A33D)),
                       Slider(
                         value: _simulatedICU,
                         min: 0,
                         max: 100,
-                        activeColor: const Color(0xFFFFB703),
+                        activeColor: const Color(0xFFE5A33D),
                         inactiveColor: Colors.white12,
                         onChanged: (val) {
                           setState(() {
@@ -615,12 +624,12 @@ class _LandingScreenState extends State<LandingScreen>
 
                       // Ventilator Available
                       _buildSliderIndicator('Ventilators In Use',
-                          _simulatedVents, const Color(0xFF2A9D8F)),
+                          _simulatedVents, const Color(0xFF0D9488)),
                       Slider(
                         value: _simulatedVents,
                         min: 0,
                         max: 100,
-                        activeColor: const Color(0xFF2A9D8F),
+                        activeColor: const Color(0xFF0D9488),
                         inactiveColor: Colors.white12,
                         onChanged: (val) {
                           setState(() {
@@ -657,7 +666,7 @@ class _LandingScreenState extends State<LandingScreen>
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: val > 85
-                    ? Colors.red.withValues(alpha: 0.2)
+                    ? AppColors.error.withValues(alpha: 0.2)
                     : color.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(4),
               ),
@@ -686,7 +695,7 @@ class _LandingScreenState extends State<LandingScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: const Color(0xFF48CAE4), size: 20),
+          Icon(icon, color: const Color(0xFF0D9488), size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -724,7 +733,7 @@ class _LandingScreenState extends State<LandingScreen>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFB703).withValues(alpha: 0.1),
+                        color: const Color(0xFFE5A33D).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(30),
                       ),
                       child: Text(
@@ -732,7 +741,7 @@ class _LandingScreenState extends State<LandingScreen>
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFFFFB703),
+                          color: const Color(0xFFE5A33D),
                         ),
                       ),
                     ),
@@ -774,7 +783,8 @@ class _LandingScreenState extends State<LandingScreen>
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.02),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    border:
+                        Border.all(color: Colors.white.withValues(alpha: 0.08)),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(24),
@@ -794,7 +804,7 @@ class _LandingScreenState extends State<LandingScreen>
                           child: Column(
                             children: [
                               const Icon(Icons.person_pin_circle_rounded,
-                                  color: Color(0xFFFFB703), size: 36),
+                                  color: Color(0xFFE5A33D), size: 36),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 4),
@@ -816,7 +826,7 @@ class _LandingScreenState extends State<LandingScreen>
                           child: Column(
                             children: [
                               const Icon(Icons.local_hospital,
-                                  color: Color(0xFF48CAE4), size: 40),
+                                  color: Color(0xFF0D9488), size: 40),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 4),
@@ -847,7 +857,7 @@ class _LandingScreenState extends State<LandingScreen>
                             child: Row(
                               children: [
                                 const Icon(Icons.local_shipping_rounded,
-                                    color: Color(0xFFFFB703), size: 24),
+                                    color: Color(0xFFE5A33D), size: 24),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
@@ -909,7 +919,7 @@ class _LandingScreenState extends State<LandingScreen>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF2A9D8F).withValues(alpha: 0.1),
+                        color: const Color(0xFF0D9488).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(30),
                       ),
                       child: Text(
@@ -917,7 +927,7 @@ class _LandingScreenState extends State<LandingScreen>
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFF2A9D8F),
+                          color: const Color(0xFF0D9488),
                         ),
                       ),
                     ),
@@ -960,7 +970,8 @@ class _LandingScreenState extends State<LandingScreen>
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.03),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    border:
+                        Border.all(color: Colors.white.withValues(alpha: 0.08)),
                   ),
                   child: Column(
                     children: [
@@ -970,11 +981,12 @@ class _LandingScreenState extends State<LandingScreen>
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF2A9D8F).withValues(alpha: 0.1),
+                              color: const Color(0xFF0D9488)
+                                  .withValues(alpha: 0.1),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(Icons.support_agent,
-                                color: Color(0xFF2A9D8F)),
+                                color: Color(0xFF0D9488)),
                           ),
                           const SizedBox(width: 12),
                           Column(
@@ -990,7 +1002,7 @@ class _LandingScreenState extends State<LandingScreen>
                                       width: 6,
                                       height: 6,
                                       decoration: const BoxDecoration(
-                                          color: Colors.green,
+                                          color: AppColors.success,
                                           shape: BoxShape.circle)),
                                   const SizedBox(width: 6),
                                   Text('Online',
@@ -1021,7 +1033,7 @@ class _LandingScreenState extends State<LandingScreen>
                                     horizontal: 16, vertical: 10),
                                 decoration: BoxDecoration(
                                   color: isUser
-                                      ? const Color(0xFF0077B6)
+                                      ? const Color(0xFF142D4E)
                                       : Colors.white.withValues(alpha: 0.06),
                                   borderRadius: BorderRadius.only(
                                     topLeft: const Radius.circular(12),
@@ -1082,7 +1094,7 @@ class _LandingScreenState extends State<LandingScreen>
       backgroundColor: Colors.white.withValues(alpha: 0.04),
       label: Text(label,
           style: GoogleFonts.poppins(
-              fontSize: 11, color: const Color(0xFF48CAE4))),
+              fontSize: 11, color: const Color(0xFF0D9488))),
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: Colors.white10)),
@@ -1187,7 +1199,8 @@ class _LandingScreenState extends State<LandingScreen>
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.03),
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    border:
+                        Border.all(color: Colors.white.withValues(alpha: 0.08)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1242,13 +1255,13 @@ class _LandingScreenState extends State<LandingScreen>
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: _bloodExpirySlider < 7
-                              ? Colors.red.withValues(alpha: 0.15)
-                              : Colors.green.withValues(alpha: 0.1),
+                              ? AppColors.error.withValues(alpha: 0.15)
+                              : AppColors.success.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
                             color: _bloodExpirySlider < 7
                                 ? Colors.redAccent
-                                : Colors.green,
+                                : AppColors.success,
                           ),
                         ),
                         child: Row(
@@ -1259,7 +1272,7 @@ class _LandingScreenState extends State<LandingScreen>
                                   : Icons.check_circle_outline,
                               color: _bloodExpirySlider < 7
                                   ? Colors.redAccent
-                                  : Colors.green,
+                                  : AppColors.success,
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -1274,7 +1287,7 @@ class _LandingScreenState extends State<LandingScreen>
                                       fontWeight: FontWeight.bold,
                                       color: _bloodExpirySlider < 7
                                           ? Colors.redAccent
-                                          : Colors.green,
+                                          : AppColors.success,
                                       fontSize: 13,
                                     ),
                                   ),
@@ -1306,216 +1319,260 @@ class _LandingScreenState extends State<LandingScreen>
   // ==================== SLIDE 5: LOGIN / PORTALS ACCESS ====================
 
   Widget _buildPortalAuthSection(bool isDesktop) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
-          child: Flex(
-            direction: isDesktop ? Axis.horizontal : Axis.vertical,
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Left Content
-              Expanded(
-                flex: 5,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0077B6).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      child: Text(
-                        'ACCESS PORTALS',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: const Color(0xFF0077B6),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Ready to Get Started?',
-                      style: GoogleFonts.outfit(
-                        fontSize: isDesktop ? 42 : 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Select your user profile role to access the corresponding workspace. Standard pre-configured test credentials can be used for administrative evaluation.',
-                      style: GoogleFonts.poppins(
-                        fontSize: 16,
-                        color: Colors.white70,
-                        height: 1.6,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-
-                    // Selector Cards
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        _buildRoleSelectorCard(
-                            'patient', 'Patient Portal', Icons.person),
-                        _buildRoleSelectorCard('hospital', 'Hospital Portal',
-                            Icons.local_hospital),
-                        _buildRoleSelectorCard('admin', 'Admin Portal',
-                            Icons.admin_panel_settings),
-                      ],
-                    )
-                  ],
+    final intro = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(999),
+            border:
+                Border.all(color: AppColors.secondary.withValues(alpha: 0.5)),
+          ),
+          child: Text(
+            'ACCESS PORTALS',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFFBFF7EC),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Ready to Get Started?',
+          style: GoogleFonts.outfit(
+            fontSize: isDesktop ? 42 : 28,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Choose your portal, then sign in with an account authorized for that workspace. Doctor and hospital driver access is managed by your hospital; private ambulance applications require administrator approval.',
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            color: Colors.white70,
+            height: 1.6,
+          ),
+        ),
+        const SizedBox(height: 28),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            _buildRoleSelectorCard('patient', 'Patient Portal', Icons.person),
+            _buildRoleSelectorCard(
+                'hospital', 'Hospital Portal', Icons.local_hospital),
+            _buildRoleSelectorCard(
+                'doctor', 'Doctor Portal', Icons.medical_services_outlined),
+            _buildRoleSelectorCard('ambulance_driver',
+                'Ambulance Driver Portal', Icons.local_taxi_outlined),
+            _buildRoleSelectorCard(
+                'admin', 'Admin Portal', Icons.admin_panel_settings),
+          ],
+        ),
+      ],
+    );
+    final signIn = Card(
+      color: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Sign In',
+              style: GoogleFonts.outfit(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: AppColors.primary,
+              ),
+            ),
+            Text(
+              'Access your ${_selectedPortal.toUpperCase()} dashboard workspace',
+              style: GoogleFonts.poppins(fontSize: 12, color: AppColors.muted),
+            ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _emailController,
+              style: const TextStyle(color: AppColors.text),
+              decoration: InputDecoration(
+                labelText: 'Email Address',
+                labelStyle: const TextStyle(color: AppColors.muted),
+                prefixIcon:
+                    const Icon(Icons.email_outlined, color: AppColors.muted),
+                filled: true,
+                fillColor: AppColors.surface,
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _passwordController,
+              obscureText: !_isPasswordVisible,
+              style: const TextStyle(color: AppColors.text),
+              decoration: InputDecoration(
+                labelText: 'Password',
+                labelStyle: const TextStyle(color: AppColors.muted),
+                prefixIcon:
+                    const Icon(Icons.lock_outline, color: AppColors.muted),
+                suffixIcon: IconButton(
+                  tooltip:
+                      _isPasswordVisible ? 'Hide password' : 'Show password',
+                  icon: Icon(
+                    _isPasswordVisible
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                    color: AppColors.muted,
+                  ),
+                  onPressed: () =>
+                      setState(() => _isPasswordVisible = !_isPasswordVisible),
+                ),
+                filled: true,
+                fillColor: AppColors.surface,
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Consumer<AuthProvider>(
+              builder: (context, auth, child) => SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: auth.isLoading ? null : _handleLogin,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: auth.isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text('Access Portal Dashboard',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
-              const SizedBox(width: 48, height: 48),
-
-              // Right Glassmorphic Login Form
-              Expanded(
-                flex: 5,
-                child: Container(
-                  padding: const EdgeInsets.all(32),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 30,
-                        offset: const Offset(0, 15),
-                      )
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Sign In',
-                        style: GoogleFonts.outfit(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Text(
-                        'Access your ${_selectedPortal.toUpperCase()} dashboard workspace',
-                        style: GoogleFonts.poppins(
-                            fontSize: 12, color: Colors.white30),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Email Field
-                      TextField(
-                        controller: _emailController,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'Email Address',
-                          labelStyle: const TextStyle(color: Colors.white70),
-                          prefixIcon: const Icon(Icons.email_outlined,
-                              color: Colors.white54),
-                          fillColor: Colors.white.withValues(alpha: 0.05),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Password Field
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: !_isPasswordVisible,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          labelStyle: const TextStyle(color: Colors.white70),
-                          prefixIcon: const Icon(Icons.lock_outline,
-                              color: Colors.white54),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _isPasswordVisible
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                              color: Colors.white54,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _isPasswordVisible = !_isPasswordVisible;
-                              });
-                            },
-                          ),
-                          fillColor: Colors.white.withValues(alpha: 0.05),
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Login Button
-                      Consumer<AuthProvider>(
-                        builder: (context, auth, child) {
-                          return ElevatedButton(
-                            onPressed: auth.isLoading ? null : _handleLogin,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0077B6),
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                            ),
-                            child: auth.isLoading
-                                ? const CircularProgressIndicator(
-                                    color: Colors.white)
-                                : const Text('Access Portal Dashboard',
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold)),
-                          );
-                        },
-                      ),
-
-                      if (_selectedPortal != 'admin') ...[
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text("Don't have an account? ",
-                                style: TextStyle(
-                                    color: Colors.white60, fontSize: 13)),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => SignupScreen(
-                                      userType: _selectedPortal == 'patient'
-                                          ? 'Patient'
-                                          : 'Hospital',
-                                    ),
-                                  ),
-                                );
-                              },
-                              child: const Text('Sign Up'),
-                            ),
-                          ],
-                        ),
-                      ]
-                    ],
-                  ),
-                ),
-              )
-            ],
-          ),
+            ),
+            const SizedBox(height: 16),
+            _buildPortalOnboardingLinks(),
+          ],
         ),
       ),
     );
+
+    return LayoutBuilder(builder: (context, constraints) {
+      if (constraints.maxWidth < 900) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 92, 20, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              intro,
+              const SizedBox(height: 28),
+              signIn,
+            ],
+          ),
+        );
+      }
+      return SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(flex: 5, child: intro),
+                    const SizedBox(width: 48),
+                    Expanded(flex: 5, child: signIn),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    });
   }
+
+  Widget _buildPortalOnboardingLinks() {
+    switch (_selectedPortal) {
+      case 'patient':
+        return _onboardingLink("Don't have an account?", 'Patient Sign Up', () {
+          Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const SignupScreen(userType: 'Patient')));
+        });
+      case 'hospital':
+        return _onboardingLink("Register your facility", 'Hospital Sign Up',
+            () {
+          Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const SignupScreen(userType: 'Hospital')));
+        });
+      case 'doctor':
+        return const Padding(
+          padding: EdgeInsets.only(top: 8),
+          child: Text(
+              'Doctor accounts are created or activated by an authorized hospital or administrator. Contact your hospital if you need access.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.muted, fontSize: 12)),
+        );
+      case 'ambulance_driver':
+        return Column(mainAxisSize: MainAxisSize.min, children: [
+          const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text(
+                  'Hospital drivers sign in with their mobile number and the initial password provided by their hospital.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.muted, fontSize: 12))),
+          TextButton.icon(
+            onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) =>
+                        const PrivateAmbulanceRegistrationScreen())),
+            icon: const Icon(Icons.local_taxi_outlined, size: 18),
+            label: const Text('Private Ambulance Registration'),
+          ),
+        ]);
+      case 'admin':
+        return const Padding(
+          padding: EdgeInsets.only(top: 8),
+          child: Text(
+              'Administrator accounts are provisioned securely by the system owner.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.muted, fontSize: 12)),
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _onboardingLink(String prompt, String label, VoidCallback onPressed) =>
+      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Flexible(
+            child: Text(prompt,
+                style: const TextStyle(color: AppColors.muted, fontSize: 13))),
+        TextButton(onPressed: onPressed, child: Text(label)),
+      ]);
 
   Widget _buildRoleSelectorCard(String role, String label, IconData icon) {
     final isSelected = _selectedPortal == role;
@@ -1530,12 +1587,12 @@ class _LandingScreenState extends State<LandingScreen>
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF48CAE4).withValues(alpha: 0.15)
+              ? AppColors.secondary
               : Colors.white.withValues(alpha: 0.02),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? const Color(0xFF48CAE4)
+                ? AppColors.secondary
                 : Colors.white.withValues(alpha: 0.08),
           ),
         ),
@@ -1543,15 +1600,18 @@ class _LandingScreenState extends State<LandingScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon,
-                color: isSelected ? const Color(0xFF48CAE4) : Colors.white30,
-                size: 18),
+                color: isSelected ? Colors.white : Colors.white70, size: 18),
             const SizedBox(width: 8),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected ? const Color(0xFF48CAE4) : Colors.white70,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: Colors.white,
+                ),
               ),
             ),
           ],
@@ -1574,31 +1634,61 @@ class _LandingScreenState extends State<LandingScreen>
     final success = await auth.login(
       _emailController.text.trim(),
       _passwordController.text.trim(),
-      _selectedPortal,
     );
 
     if (success && mounted) {
-      if (_selectedPortal == 'patient') {
+      // The server determines the role from the authenticated account.  A
+      // portal tab is presentation only; it can never select a privilege.
+      final role = auth.currentUser?.userType;
+      if (role != _selectedPortal && role != null) {
+        final actualPortal = switch (role) {
+          'patient' => 'Patient Portal',
+          'hospital' => 'Hospital Portal',
+          'doctor' => 'Doctor Portal',
+          'ambulance_driver' => 'Ambulance Driver Portal',
+          'admin' => 'Admin Portal',
+          _ => 'the portal assigned to your account',
+        };
+        _showError(
+            'Your account belongs to $actualPortal. Opening that portal.');
+      }
+      if (role == 'patient') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => const patient.PatientHomeScreen(),
           ),
         );
-      } else if (_selectedPortal == 'hospital') {
+      } else if (role == 'hospital') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => const hospital.HospitalHomeScreen(),
           ),
         );
-      } else {
+      } else if (role == 'doctor') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const DoctorDashboardScreen(),
+          ),
+        );
+      } else if (role == 'ambulance_driver') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const AmbulanceDriverDashboard(),
+          ),
+        );
+      } else if (role == 'admin') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => const admin.AdminHomeScreen(),
           ),
         );
+      } else {
+        _showError('This account has no supported portal role.');
       }
     } else {
       _showError(auth.errorMessage ?? 'Invalid credentials. Please try again.');
@@ -1609,7 +1699,7 @@ class _LandingScreenState extends State<LandingScreen>
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         duration: const Duration(seconds: 3),
       ),
     );
@@ -1650,7 +1740,7 @@ class MapGridPainter extends CustomPainter {
 
     // Draw dotted path for route telemetry
     final routePaint = Paint()
-      ..color = const Color(0xFFFFB703).withValues(alpha: 0.6)
+      ..color = const Color(0xFFE5A33D).withValues(alpha: 0.6)
       ..strokeWidth = 3.0
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;

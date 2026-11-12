@@ -17,7 +17,7 @@ ALTER TABLE IF EXISTS users
   ADD COLUMN IF NOT EXISTS hospital_role VARCHAR(100);
 
 ALTER TABLE IF EXISTS users
-  ADD COLUMN IF NOT EXISTS permissions JSONB;
+  ADD COLUMN IF NOT EXISTS permissions TEXT[] DEFAULT '{}'::text[];
 
 -- Staff activity log
 CREATE TABLE IF NOT EXISTS staff_activity_log (

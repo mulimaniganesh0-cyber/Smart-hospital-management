@@ -2,6 +2,10 @@
 
 This directory contains the Flutter application for the Smart Hospital Resource Management System.
 
+For public web access, serve/build this Flutter app from `frontend/` (the web
+entry point is `frontend/web/index.html`). Do not serve the repository root:
+its root `index.html` is not the Flutter application.
+
 ## Run locally
 
 ```powershell
@@ -13,7 +17,7 @@ Configure the API and real-time server for the target environment with Dart
 defines. `10.0.2.2` is only for the Android emulator:
 
 ```powershell
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5000/api --dart-define=SOCKET_URL=http://10.0.2.2:5000
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5001/api --dart-define=SOCKET_URL=http://10.0.2.2:5001
 ```
 
 Use `10.0.2.2` for an Android emulator. For a physical device, use the reachable IP address or domain of the backend server.

@@ -48,7 +48,7 @@ exports.queryChatbot = async (req, res) => {
     res.json({ success: true, conversationId: conversationId || null, type: data.type, message: data.response, ...data, data, requestId: req.body.requestId || null });
     console.info(`[CHATBOT] HTTP response: ${Date.now() - startedAt}ms`);
   } catch (error) {
-    console.error(`[CHATBOT ERROR] requestId=${req.body?.requestId || 'none'}; ${error.stack || error.message || error}`);
+    console.error(`[CHATBOT ERROR] requestId=${req.body?.requestId || 'none'}; request failed`);
     const databaseError = /database|connect|postgres|relation|timeout/i.test(error.message || '');
     res.status(databaseError ? 503 : 500).json({ success: false, error: databaseError ? 'DATABASE_ERROR' : 'CHATBOT_ERROR', message: databaseError ? 'Hospital information is temporarily unavailable. Please try again shortly.' : 'CareGuide could not complete that request right now.' });
   }

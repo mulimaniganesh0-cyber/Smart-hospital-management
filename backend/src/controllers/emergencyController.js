@@ -8,6 +8,10 @@ const { RESPONSE_SECONDS, createDispatches, respond, processExpiredDispatches } 
 function emitEmergency(io, event, emergency) {
   if (!io || !emergency) return;
   const payload = { ...emergency, event, occurred_at: new Date().toISOString() };
+  if (emergency.assigned_driver_user_id) {
+    io.to(`emergency_assignment_${emergency.id}`).emit(event, payload);
+    io.to(`driver_${emergency.assigned_driver_user_id}`).emit(event, payload);
+  }
   if (emergency.hospital_id) io.to(`hospital_${emergency.hospital_id}`).emit(event, payload);
   if (emergency.patient_id) io.to(`patient_${emergency.patient_id}`).emit(event, payload);
   // Legacy listeners remain supported while clients move to namespaced events.
@@ -36,6 +40,12 @@ exports.createEmergencyRequest = async (req, res) => {
     if ((location_lat !== undefined && !validCoordinate(location_lat, -90, 90)) || (location_lng !== undefined && !validCoordinate(location_lng, -180, 180))) {
       return res.status(400).json({ success: false, message: 'Location coordinates are invalid' });
     }
+    const hasLat=location_lat!==undefined&&location_lat!==null,hasLng=location_lng!==undefined&&location_lng!==null;
+    const initialAccuracy=location_accuracy==null?null:Number(location_accuracy);
+    const initialFix=location_timestamp?new Date(location_timestamp):new Date();
+    if(hasLat!==hasLng||(initialAccuracy!==null&&(!Number.isFinite(initialAccuracy)||initialAccuracy<0||initialAccuracy>10000))||Number.isNaN(initialFix.getTime())||initialFix>new Date(Date.now()+30000)||Date.now()-initialFix.getTime()>120000){
+      return res.status(400).json({success:false,message:'Location accuracy or timestamp is invalid or stale'});
+    }
     await client.query('BEGIN');
     
     const patientResult = await client.query(
@@ -63,8 +73,8 @@ exports.createEmergencyRequest = async (req, res) => {
     
     const result = await client.query(
       `INSERT INTO emergency_requests 
-       (patient_id, hospital_id, ambulance_id, emergency_type, severity, description, location_lat, location_lng, location_accuracy, location_timestamp, status)
-       VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, 'pending')
+       (patient_id, hospital_id, ambulance_id, emergency_type, severity, description, location_lat, location_lng, location_accuracy, location_timestamp, patient_location_updated_at, status)
+       VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, CASE WHEN $6 IS NOT NULL AND $7 IS NOT NULL THEN CURRENT_TIMESTAMP END, 'pending')
        RETURNING *`,
       [
         patientId, 
@@ -74,8 +84,8 @@ exports.createEmergencyRequest = async (req, res) => {
         description || 'Emergency SOS triggered', 
         location_lat, 
         location_lng,
-        Number.isFinite(Number(location_accuracy)) ? Number(location_accuracy) : null,
-        location_timestamp ? new Date(location_timestamp) : new Date()
+        initialAccuracy,
+        hasLat ? initialFix : new Date()
       ]
     );
 
@@ -143,7 +153,9 @@ exports.getSecureEmergencyLocation = async (req, res) => {
     const hash = crypto.createHash('sha256').update(token).digest('hex');
     const result = await pool.query(`SELECT e.id,e.status,e.location_lat,e.location_lng,e.location_accuracy,e.location_timestamp,
       h.name AS hospital_name,h.phone AS hospital_phone,h.latitude AS hospital_latitude,h.longitude AS hospital_longitude,
-      a.vehicle_number,a.current_location_lat AS ambulance_latitude,a.current_location_lng AS ambulance_longitude
+      a.vehicle_number,COALESCE(a.driver_location_lat,a.current_location_lat) AS ambulance_latitude,
+      COALESCE(a.driver_location_lng,a.current_location_lng) AS ambulance_longitude,
+      a.driver_location_timestamp AS ambulance_location_timestamp
       FROM emergency_requests e LEFT JOIN hospitals h ON h.id=e.accepting_hospital_id LEFT JOIN ambulances a ON a.id=e.ambulance_id
       WHERE e.secure_location_token_hash=$1 AND e.secure_location_expires_at>CURRENT_TIMESTAMP AND e.status NOT IN ('completed','resolved','cancelled')`, [hash]);
     if (!result.rows[0]) return res.status(404).json({ success: false, message: 'Emergency location is unavailable' });
@@ -192,22 +204,36 @@ exports.processSosDispatchTimeouts = async (req, res) => {
 
 exports.updateLiveLocation = async (req, res) => {
   try {
-    const { emergencyId, location_lat, location_lng } = req.body;
+    const { emergencyId, location_lat, location_lng, location_accuracy, location_timestamp } = req.body;
 
     if (!emergencyId || location_lat === undefined || location_lng === undefined) {
       return res.status(400).json({ success: false, message: 'Emergency ID and coordinates required' });
     }
 
-    const result = await pool.query(
-      `UPDATE emergency_requests
-       SET location_lat = $1, location_lng = $2
-       WHERE id = $3 AND patient_id = (SELECT id FROM patients WHERE user_id = $4)
-       RETURNING *`,
-      [location_lat, location_lng, emergencyId, req.user.id]
-    );
+    const lat = Number(location_lat), lng = Number(location_lng), accuracy = location_accuracy == null ? null : Number(location_accuracy);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180 || (accuracy != null && (!Number.isFinite(accuracy) || accuracy < 0 || accuracy > 10000))) return res.status(400).json({ success: false, message: 'Coordinates or accuracy are invalid' });
+    const fixTime=location_timestamp?new Date(location_timestamp):new Date();
+    if(Number.isNaN(fixTime.getTime())||fixTime>new Date(Date.now()+30000)||Date.now()-fixTime.getTime()>120000)return res.status(400).json({success:false,message:'Location timestamp is invalid or stale'});
+    const result = await pool.query(`UPDATE emergency_requests SET location_lat=$1,location_lng=$2,location_accuracy=$3,patient_location_accuracy=$3,
+      location_timestamp=CURRENT_TIMESTAMP,patient_location_updated_at=CURRENT_TIMESTAMP
+      WHERE id=$4 AND patient_id=(SELECT id FROM patients WHERE user_id=$5) AND patient_location_sharing=TRUE
+        AND status NOT IN ('completed','resolved','cancelled')
+        AND (assigned_driver_user_id IS NULL OR EXISTS(SELECT 1 FROM users d JOIN ambulances a ON a.id=emergency_requests.ambulance_id AND a.driver_user_id=d.id AND a.is_active=TRUE WHERE d.id=assigned_driver_user_id AND d.role='ambulance_driver' AND d.driver_status='active' AND d.account_status='ACTIVE'))
+        AND (patient_location_updated_at IS NULL OR patient_location_updated_at<CURRENT_TIMESTAMP-INTERVAL '3 seconds') RETURNING *`, [lat,lng,accuracy,emergencyId,req.user.id]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'Emergency request not found' });
+    }
+
+    // Share only with stored assignment participants; never trust client room IDs.
+    const io = req.app.get('io');
+    const locationPayload = { emergencyId: result.rows[0].id, latitude: lat, longitude: lng, accuracy, timestamp: result.rows[0].patient_location_updated_at };
+    if (io) {
+      io.to(`emergency_assignment_${result.rows[0].id}`).emit('patient:location_updated', locationPayload);
+      if (result.rows[0].assigned_driver_user_id) io.to(`driver_${result.rows[0].assigned_driver_user_id}`).emit('patient:location_updated', locationPayload);
+      const hospitalId = result.rows[0].accepting_hospital_id || result.rows[0].hospital_id;
+      if (hospitalId) io.to(`hospital_${hospitalId}`).emit('patient:location_updated', locationPayload);
+      io.to(`patient_${result.rows[0].patient_id}`).emit('patient:location_updated', locationPayload);
     }
 
     // Also fetch ambulance status if assigned
@@ -226,7 +252,7 @@ exports.updateLiveLocation = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Update live location error:', error);
+    console.error('Update live location error');
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
   }
 };
@@ -270,12 +296,13 @@ exports.getPatientSosHistory = async (req, res) => {
 exports.endEmergency = async (req, res) => {
   try {
     const { emergencyId } = req.params;
-    const { status = 'completed' } = req.body;
+    const status = String(req.body?.status || 'completed').toLowerCase();
+    if(!['completed','cancelled'].includes(status))return res.status(400).json({success:false,message:'Patient can end an emergency as completed or cancelled'});
 
     const result = await pool.query(
       `UPDATE emergency_requests
-       SET status = $1, completed_at = CURRENT_TIMESTAMP
-       WHERE id = $2 AND patient_id = (SELECT id FROM patients WHERE user_id = $3)
+       SET status = $1, completed_at = CURRENT_TIMESTAMP,patient_location_sharing=FALSE,location_lat=NULL,location_lng=NULL,location_accuracy=NULL,location_timestamp=NULL,patient_location_updated_at=NULL
+       WHERE id = $2 AND patient_id = (SELECT id FROM patients WHERE user_id = $3) AND status NOT IN ('completed','resolved','cancelled')
        RETURNING *`,
       [status, emergencyId, req.user.id]
     );
@@ -285,6 +312,7 @@ exports.endEmergency = async (req, res) => {
     }
 
     const emergency = result.rows[0];
+    req.app.get('io')?.in(`emergency_assignment_${emergency.id}`).socketsLeave(`emergency_assignment_${emergency.id}`);
 
     // Free up assigned ambulance
     if (emergency.ambulance_id) {
@@ -420,6 +448,12 @@ exports.updateEmergencyStatus = async (req, res) => {
        SET status = $1::varchar,
            assigned_at = CASE WHEN $1::varchar IN ('accepted', 'assigned', 'dispatched') THEN CURRENT_TIMESTAMP ELSE assigned_at END,
            completed_at = CASE WHEN $1::varchar IN ('completed', 'resolved', 'cancelled') THEN CURRENT_TIMESTAMP ELSE completed_at END,
+           patient_location_sharing = CASE WHEN $1::varchar IN ('completed', 'resolved', 'cancelled') THEN FALSE ELSE patient_location_sharing END,
+           location_lat = CASE WHEN $1::varchar IN ('completed', 'resolved', 'cancelled') THEN NULL ELSE location_lat END,
+           location_lng = CASE WHEN $1::varchar IN ('completed', 'resolved', 'cancelled') THEN NULL ELSE location_lng END,
+           location_accuracy = CASE WHEN $1::varchar IN ('completed', 'resolved', 'cancelled') THEN NULL ELSE location_accuracy END,
+           location_timestamp = CASE WHEN $1::varchar IN ('completed', 'resolved', 'cancelled') THEN NULL ELSE location_timestamp END,
+           patient_location_updated_at = CASE WHEN $1::varchar IN ('completed', 'resolved', 'cancelled') THEN NULL ELSE patient_location_updated_at END,
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $2::integer AND hospital_id = $3::integer
          AND status IS DISTINCT FROM $1::varchar
@@ -436,6 +470,7 @@ exports.updateEmergencyStatus = async (req, res) => {
       await client.query(`UPDATE ambulances SET is_available = TRUE, status = 'AVAILABLE', updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [result.rows[0].ambulance_id]);
     }
     await client.query('COMMIT');
+    if (['completed','resolved','cancelled'].includes(status)) req.app.get('io')?.in(`emergency_assignment_${result.rows[0].id}`).socketsLeave(`emergency_assignment_${result.rows[0].id}`);
     const hospitalName = await pool.query('SELECT name FROM hospitals WHERE id=$1', [hospital.rows[0].id]);
     const patientUser = await pool.query('SELECT user_id FROM patients WHERE id=$1', [result.rows[0].patient_id]);
     if (patientUser.rows[0]) {
@@ -466,17 +501,30 @@ exports.assignEmergencyAmbulance = async (req, res) => {
     if (!hospital.rows.length) return res.status(404).json({ success: false, message: 'Hospital not found' });
     const hospitalId = hospital.rows[0].id;
     await client.query('BEGIN');
-    const emergency = await client.query(`SELECT * FROM emergency_requests WHERE id=$1 AND hospital_id=$2 FOR UPDATE`, [emergencyId, hospitalId]);
+    const emergency = await client.query(`SELECT * FROM emergency_requests WHERE id=$1 AND COALESCE(accepting_hospital_id,hospital_id)=$2 FOR UPDATE`, [emergencyId, hospitalId]);
     if (!emergency.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ success: false, message: 'Emergency request not found for this hospital' }); }
     if (['completed', 'resolved', 'cancelled'].includes(emergency.rows[0].status)) { await client.query('ROLLBACK'); return res.status(409).json({ success: false, message: 'Cannot assign an ambulance to a closed emergency' }); }
     const ambulance = await client.query(`SELECT * FROM ambulances WHERE id=$1 AND hospital_id=$2 FOR UPDATE`, [ambulanceId, hospitalId]);
     if (!ambulance.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ success: false, message: 'Ambulance not found for this hospital' }); }
     if (!ambulance.rows[0].is_active || !ambulance.rows[0].is_available || ambulance.rows[0].status !== 'AVAILABLE') { await client.query('ROLLBACK'); return res.status(409).json({ success: false, message: 'This ambulance is not available' }); }
+    if (!ambulance.rows[0].driver_user_id) { await client.query('ROLLBACK'); return res.status(409).json({ success: false, message: 'Assign an active ambulance driver to this ambulance first' }); }
+    const driver = await client.query(`SELECT id,name FROM users WHERE id=$1 AND hospital_id=$2 AND role='ambulance_driver' AND driver_type='hospital_driver' AND driver_status='active' AND account_status='ACTIVE' FOR UPDATE`, [ambulance.rows[0].driver_user_id, hospitalId]);
+    if (!driver.rowCount) { await client.query('ROLLBACK'); return res.status(409).json({ success: false, message: 'This ambulance has no active eligible driver' }); }
+    const busyDriver = await client.query(`SELECT 1 FROM emergency_requests WHERE assigned_driver_user_id=$1 AND id<>$2 AND status NOT IN ('completed','resolved','cancelled') UNION ALL SELECT 1 FROM ambulance_bookings WHERE driver_user_id=$1 AND status NOT IN ('completed','cancelled') LIMIT 1`, [driver.rows[0].id, emergencyId]);
+    if (busyDriver.rowCount) { await client.query('ROLLBACK'); return res.status(409).json({ success: false, message: 'The assigned driver is already handling an emergency' }); }
+    const previousDriverId=emergency.rows[0].assigned_driver_user_id;
+    const previousAmbulanceId=emergency.rows[0].ambulance_id;
+    if(previousAmbulanceId && Number(previousAmbulanceId)!==ambulanceId) await client.query(`UPDATE ambulances SET is_available=TRUE,status='AVAILABLE',updated_at=CURRENT_TIMESTAMP WHERE id=$1`,[previousAmbulanceId]);
     await client.query(`UPDATE ambulances SET is_available=FALSE,status='ASSIGNED' WHERE id=$1`, [ambulanceId]);
-    const updated = await client.query(`UPDATE emergency_requests SET ambulance_id=$1,status='assigned',assigned_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=$2 RETURNING *`, [ambulanceId, emergencyId]);
+    const updated = await client.query(`UPDATE emergency_requests SET ambulance_id=$1,assigned_driver_user_id=$2,status='assigned',assigned_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE id=$3 RETURNING *`, [ambulanceId, driver.rows[0].id, emergencyId]);
     await client.query('COMMIT');
+    if(previousDriverId && previousDriverId!==driver.rows[0].id){
+      const io=req.app.get('io');
+      if(io){io.in(`emergency_assignment_${emergencyId}`).socketsLeave(`emergency_assignment_${emergencyId}`);io.to(`driver_${previousDriverId}`).emit('emergency:assignment_revoked',{id:emergencyId,reason:'reassigned'});}
+    }
     const patientUser = await pool.query('SELECT user_id FROM patients WHERE id=$1', [updated.rows[0].patient_id]);
     if (patientUser.rows[0]) await createNotification({ io: req.app.get('io'), recipientUserId: patientUser.rows[0].user_id, hospitalId, patientId: updated.rows[0].patient_id, ambulanceId, emergencyId, type: 'ambulance_assigned', priority: 'high', relatedType: 'emergency', relatedId: emergencyId, title: 'Ambulance assigned', message: `An ambulance has been assigned to your emergency request.` });
+    await createNotification({ io: req.app.get('io'), recipientUserId: driver.rows[0].id, hospitalId, patientId: updated.rows[0].patient_id, ambulanceId, emergencyId, type: 'driver_emergency_assignment', priority: 'high', relatedType: 'emergency', relatedId: emergencyId, title: 'New emergency assignment', message: `You have been assigned ambulance ${ambulance.rows[0].vehicle_number} for an emergency.` });
     emitEmergency(req.app.get('io'), 'emergency:ambulance_assigned', { ...updated.rows[0], ambulance: ambulance.rows[0] });
     res.json({ success: true, message: 'Ambulance assigned', data: { ...updated.rows[0], ambulance: ambulance.rows[0] } });
   } catch (error) {

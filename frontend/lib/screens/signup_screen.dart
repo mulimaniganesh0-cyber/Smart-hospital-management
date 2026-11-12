@@ -1,5 +1,6 @@
 // lib/screens/signup_screen.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import 'hospital/simple_location_picker.dart';
@@ -55,10 +56,11 @@ class _SignupScreenState extends State<SignupScreen> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
+                  color: AppColors.error.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.admin_panel_settings, size: 80, color: Colors.red),
+                child: const Icon(Icons.admin_panel_settings,
+                    size: 80, color: AppColors.error),
               ),
               const SizedBox(height: 20),
               const Text(
@@ -74,7 +76,8 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(height: 30),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                style:
+                    ElevatedButton.styleFrom(backgroundColor: AppColors.error),
                 child: const Text('Back to Login'),
               ),
             ],
@@ -94,7 +97,10 @@ class _SignupScreenState extends State<SignupScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.white, const Color(0xFF0A4D68).withValues(alpha: 0.05)],
+            colors: [
+              Colors.white,
+              const Color(0xFF142D4E).withValues(alpha: 0.05)
+            ],
           ),
         ),
         child: SingleChildScrollView(
@@ -105,34 +111,39 @@ class _SignupScreenState extends State<SignupScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 20),
-                _buildTextField(_nameController, 'Full Name', Icons.person_outline),
+                _buildTextField(
+                    _nameController, 'Full Name', Icons.person_outline),
                 const SizedBox(height: 16),
                 _buildTextField(_emailController, 'Email', Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress),
                 const SizedBox(height: 16),
-                _buildTextField(_phoneController, 'Phone Number', Icons.phone_outlined,
+                _buildTextField(
+                    _phoneController, 'Phone Number', Icons.phone_outlined,
                     keyboardType: TextInputType.phone),
-
                 if (widget.userType == 'Hospital') ...[
                   const SizedBox(height: 24),
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.green.shade50, Colors.green.shade100],
+                        colors: [
+                          AppColors.success.withValues(alpha: 0.1),
+                          AppColors.success.withValues(alpha: 0.1)
+                        ],
                       ),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.green.shade200),
+                      border: Border.all(
+                          color: AppColors.success.withValues(alpha: 0.1)),
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.local_hospital, color: Colors.green),
+                        Icon(Icons.local_hospital, color: AppColors.success),
                         SizedBox(width: 12),
                         Text(
                           'Hospital Details',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.green,
+                            color: AppColors.success,
                           ),
                         ),
                       ],
@@ -148,7 +159,8 @@ class _SignupScreenState extends State<SignupScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: _buildTextField(null, 'City', Icons.location_city,
+                        child: _buildTextField(
+                            null, 'City', Icons.location_city,
                             onChanged: (v) => _hospitalCity = v),
                       ),
                       const SizedBox(width: 12),
@@ -163,46 +175,64 @@ class _SignupScreenState extends State<SignupScreen> {
                       onChanged: (v) => _hospitalPincode = v,
                       keyboardType: TextInputType.number),
                   const SizedBox(height: 16),
-                  _buildTextField(null, 'Area', Icons.location_on, onChanged: (v) => _hospitalArea = v),
+                  _buildTextField(null, 'Area', Icons.location_on,
+                      onChanged: (v) => _hospitalArea = v),
                   const SizedBox(height: 16),
-                  _buildTextField(null, 'Country', Icons.public, onChanged: (v) => _hospitalCountry = v),
+                  _buildTextField(null, 'Country', Icons.public,
+                      onChanged: (v) => _hospitalCountry = v),
                   const SizedBox(height: 16),
-                  _buildTextField(null, 'Hospital License / Registration Number', Icons.badge, onChanged: (v) => _registrationNumber = v),
+                  _buildTextField(null,
+                      'Hospital License / Registration Number', Icons.badge,
+                      onChanged: (v) => _registrationNumber = v),
                   const SizedBox(height: 16),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.map_outlined),
-                    label: Text(_locationConfirmed ? 'Location confirmed: ${_hospitalLatitude!.toStringAsFixed(5)}, ${_hospitalLongitude!.toStringAsFixed(5)}' : 'Select and confirm hospital location'),
+                    label: Text(_locationConfirmed
+                        ? 'Location confirmed: ${_hospitalLatitude!.toStringAsFixed(5)}, ${_hospitalLongitude!.toStringAsFixed(5)}'
+                        : 'Select and confirm hospital location'),
                     onPressed: () async {
-                      await Navigator.of(context).push(MaterialPageRoute(builder: (_) => SimpleLocationPicker(
-                        initialAddress: _hospitalAddress,
-                        initialLatitude: _hospitalLatitude,
-                        initialLongitude: _hospitalLongitude,
-                        onLocationSelected: (lat, lng, address) => setState(() { _hospitalLatitude = lat; _hospitalLongitude = lng; _locationConfirmed = true; if (_hospitalAddress.isEmpty) _hospitalAddress = address; }),
-                      )));
+                      await Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => SimpleLocationPicker(
+                                initialAddress: _hospitalAddress,
+                                initialLatitude: _hospitalLatitude,
+                                initialLongitude: _hospitalLongitude,
+                                onLocationSelected: (lat, lng, address) =>
+                                    setState(() {
+                                  _hospitalLatitude = lat;
+                                  _hospitalLongitude = lng;
+                                  _locationConfirmed = true;
+                                  if (_hospitalAddress.isEmpty) {
+                                    _hospitalAddress = address;
+                                  }
+                                }),
+                              )));
                     },
                   ),
                 ],
-
                 if (widget.userType == 'Patient') ...[
                   const SizedBox(height: 24),
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.blue.shade50, Colors.blue.shade100],
+                        colors: [
+                          AppColors.primary.withValues(alpha: 0.1),
+                          AppColors.primary.withValues(alpha: 0.1)
+                        ],
                       ),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.blue.shade200),
+                      border: Border.all(
+                          color: AppColors.primary.withValues(alpha: 0.1)),
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.person, color: Colors.blue),
+                        Icon(Icons.person, color: AppColors.primary),
                         SizedBox(width: 12),
                         Text(
                           'Personal Details',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue,
+                            color: AppColors.primary,
                           ),
                         ),
                       ],
@@ -219,36 +249,41 @@ class _SignupScreenState extends State<SignupScreen> {
                     Icons.water_drop,
                   ),
                   const SizedBox(height: 16),
-                  _buildTextField(null, 'Emergency Contact Number', Icons.emergency,
+                  _buildTextField(
+                      null, 'Emergency Contact Number', Icons.emergency,
                       onChanged: (v) => _emergencyContact = v,
                       keyboardType: TextInputType.phone),
                   const SizedBox(height: 16),
                   _buildTextField(null, 'Emergency Contact Name', Icons.person,
                       onChanged: (v) => _emergencyContactName = v),
                   const SizedBox(height: 16),
-                  _buildTextField(null, 'Relationship (optional)', Icons.people_outline,
+                  _buildTextField(
+                      null, 'Relationship (optional)', Icons.people_outline,
                       onChanged: (v) => _emergencyContactRelationship = v),
                 ],
-
                 const SizedBox(height: 24),
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Colors.purple.shade50, Colors.purple.shade100],
+                      colors: [
+                        AppColors.secondary.withValues(alpha: 0.1),
+                        AppColors.secondary.withValues(alpha: 0.1)
+                      ],
                     ),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.purple.shade200),
+                    border: Border.all(
+                        color: AppColors.secondary.withValues(alpha: 0.1)),
                   ),
                   child: const Row(
                     children: [
-                      Icon(Icons.lock, color: Colors.purple),
+                      Icon(Icons.lock, color: AppColors.secondary),
                       SizedBox(width: 12),
                       Text(
                         'Security',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Colors.purple,
+                          color: AppColors.secondary,
                         ),
                       ),
                     ],
@@ -259,14 +294,16 @@ class _SignupScreenState extends State<SignupScreen> {
                   _passwordController,
                   'Password',
                   _isPasswordVisible,
-                  () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+                  () =>
+                      setState(() => _isPasswordVisible = !_isPasswordVisible),
                 ),
                 const SizedBox(height: 16),
                 _buildPasswordField(
                   _confirmPasswordController,
                   'Confirm Password',
                   _isConfirmPasswordVisible,
-                  () => setState(() => _isConfirmPasswordVisible = !_isConfirmPasswordVisible),
+                  () => setState(() =>
+                      _isConfirmPasswordVisible = !_isConfirmPasswordVisible),
                   isConfirm: true,
                   passwordController: _passwordController,
                 ),
@@ -276,7 +313,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     Checkbox(
                       value: _acceptTerms,
                       onChanged: (v) => setState(() => _acceptTerms = v!),
-                      activeColor: const Color(0xFF0A4D68),
+                      activeColor: const Color(0xFF142D4E),
                     ),
                     Expanded(
                       child: Text(
@@ -298,7 +335,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           ? _handleSignup
                           : null,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0A4D68),
+                        backgroundColor: const Color(0xFF142D4E),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -350,10 +387,10 @@ class _SignupScreenState extends State<SignupScreen> {
         prefixIcon: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF0A4D68).withValues(alpha: 0.1),
+            color: const Color(0xFF142D4E).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: const Color(0xFF0A4D68), size: 20),
+          child: Icon(icon, color: const Color(0xFF142D4E), size: 20),
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -383,10 +420,11 @@ class _SignupScreenState extends State<SignupScreen> {
         prefixIcon: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF0A4D68).withValues(alpha: 0.1),
+            color: const Color(0xFF142D4E).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Icon(Icons.lock_outline, color: Color(0xFF0A4D68), size: 20),
+          child: const Icon(Icons.lock_outline,
+              color: Color(0xFF142D4E), size: 20),
         ),
         suffixIcon: IconButton(
           icon: Icon(
@@ -427,10 +465,10 @@ class _SignupScreenState extends State<SignupScreen> {
         prefixIcon: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF0A4D68).withValues(alpha: 0.1),
+            color: const Color(0xFF142D4E).withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: const Color(0xFF0A4D68), size: 20),
+          child: Icon(icon, color: const Color(0xFF142D4E), size: 20),
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
@@ -439,7 +477,8 @@ class _SignupScreenState extends State<SignupScreen> {
         fillColor: Colors.white,
       ),
       initialValue: value.isNotEmpty ? value : null,
-      items: items.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+      items:
+          items.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
       onChanged: onChanged,
       validator: (v) => v == null || v.isEmpty ? 'Please select $label' : null,
     );
@@ -460,10 +499,10 @@ class _SignupScreenState extends State<SignupScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF0A4D68).withValues(alpha: 0.1),
+                color: const Color(0xFF142D4E).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.cake, color: Color(0xFF0A4D68), size: 20),
+              child: const Icon(Icons.cake, color: Color(0xFF142D4E), size: 20),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -506,7 +545,7 @@ class _SignupScreenState extends State<SignupScreen> {
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: const ColorScheme.light(
-            primary: Color(0xFF0A4D68),
+            primary: Color(0xFF142D4E),
             onPrimary: Colors.white,
           ),
         ),
@@ -524,8 +563,12 @@ class _SignupScreenState extends State<SignupScreen> {
       Map<String, dynamic> additionalData = {};
 
       if (widget.userType == 'Hospital') {
-        if (!_locationConfirmed || _hospitalLatitude == null || _hospitalLongitude == null) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select and confirm the hospital location.')));
+        if (!_locationConfirmed ||
+            _hospitalLatitude == null ||
+            _hospitalLongitude == null) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content:
+                  Text('Please select and confirm the hospital location.')));
           return;
         }
         additionalData = {
@@ -577,10 +620,11 @@ class _SignupScreenState extends State<SignupScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.green.withValues(alpha: 0.1),
+                    color: AppColors.success.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.check_circle, color: Colors.green),
+                  child:
+                      const Icon(Icons.check_circle, color: AppColors.success),
                 ),
                 const SizedBox(width: 12),
                 const Text(
@@ -607,7 +651,7 @@ class _SignupScreenState extends State<SignupScreen> {
             content: Text(
               auth.errorMessage ?? 'Registration failed. Please try again.',
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }

@@ -33,9 +33,12 @@ const chatbotRoutes = require('./routes/chatbotRoutes');
 const medicalRoutes = require('./routes/medicalRoutes');
 const specialtyRoutes = require('./routes/specialtyRoutes');
 const doctorRoutes = require('./routes/doctorRoutes');
+const doctorPortalRoutes = require('./routes/doctorPortalRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const familyRoutes = require('./routes/familyRoutes');
 const queueRoutes = require('./routes/queueRoutes');
+const driverRoutes = require('./routes/driverRoutes');
 const { pool } = require('./config/database');
 const { getOllamaHealth } = require('./services/ollamaService');
 
@@ -118,7 +121,7 @@ app.use((req, res, next) => {
   const startTime = Date.now();
   const requestId = Math.random().toString(36).substring(7);
   
-  console.log(`${new Date().toISOString()} - [${requestId}] ${req.method} ${req.url}`);
+  console.log(`${new Date().toISOString()} - [${requestId}] ${req.method} ${req.path}`);
   console.log(`  Origin: ${req.headers.origin || 'No origin'}`);
   
   res.on('finish', () => {
@@ -136,6 +139,7 @@ app.use('/api/specialties', specialtyRoutes);
 app.use('/api/patients', patientRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/emergency', emergencyRoutes);
+app.use('/api/driver', driverRoutes);
 app.use('/api/blood-bank', bloodBankRoutes);
 app.use('/api/ambulance', ambulanceRoutes);
 app.use('/api/admin', adminRoutes);
@@ -149,7 +153,9 @@ app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/careguide', chatbotRoutes);
 app.use('/api/medical', medicalRoutes);
 app.use('/api/doctors', doctorRoutes);
+app.use('/api/doctor', doctorPortalRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/family', familyRoutes);
 app.use('/api/queues', queueRoutes);
 app.use('/api', reviewRoutes);
 

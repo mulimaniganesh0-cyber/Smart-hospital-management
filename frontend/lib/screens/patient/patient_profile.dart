@@ -1,5 +1,6 @@
 // lib/screens/patient/patient_profile.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/patient_provider.dart';
@@ -27,19 +28,34 @@ class PatientProfile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF0A4D68), Color(0xFF088395)]),
+                gradient: const LinearGradient(
+                    colors: [Color(0xFF142D4E), Color(0xFF0D9488)]),
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Column(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 20, offset: const Offset(0, 10))]),
-                    child: const Icon(Icons.person, size: 60, color: Color(0xFF0A4D68)),
+                    decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10))
+                        ]),
+                    child: const Icon(Icons.person,
+                        size: 60, color: Color(0xFF142D4E)),
                   ),
                   const SizedBox(height: 16),
-                  Text(patientData?['name'] ?? 'Patient Name', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
-                  Text(patientData?['email'] ?? 'email@example.com', style: const TextStyle(color: Colors.white70)),
+                  Text(patientData?['name'] ?? 'Patient Name',
+                      style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white)),
+                  Text(patientData?['email'] ?? 'email@example.com',
+                      style: const TextStyle(color: Colors.white70)),
                 ],
               ),
             ),
@@ -48,9 +64,32 @@ class PatientProfile extends StatelessWidget {
               title: 'Personal Information',
               icon: Icons.person_outline,
               children: [
-                _buildInfoRow(Icons.phone, 'Phone Number', patientData?['phone'] ?? 'Not set', Colors.green, () => _showEditDialog(context, 'Phone Number', patientData?['phone'] ?? '', (v) => patientProvider.updateProfile(phone: v))),
-                _buildInfoRow(Icons.water_drop, 'Blood Group', patientData?['blood_group'] ?? 'Not set', Colors.red, () => _showBloodGroupDialog(context, patientData?['blood_group'] ?? '', (v) => patientProvider.updateProfile(bloodGroup: v))),
-                _buildInfoRow(Icons.emergency, 'Emergency Contact', _contactLabel(patientData), Colors.orange, () => _showEmergencyContactDialog(context, patientProvider, patientData)),
+                _buildInfoRow(
+                    Icons.phone,
+                    'Phone Number',
+                    patientData?['phone'] ?? 'Not set',
+                    AppColors.success,
+                    () => _showEditDialog(
+                        context,
+                        'Phone Number',
+                        patientData?['phone'] ?? '',
+                        (v) => patientProvider.updateProfile(phone: v))),
+                _buildInfoRow(
+                    Icons.water_drop,
+                    'Blood Group',
+                    patientData?['blood_group'] ?? 'Not set',
+                    AppColors.error,
+                    () => _showBloodGroupDialog(
+                        context,
+                        patientData?['blood_group'] ?? '',
+                        (v) => patientProvider.updateProfile(bloodGroup: v))),
+                _buildInfoRow(
+                    Icons.emergency,
+                    'Emergency Contact',
+                    _contactLabel(patientData),
+                    AppColors.warning,
+                    () => _showEmergencyContactDialog(
+                        context, patientProvider, patientData)),
               ],
             ),
             const SizedBox(height: 24),
@@ -58,12 +97,18 @@ class PatientProfile extends StatelessWidget {
               title: 'Health Record',
               icon: Icons.health_and_safety,
               children: [
-                const Text('View and maintain your health timeline, readings, conditions, medicines, and other patient-provided records.'),
+                const Text(
+                    'View and maintain your health timeline, readings, conditions, medicines, and other patient-provided records.'),
                 const SizedBox(height: 12),
-                SizedBox(width: double.infinity, child: ElevatedButton.icon(
-                  icon: const Icon(Icons.folder_shared), label: const Text('View Health Record'),
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const HealthRecordScreen())),
-                )),
+                SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.folder_shared),
+                      label: const Text('View Health Record'),
+                      onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                              builder: (_) => const HealthRecordScreen())),
+                    )),
               ],
             ),
             const SizedBox(height: 24),
@@ -74,36 +119,60 @@ class PatientProfile extends StatelessWidget {
                   final shouldLogout = await showDialog<bool>(
                     context: context,
                     builder: (context) => AlertDialog(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
                       title: Row(
                         children: [
-                          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.logout, color: Colors.red)),
+                          Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                  color: AppColors.error.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12)),
+                              child: const Icon(Icons.logout,
+                                  color: AppColors.error)),
                           const SizedBox(width: 12),
-                          const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold)),
+                          const Text('Logout',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
                         ],
                       ),
                       content: const Text('Are you sure you want to logout?'),
                       actions: [
-                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                        ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text('Logout')),
+                        TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel')),
+                        ElevatedButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.error),
+                            child: const Text('Logout')),
                       ],
                     ),
                   );
                   if (shouldLogout == true && context.mounted) {
                     await authProvider.logout();
-                    if (context.mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const LoginScreen()), (route) => false);
+                    if (context.mounted) {
+                      Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const LoginScreen()),
+                          (route) => false);
+                    }
                   }
                 },
                 icon: const Icon(Icons.logout),
                 label: const Text('Logout'),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.error,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16))),
               ),
             ),
           ],
         ),
       ),
     );
-    
   }
 
   String _contactLabel(Map<String, dynamic>? data) {
@@ -112,29 +181,77 @@ class PatientProfile extends StatelessWidget {
     return name.isEmpty ? (phone.isEmpty ? 'Not set' : phone) : '$name\n$phone';
   }
 
-  void _showEmergencyContactDialog(BuildContext context, PatientProvider provider, Map<String, dynamic>? data) {
-    final name = TextEditingController(text: data?['emergency_contact_name']?.toString() ?? '');
-    final phone = TextEditingController(text: data?['emergency_contact']?.toString() ?? '');
-    final relationship = TextEditingController(text: data?['emergency_contact_relationship']?.toString() ?? '');
-    showDialog(context: context, builder: (dialogContext) => AlertDialog(
-      title: const Text('Emergency Contact'),
-      content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        TextField(controller: name, decoration: const InputDecoration(labelText: 'Contact name')),
-        TextField(controller: phone, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Phone number')),
-        TextField(controller: relationship, decoration: const InputDecoration(labelText: 'Relationship (optional)')),
-      ])),
-      actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')), ElevatedButton(onPressed: () async {
-        final message = await provider.updateEmergencyContact(name: name.text.trim(), phone: phone.text.trim(), relationship: relationship.text.trim());
-        if (!dialogContext.mounted) return;
-        if (message == null) { Navigator.pop(dialogContext); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Emergency contact updated'), backgroundColor: Colors.green)); }
-        else { ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red)); }
-      }, child: const Text('Save'))],
-    ));
+  void _showEmergencyContactDialog(BuildContext context,
+      PatientProvider provider, Map<String, dynamic>? data) {
+    final name = TextEditingController(
+        text: data?['emergency_contact_name']?.toString() ?? '');
+    final phone = TextEditingController(
+        text: data?['emergency_contact']?.toString() ?? '');
+    final relationship = TextEditingController(
+        text: data?['emergency_contact_relationship']?.toString() ?? '');
+    showDialog(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+              title: const Text('Emergency Contact'),
+              content: SingleChildScrollView(
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                TextField(
+                    controller: name,
+                    decoration:
+                        const InputDecoration(labelText: 'Contact name')),
+                TextField(
+                    controller: phone,
+                    keyboardType: TextInputType.phone,
+                    decoration:
+                        const InputDecoration(labelText: 'Phone number')),
+                TextField(
+                    controller: relationship,
+                    decoration: const InputDecoration(
+                        labelText: 'Relationship (optional)')),
+              ])),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text('Cancel')),
+                ElevatedButton(
+                    onPressed: () async {
+                      final message = await provider.updateEmergencyContact(
+                          name: name.text.trim(),
+                          phone: phone.text.trim(),
+                          relationship: relationship.text.trim());
+                      if (!dialogContext.mounted) return;
+                      if (message == null) {
+                        Navigator.pop(dialogContext);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('Emergency contact updated'),
+                                backgroundColor: AppColors.success));
+                      } else {
+                        ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            SnackBar(
+                                content: Text(message),
+                                backgroundColor: AppColors.error));
+                      }
+                    },
+                    child: const Text('Save'))
+              ],
+            ));
   }
 
-  Widget _buildInfoCard({required String title, required IconData icon, required List<Widget> children}) {
+  Widget _buildInfoCard(
+      {required String title,
+      required IconData icon,
+      required List<Widget> children}) {
     return Container(
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.grey.shade100, blurRadius: 20, offset: const Offset(0, 4))]),
+      decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.grey.shade100,
+                blurRadius: 20,
+                offset: const Offset(0, 4))
+          ]),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -142,9 +259,17 @@ class PatientProfile extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF0A4D68).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: const Color(0xFF0A4D68), size: 20)),
+                Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF142D4E).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12)),
+                    child:
+                        Icon(icon, color: const Color(0xFF142D4E), size: 20)),
                 const SizedBox(width: 12),
-                Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 16),
@@ -155,22 +280,36 @@ class PatientProfile extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String label, String value, Color color, VoidCallback onEdit) {
+  Widget _buildInfoRow(IconData icon, String label, String value, Color color,
+      VoidCallback onEdit) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, size: 18, color: color)),
+          Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, size: 18, color: color)),
           const SizedBox(width: 12),
-          SizedBox(width: 120, child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600))),
-          Expanded(child: Text(value, style: TextStyle(color: Colors.grey[700]))),
-          IconButton(icon: const Icon(Icons.edit, size: 18), onPressed: onEdit, constraints: const BoxConstraints()),
+          SizedBox(
+              width: 120,
+              child: Text(label,
+                  style: const TextStyle(fontWeight: FontWeight.w600))),
+          Expanded(
+              child: Text(value, style: TextStyle(color: Colors.grey[700]))),
+          IconButton(
+              icon: const Icon(Icons.edit, size: 18),
+              onPressed: onEdit,
+              constraints: const BoxConstraints()),
         ],
       ),
     );
   }
 
-  void _showEditDialog(BuildContext context, String field, String currentValue, Function(String) onSave) {
+  void _showEditDialog(BuildContext context, String field, String currentValue,
+      Function(String) onSave) {
     final controller = TextEditingController(text: currentValue);
     showDialog(
       context: context,
@@ -178,23 +317,37 @@ class PatientProfile extends StatelessWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFF0A4D68).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.edit, color: Color(0xFF0A4D68))),
+            Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    color: const Color(0xFF142D4E).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.edit, color: Color(0xFF142D4E))),
             const SizedBox(width: 12),
-            Text('Edit $field', style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text('Edit $field',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
-        content: TextField(controller: controller, decoration: InputDecoration(labelText: field, border: const OutlineInputBorder())),
+        content: TextField(
+            controller: controller,
+            decoration: InputDecoration(
+                labelText: field, border: const OutlineInputBorder())),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
               if (controller.text.isNotEmpty) {
                 onSave(controller.text);
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$field updated successfully'), backgroundColor: Colors.green));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('$field updated successfully'),
+                    backgroundColor: AppColors.success));
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0A4D68)),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF142D4E)),
             child: const Text('Save'),
           ),
         ],
@@ -202,37 +355,60 @@ class PatientProfile extends StatelessWidget {
     );
   }
 
-  void _showBloodGroupDialog(BuildContext context, String currentValue, Function(String) onSave) {
+  void _showBloodGroupDialog(
+      BuildContext context, String currentValue, Function(String) onSave) {
     String selectedGroup = currentValue;
-    final List<String> bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    final List<String> bloodGroups = [
+      'A+',
+      'A-',
+      'B+',
+      'B-',
+      'AB+',
+      'AB-',
+      'O+',
+      'O-'
+    ];
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)), child: const Icon(Icons.water_drop, color: Colors.red)),
+            Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.water_drop, color: AppColors.error)),
             const SizedBox(width: 12),
-            const Text('Edit Blood Group', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Edit Blood Group',
+                style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
         content: DropdownButtonFormField<String>(
           initialValue: selectedGroup.isNotEmpty ? selectedGroup : null,
-          decoration: const InputDecoration(labelText: 'Blood Group', border: OutlineInputBorder()),
-          items: bloodGroups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+          decoration: const InputDecoration(
+              labelText: 'Blood Group', border: OutlineInputBorder()),
+          items: bloodGroups
+              .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+              .toList(),
           onChanged: (v) => selectedGroup = v!,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
               if (selectedGroup.isNotEmpty) {
                 onSave(selectedGroup);
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Blood group updated successfully'), backgroundColor: Colors.green));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Blood group updated successfully'),
+                    backgroundColor: AppColors.success));
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Save'),
           ),
         ],

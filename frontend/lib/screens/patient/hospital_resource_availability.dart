@@ -1,5 +1,6 @@
 // lib/screens/patient/hospital_resource_availability.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import '../../models/hospital_model.dart';
 
 class HospitalResourceAvailability extends StatelessWidget {
@@ -64,7 +65,7 @@ class HospitalResourceAvailability extends StatelessWidget {
                 Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0A4D68),
+                backgroundColor: const Color(0xFF142D4E),
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 minimumSize: const Size(double.infinity, 50),
               ),
@@ -89,7 +90,7 @@ class HospitalResourceAvailability extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon, color: const Color(0xFF0A4D68)),
+                Icon(icon, color: const Color(0xFF142D4E)),
                 const SizedBox(width: 8),
                 Text(
                   title,
@@ -116,9 +117,9 @@ class HospitalResourceAvailability extends StatelessWidget {
     final ratio = total > 0 ? available / total : 0;
     Color getColor() {
       if (total == 0) return Colors.grey;
-      if (ratio > 0.5) return Colors.green;
-      if (ratio > 0.2) return Colors.orange;
-      return Colors.red;
+      if (ratio > 0.5) return AppColors.success;
+      if (ratio > 0.2) return AppColors.warning;
+      return AppColors.error;
     }
 
     return Padding(

@@ -135,7 +135,6 @@ exports.requestBlood = async (req, res) => {
       ]
     );
 
-    console.log('Blood request created:', result.rows[0]);
 
     res.status(201).json({
       success: true,
@@ -155,59 +154,149 @@ exports.requestBlood = async (req, res) => {
 // ==================== UPDATE BLOOD STOCK ====================
 
 exports.updateBloodStock = async (req, res) => {
+  let client;
   try {
     const userId = req.user.id;
     const bloodGroup = normalizeBloodGroup(req.body.blood_group ?? req.body.bloodGroup);
     const units = Number(req.body.units);
-    
-    console.log('Updating blood stock:', { userId, bloodGroup, units });
-    
-    const hospitalResult = await pool.query(
-      'SELECT id FROM hospitals WHERE user_id = $1',
-      [userId]
-    );
-    
-    if (hospitalResult.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Hospital not found' 
+    const expiryDate = req.body.expiry_date ?? req.body.expiryDate;
+    const dateMatch = typeof expiryDate === 'string'
+      ? expiryDate.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+      : null;
+    const parsedDate = dateMatch ? new Date(`${expiryDate}T00:00:00.000Z`) : null;
+    const isCalendarDate = !!parsedDate &&
+      !Number.isNaN(parsedDate.getTime()) &&
+      parsedDate.toISOString().slice(0, 10) === expiryDate;
+
+    if (!bloodGroup || !Number.isSafeInteger(units) || units < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'A valid blood group and non-negative whole unit count are required.',
       });
     }
-    
-    const hospitalId = hospitalResult.rows[0].id;
-    
-    if (!bloodGroup || !Number.isInteger(units) || units < 0) {
-      return res.status(400).json({ success: false, message: 'A valid blood group and non-negative unit count are required' });
+    if (!isCalendarDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Expiry date must be a valid date in YYYY-MM-DD format.',
+      });
     }
 
-    const result = await pool.query(
-      `INSERT INTO blood_bank (hospital_id, blood_group, units_available, last_updated)
-       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-       ON CONFLICT (hospital_id, blood_group) 
-       DO UPDATE SET units_available = EXCLUDED.units_available, last_updated = CURRENT_TIMESTAMP
-       RETURNING *`,
-      [hospitalId, bloodGroup, units]
+    client = await pool.connect();
+    await client.query('BEGIN');
+    const hospitalResult = await client.query(
+      'SELECT id FROM hospitals WHERE user_id = $1 FOR UPDATE',
+      [userId],
     );
+    if (!hospitalResult.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Hospital not found.' });
+    }
+    const hospitalId = hospitalResult.rows[0].id;
+    const expiryCheck = await client.query(
+      'SELECT $1::date >= CURRENT_DATE AS is_valid',
+      [expiryDate],
+    );
+    if (!expiryCheck.rows[0]?.is_valid) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        success: false,
+        message: 'Expiry date must be today or a future date.',
+      });
+    }
+
+    const parent = await client.query(
+      `SELECT id FROM blood_bank
+       WHERE hospital_id = $1 AND blood_group = $2 FOR UPDATE`,
+      [hospitalId, bloodGroup],
+    );
+    if (!parent.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Blood group stock was not found.' });
+    }
+    const bloodBankId = parent.rows[0].id;
+    const batches = await client.query(
+      `SELECT id, units_available FROM blood_inventory_batches
+       WHERE blood_bank_id = $1 AND hospital_id = $2 AND blood_group = $3
+       ORDER BY id FOR UPDATE`,
+      [bloodBankId, hospitalId, bloodGroup],
+    );
+    const requestedBatchId = req.body.batch_id ?? req.body.batchId;
+    let batch;
+    if (requestedBatchId != null) {
+      batch = batches.rows.find((row) => String(row.id) === String(requestedBatchId));
+    } else if (batches.rows.length === 1) {
+      batch = batches.rows[0];
+    } else if (batches.rows.length > 1) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: 'Select a specific stock batch to edit.' });
+    }
+    if (!batch) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Blood stock batch was not found.' });
+    }
+    const previousUnits = Number(batch.units_available);
+    const updatedBatch = await client.query(
+      `UPDATE blood_inventory_batches
+       SET units_available = $1, expiry_date = $2::date, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3 AND blood_bank_id = $4 AND hospital_id = $5 AND blood_group = $6
+       RETURNING *`,
+      [units, expiryDate, batch.id, bloodBankId, hospitalId, bloodGroup],
+    );
+    if (updatedBatch.rowCount !== 1) {
+      throw new Error('The selected blood stock batch could not be updated.');
+    }
+    const totals = await client.query(
+      `SELECT COALESCE(SUM(units_available) FILTER (WHERE expiry_date IS NULL OR expiry_date >= CURRENT_DATE), 0) AS units,
+              MIN(expiry_date) FILTER (WHERE expiry_date IS NULL OR expiry_date >= CURRENT_DATE) AS expiry_date
+       FROM blood_inventory_batches WHERE blood_bank_id = $1`,
+      [bloodBankId],
+    );
+    await client.query(
+      `UPDATE blood_bank SET units_available = $1, expiry_date = $2,
+         last_updated = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3 AND hospital_id = $4`,
+      [totals.rows[0].units, totals.rows[0].expiry_date, bloodBankId, hospitalId],
+    );
+    const change = Math.abs(units - previousUnits);
+    if (change > 0) {
+      await client.query(
+        `INSERT INTO blood_inventory_transactions
+           (hospital_id, blood_bank_id, blood_group, transaction_type, units, reference_type, created_by)
+         VALUES ($1, $2, $3, 'ADJUSTMENT', $4, $5, $6)`,
+        [
+          hospitalId,
+            bloodBankId,
+          bloodGroup,
+          change,
+          units >= previousUnits ? 'MANUAL_ADJUSTMENT_IN' : 'MANUAL_ADJUSTMENT_OUT',
+          userId,
+        ],
+      );
+    }
+    await client.query('COMMIT');
     await emitBloodInventoryChanged(req, hospitalId);
-    
     res.json({
       success: true,
       message: 'Blood stock updated successfully',
-      data: result.rows[0],
+      data: { ...updatedBatch.rows[0], group_units_available: totals.rows[0].units },
     });
   } catch (error) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
     console.error('Update blood stock error:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Server error', 
       error: error.message 
     });
+  } finally {
+    client?.release();
   }
 };
 
 // ==================== BLOOD EXPIRY MANAGEMENT ====================
 
 exports.addBloodWithExpiry = async (req, res) => {
+  let client;
   try {
     const userId = req.user.id;
     const { 
@@ -220,92 +309,96 @@ exports.addBloodWithExpiry = async (req, res) => {
       batch_number
     } = req.body;
     const blood_group = normalizeBloodGroup(requestedBloodGroup);
-
-    if (!blood_group || !Number.isInteger(Number(units)) || Number(units) <= 0) {
-      return res.status(400).json({ success: false, message: 'A valid blood group and positive unit count are required' });
+    const unitCount = Number(units);
+    const validDate = (value) => {
+      if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+      const parsed = new Date(`${value}T00:00:00.000Z`);
+      return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+    };
+    if (!blood_group || !Number.isFinite(unitCount) || unitCount <= 0 || unitCount > 1000 || Math.round(unitCount * 100) !== unitCount * 100) {
+      return res.status(400).json({ success: false, message: 'A valid blood group and a positive amount up to 1000 units are required.' });
+    }
+    if ((expiry_date && !validDate(expiry_date)) || (donation_date && !validDate(donation_date)) ||
+        (donation_date && donation_date > new Date().toISOString().slice(0, 10)) ||
+        (expiry_date && new Date(`${expiry_date}T00:00:00Z`) < new Date(new Date().toISOString().slice(0, 10)))) {
+      return res.status(400).json({ success: false, message: 'Enter valid donation and future expiry dates.' });
+    }
+    if (batch_number != null && (typeof batch_number !== 'string' || batch_number.trim().length > 50)) {
+      return res.status(400).json({ success: false, message: 'Batch number must be 50 characters or fewer.' });
+    }
+    if ((donor_name != null && (typeof donor_name !== 'string' || donor_name.trim().length > 255)) ||
+        (donor_phone != null && (typeof donor_phone !== 'string' || donor_phone.trim().length > 30))) {
+      return res.status(400).json({ success: false, message: 'Donor name or phone number is invalid.' });
     }
 
-    console.log('Adding blood with expiry:', { blood_group, units, expiry_date, donor_name });
-
-    const hospitalResult = await pool.query(
-      'SELECT id FROM hospitals WHERE user_id = $1',
-      [userId]
-    );
-
-    if (hospitalResult.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Hospital not found' 
-      });
+    const batchNum = batch_number?.trim() || `BATCH-${require('crypto').randomUUID()}`;
+    client = await pool.connect();
+    await client.query('BEGIN');
+    const hospitalResult = await client.query('SELECT id FROM hospitals WHERE user_id = $1', [userId]);
+    if (!hospitalResult.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Hospital not found.' });
     }
-
     const hospitalId = hospitalResult.rows[0].id;
-    const batchNum = batch_number || `BATCH${Date.now().toString().slice(-6)}${blood_group}`;
-
-    // Check if blood group already exists for this hospital
-    const existingResult = await pool.query(
-      'SELECT id, units_available FROM blood_bank WHERE hospital_id = $1 AND blood_group = $2',
-      [hospitalId, blood_group]
+    const parent = await client.query(
+      `INSERT INTO blood_bank (
+         hospital_id, blood_group, units_available, expiry_date, batch_number,
+         donation_date, donor_name, donor_phone, last_updated, minimum_threshold
+       ) VALUES ($1, $2, 0, NULL, $3, COALESCE($4::date, CURRENT_DATE), $5, $6, CURRENT_TIMESTAMP, 10)
+       ON CONFLICT (hospital_id, blood_group)
+       DO UPDATE SET last_updated = CURRENT_TIMESTAMP
+       RETURNING *`,
+      [hospitalId, blood_group, batchNum, donation_date || null,
+       donor_name?.trim() || 'Unknown', donor_phone?.trim() || null]
     );
-
-    let result;
-    if (existingResult.rows.length > 0) {
-      // Update existing record - add units to existing stock
-      const existingId = existingResult.rows[0].id;
-      const currentUnits = existingResult.rows[0].units_available || 0;
-      const newUnits = currentUnits + units;
-      
-      result = await pool.query(
-        `UPDATE blood_bank 
-         SET units_available = $1,
-             expiry_date = COALESCE($2, expiry_date),
-             batch_number = COALESCE($3, batch_number),
-             donation_date = COALESCE($4, donation_date),
-             donor_name = COALESCE($5, donor_name),
-             last_updated = CURRENT_TIMESTAMP
-         WHERE id = $6
-         RETURNING *`,
-        [newUnits, expiry_date, batchNum, donation_date || new Date(), donor_name || 'Unknown', existingId]
-      );
-      console.log(`Updated existing ${blood_group} stock: ${currentUnits} -> ${newUnits} units`);
-    } else {
-      // Insert new record
-      result = await pool.query(
-        `INSERT INTO blood_bank (
-          hospital_id, blood_group, units_available, 
-          expiry_date, batch_number, donation_date, donor_name,
-          last_updated, minimum_threshold
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, 10)
-        RETURNING *`,
-        [hospitalId, blood_group, units, expiry_date, batchNum, donation_date || new Date(), donor_name || 'Unknown']
-      );
-      console.log(`Added new ${blood_group} stock: ${units} units`);
-    }
-
-    // Add to donation history
-    await pool.query(
-      `INSERT INTO blood_donation_history (
-        hospital_id, donor_name, donor_phone, blood_group, 
-        units_donated, donation_date, expiry_date, batch_number
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [hospitalId, donor_name || 'Anonymous', donor_phone || '', blood_group, units, donation_date || new Date(), expiry_date, batchNum]
+    const bloodBankId = parent.rows[0].id;
+    const result = await client.query(
+      `INSERT INTO blood_inventory_batches
+         (blood_bank_id, hospital_id, blood_group, batch_number, units_available,
+          expiry_date, donation_date, donor_name, donor_phone)
+       VALUES ($1, $2, $3, $4, $5, $6::date, COALESCE($7::date, CURRENT_DATE), $8, $9)
+       RETURNING *`,
+      [bloodBankId, hospitalId, blood_group, batchNum, unitCount, expiry_date || null,
+       donation_date || null, donor_name?.trim() || 'Unknown', donor_phone?.trim() || null]
     );
+    const totals = await client.query(
+      `SELECT COALESCE(SUM(units_available) FILTER (WHERE expiry_date IS NULL OR expiry_date >= CURRENT_DATE), 0) AS units,
+              MIN(expiry_date) FILTER (WHERE expiry_date IS NULL OR expiry_date >= CURRENT_DATE) AS expiry_date
+       FROM blood_inventory_batches WHERE blood_bank_id = $1`,
+      [bloodBankId],
+    );
+    await client.query(
+      `UPDATE blood_bank SET units_available = $1, expiry_date = $2,
+         batch_number = $3, donation_date = $4::date, donor_name = $5,
+         donor_phone = $6, last_updated = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $7 AND hospital_id = $8`,
+      [totals.rows[0].units, totals.rows[0].expiry_date, batchNum, donation_date || null,
+       donor_name?.trim() || 'Unknown', donor_phone?.trim() || null, bloodBankId, hospitalId],
+    );
+    await client.query(
+      `INSERT INTO blood_inventory_transactions
+         (hospital_id, blood_bank_id, blood_group, transaction_type, units, reference_type, created_by)
+       VALUES ($1, $2, $3, 'DONATION', $4, 'DIRECT_STOCK_ADD', $5)`,
+      [hospitalId, bloodBankId, blood_group, unitCount, userId]
+    );
+    await client.query('COMMIT');
     await emitBloodInventoryChanged(req, hospitalId);
 
     res.status(201).json({
       success: true,
-      message: existingResult.rows.length > 0 
-        ? `Blood stock updated successfully. Added ${units} units to existing ${blood_group} stock.`
-        : 'Blood stock added successfully with expiry tracking',
-      data: result.rows[0],
+      message: `${unitCount} unit(s) of ${blood_group} added to hospital stock.`,
+      data: { ...result.rows[0], group_units_available: totals.rows[0].units },
     });
   } catch (error) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
     console.error('Add blood with expiry error:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Server error', 
       error: error.message 
     });
+  } finally {
+    client?.release();
   }
 };
 
@@ -381,58 +474,36 @@ exports.getMyBloodRequests = async (req, res) => {
 };
 
 exports.approveBloodRequest = async (req, res) => {
+  let client;
   try {
     const userId = req.user.id;
-    const { requestId } = req.params;
-
-    const hospitalResult = await pool.query(
-      'SELECT id FROM hospitals WHERE user_id = $1', [userId]
-    );
-    if (hospitalResult.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Hospital not found' });
-    }
+    const requestId = Number(req.params.requestId);
+    if (!Number.isSafeInteger(requestId) || requestId < 1) return res.status(400).json({success:false,message:'Valid request ID is required'});
+    client = await pool.connect();
+    await client.query('BEGIN');
+    const hospitalResult = await client.query('SELECT id FROM hospitals WHERE user_id = $1 FOR UPDATE', [userId]);
+    if (!hospitalResult.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ success: false, message: 'Hospital not found' }); }
     const hospitalId = hospitalResult.rows[0].id;
-
-    // Find the request
-    const reqResult = await pool.query(
-      'SELECT * FROM blood_requests WHERE id = $1 AND hospital_id = $2 AND status = $3',
-      [requestId, hospitalId, 'pending']
-    );
-    if (reqResult.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Pending request not found' });
-    }
-
-    const bloodReq = reqResult.rows[0];
-
-    // Check availability
-    const stockResult = await pool.query(
-      'SELECT units_available FROM blood_bank WHERE hospital_id = $1 AND blood_group = $2',
-      [hospitalId, bloodReq.blood_group]
-    );
-    const available = stockResult.rows.length > 0 ? stockResult.rows[0].units_available : 0;
-    if (available < bloodReq.units_required) {
-      return res.status(400).json({
-        success: false,
-        message: `Insufficient ${bloodReq.blood_group} stock. Available: ${available}, Requested: ${bloodReq.units_required}`,
-      });
-    }
-
-    // Deduct stock
-    await pool.query(
-      'UPDATE blood_bank SET units_available = units_available - $1, last_updated = CURRENT_TIMESTAMP WHERE hospital_id = $2 AND blood_group = $3',
-      [bloodReq.units_required, hospitalId, bloodReq.blood_group]
-    );
-
-    // Update status
-    const result = await pool.query(
-      "UPDATE blood_requests SET status = 'approved', fulfilled_date = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *",
-      [requestId]
-    );
-
+    const request = await client.query(`SELECT * FROM blood_requests WHERE id=$1 AND hospital_id=$2 AND status='pending' FOR UPDATE`, [requestId, hospitalId]);
+    if (!request.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ success: false, message: 'Pending request not found' }); }
+    const bloodReq = request.rows[0];
+    // The conditional decrement serializes competing approvals and cannot make stock negative.
+    const stock = await client.query(`UPDATE blood_bank SET units_available=units_available-$1,last_updated=CURRENT_TIMESTAMP
+      WHERE hospital_id=$2 AND blood_group=$3 AND units_available >= $1
+        AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE) RETURNING units_available`, [bloodReq.units_required, hospitalId, bloodReq.blood_group]);
+    if (!stock.rowCount) { await client.query('ROLLBACK'); return res.status(400).json({success:false,message:`Insufficient ${bloodReq.blood_group} stock for this request`}); }
+    const result = await client.query(`UPDATE blood_requests SET status='approved',fulfilled_date=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+      WHERE id=$1 AND hospital_id=$2 AND status='pending' RETURNING *`, [requestId, hospitalId]);
+    if (!result.rowCount) { await client.query('ROLLBACK'); return res.status(409).json({success:false,message:'Request was already processed'}); }
+    await client.query('COMMIT');
+    await emitBloodInventoryChanged(req, hospitalId);
     res.json({ success: true, message: 'Blood request approved and stock deducted', data: result.rows[0] });
   } catch (error) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
     console.error('Approve blood request error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  } finally {
+    client?.release();
   }
 };
 
@@ -472,114 +543,153 @@ exports.rejectBloodRequest = async (req, res) => {
 // ==================== EMERGENCY BLOOD REQUEST ====================
 
 exports.emergencyBloodRequest = async (req, res) => {
+  let client;
   try {
     const userId = req.user.id;
-    const { blood_group, units_required, patient_name, urgency_level } = req.body;
-
-    const patientResult = await pool.query('SELECT id FROM patients WHERE user_id = $1', [userId]);
-    const patientId = patientResult.rows.length > 0 ? patientResult.rows[0].id : null;
-
-    // Find nearest hospital with stock
-    const hospitalWithStock = await pool.query(
-      `SELECT bb.hospital_id, bb.units_available, h.name as hospital_name
-       FROM blood_bank bb
-       JOIN hospitals h ON bb.hospital_id = h.id
-       WHERE bb.blood_group = $1 AND bb.units_available >= $2
-       ORDER BY bb.units_available DESC
-       LIMIT 1`,
-      [blood_group, units_required]
-    );
-
-    if (hospitalWithStock.rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: `No hospitals have ${units_required} units of ${blood_group} available for emergency.`,
-      });
+    const { blood_group: requestedGroup, units_required, patient_name, urgency_level } = req.body;
+    const bloodGroup = normalizeBloodGroup(requestedGroup);
+    const units = Number(units_required);
+    if (!bloodGroup || !Number.isSafeInteger(units) || units < 1 || units > 100) {
+      return res.status(400).json({ success: false, message: 'A valid blood group and request of 1 to 100 units are required.' });
     }
 
-    const targetHospital = hospitalWithStock.rows[0];
-
-    const result = await pool.query(
+    client = await pool.connect();
+    await client.query('BEGIN');
+    const patientResult = await client.query('SELECT id FROM patients WHERE user_id = $1', [userId]);
+    const patientId = patientResult.rows[0]?.id ?? null;
+    const targetResult = await client.query(
+      `SELECT bb.id, bb.hospital_id, bb.units_available, h.name AS hospital_name
+       FROM blood_bank bb JOIN hospitals h ON h.id = bb.hospital_id
+       WHERE bb.blood_group = $1 AND bb.units_available >= $2 AND h.is_verified = TRUE
+         AND (bb.expiry_date IS NULL OR bb.expiry_date >= CURRENT_DATE)
+       ORDER BY bb.units_available DESC, h.name
+       LIMIT 1 FOR UPDATE OF bb SKIP LOCKED`,
+      [bloodGroup, units]
+    );
+    if (!targetResult.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: `No hospital currently has ${units} unexpired units of ${bloodGroup} available.` });
+    }
+    const targetHospital = targetResult.rows[0];
+    const stockUpdate = await client.query(
+      `UPDATE blood_bank SET units_available = units_available - $1,
+         last_updated = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $2 AND units_available >= $1 RETURNING id`,
+      [units, targetHospital.id]
+    );
+    if (!stockUpdate.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: 'Blood inventory changed. Please retry.' });
+    }
+    const result = await client.query(
       `INSERT INTO blood_requests (
         patient_id, user_id, hospital_id, blood_group, units_required,
         patient_name, status, urgency_level, request_date
       ) VALUES ($1, $2, $3, $4, $5, $6, 'approved', $7, CURRENT_TIMESTAMP)
       RETURNING *`,
-      [patientId, userId, targetHospital.hospital_id, blood_group, units_required,
-       patient_name || 'Emergency Patient', urgency_level || 'critical']
+      [patientId, userId, targetHospital.hospital_id, bloodGroup, units,
+       typeof patient_name === 'string' ? patient_name.trim().slice(0, 255) : 'Emergency Patient', urgency_level || 'critical']
     );
-
-    // Auto-deduct stock for emergency
-    await pool.query(
-      'UPDATE blood_bank SET units_available = units_available - $1, last_updated = CURRENT_TIMESTAMP WHERE hospital_id = $2 AND blood_group = $3',
-      [units_required, targetHospital.hospital_id, blood_group]
+    await client.query(
+      `INSERT INTO blood_inventory_transactions
+         (hospital_id, blood_bank_id, blood_group, transaction_type, units, reference_type, reference_id, created_by)
+       VALUES ($1, $2, $3, 'ISSUED', $4, 'EMERGENCY_BLOOD_REQUEST', $5, $6)`,
+      [targetHospital.hospital_id, targetHospital.id, bloodGroup, units, result.rows[0].id, userId]
     );
+    await client.query('COMMIT');
 
     res.status(201).json({
       success: true,
-      message: `Emergency blood request auto-approved. ${units_required} units of ${blood_group} allocated from ${targetHospital.hospital_name}.`,
+      message: `Emergency blood request approved. ${units} units of ${bloodGroup} allocated from ${targetHospital.hospital_name}.`,
       data: result.rows[0],
     });
   } catch (error) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
     console.error('Emergency blood request error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  } finally {
+    client?.release();
   }
 };
 
 // ==================== INTER-HOSPITAL BLOOD TRANSFER ====================
 
 exports.transferBlood = async (req, res) => {
+  let client;
   try {
     const userId = req.user.id;
-    const { target_hospital_id, blood_group, units } = req.body;
+    const targetHospitalId = Number(req.body.target_hospital_id);
+    const bloodGroup = normalizeBloodGroup(req.body.blood_group);
+    const units = Number(req.body.units);
+    if (!Number.isSafeInteger(targetHospitalId) || targetHospitalId < 1 || !bloodGroup || !Number.isSafeInteger(units) || units < 1 || units > 1000) {
+      return res.status(400).json({ success: false, message: 'Select a valid target hospital and blood group, and transfer between 1 and 1000 units.' });
+    }
 
-    const sourceResult = await pool.query('SELECT id, name FROM hospitals WHERE user_id = $1', [userId]);
-    if (sourceResult.rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Source hospital not found' });
+    client = await pool.connect();
+    await client.query('BEGIN');
+    const sourceResult = await client.query('SELECT id, name FROM hospitals WHERE user_id = $1', [userId]);
+    if (!sourceResult.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Source hospital not found.' });
     }
     const sourceHospitalId = sourceResult.rows[0].id;
-    const sourceHospitalName = sourceResult.rows[0].name;
-
-    if (sourceHospitalId === target_hospital_id) {
-      return res.status(400).json({ success: false, message: 'Cannot transfer to self' });
+    if (sourceHospitalId === targetHospitalId) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: 'Cannot transfer stock to the same hospital.' });
     }
-
-    // Check source stock
-    const sourceStock = await pool.query(
-      'SELECT units_available FROM blood_bank WHERE hospital_id = $1 AND blood_group = $2',
-      [sourceHospitalId, blood_group]
-    );
-    const available = sourceStock.rows.length > 0 ? sourceStock.rows[0].units_available : 0;
-    if (available < units) {
-      return res.status(400).json({
-        success: false,
-        message: `Insufficient ${blood_group} stock to transfer. Available: ${available}`,
-      });
+    const target = await client.query('SELECT id FROM hospitals WHERE id=$1', [targetHospitalId]);
+    if (!target.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Target hospital not found.' });
     }
-
-    // Deduct from source
-    await pool.query(
-      'UPDATE blood_bank SET units_available = units_available - $1, last_updated = CURRENT_TIMESTAMP WHERE hospital_id = $2 AND blood_group = $3',
-      [units, sourceHospitalId, blood_group]
+    const debit = await client.query(
+      `UPDATE blood_bank SET units_available=units_available-$1,
+         last_updated=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
+       WHERE hospital_id=$2 AND blood_group=$3 AND units_available >= $1
+         AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
+       RETURNING id, expiry_date, batch_number`,
+      [units, sourceHospitalId, bloodGroup]
     );
-
-    // Add to target (upsert)
-    await pool.query(
-      `INSERT INTO blood_bank (hospital_id, blood_group, units_available, last_updated, minimum_threshold)
-       VALUES ($1, $2, $3, CURRENT_TIMESTAMP, 10)
+    if (!debit.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: `Insufficient unexpired ${bloodGroup} stock to transfer.` });
+    }
+    const credit = await client.query(
+      `INSERT INTO blood_bank (hospital_id, blood_group, units_available, expiry_date, batch_number, last_updated, minimum_threshold)
+       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, 10)
        ON CONFLICT (hospital_id, blood_group)
-       DO UPDATE SET units_available = blood_bank.units_available + $3, last_updated = CURRENT_TIMESTAMP`,
-      [target_hospital_id, blood_group, units]
+       DO UPDATE SET units_available = blood_bank.units_available + $3,
+         expiry_date = CASE
+           WHEN blood_bank.units_available <= 0 OR blood_bank.expiry_date < CURRENT_DATE THEN EXCLUDED.expiry_date
+           WHEN EXCLUDED.expiry_date IS NULL THEN blood_bank.expiry_date
+           WHEN blood_bank.expiry_date IS NULL THEN EXCLUDED.expiry_date
+           ELSE LEAST(blood_bank.expiry_date, EXCLUDED.expiry_date)
+         END,
+         batch_number = EXCLUDED.batch_number,
+         last_updated = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       RETURNING id`,
+      [targetHospitalId, bloodGroup, units, debit.rows[0].expiry_date, debit.rows[0].batch_number]
     );
-
+    await client.query(
+      `INSERT INTO blood_inventory_transactions
+         (hospital_id, blood_bank_id, blood_group, transaction_type, units, reference_type, created_by)
+       VALUES ($1, $2, $3, 'ADJUSTMENT', $4, 'TRANSFER_OUT', $5),
+              ($6, $7, $3, 'ADJUSTMENT', $4, 'TRANSFER_IN', $5)`,
+      [sourceHospitalId, debit.rows[0].id, bloodGroup, units, userId, targetHospitalId, credit.rows[0].id]
+    );
+    await client.query('COMMIT');
+    await Promise.all([sourceHospitalId, targetHospitalId].map((id) => emitBloodInventoryChanged(req, id)));
     res.json({
       success: true,
-      message: `${units} units of ${blood_group} transferred from ${sourceHospitalName} to hospital #${target_hospital_id}`,
-      data: { source: sourceHospitalId, target: target_hospital_id, blood_group, units },
+      message: `${units} units of ${bloodGroup} transferred successfully.`,
+      data: { source: sourceHospitalId, target: targetHospitalId, blood_group: bloodGroup, units },
     });
   } catch (error) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
     console.error('Transfer blood error:', error);
     res.status(500).json({ success: false, message: 'Server error', error: error.message });
+  } finally {
+    client?.release();
   }
 };
 
@@ -785,110 +895,66 @@ exports.markAllNotificationsRead = async (req, res) => {
 // ==================== BLOOD USAGE ====================
 
 exports.useBloodUnits = async (req, res) => {
+  let client;
   try {
     const userId = req.user.id;
     const { blood_group, units_required, used_for } = req.body;
-
-    const hospitalResult = await pool.query(
-      'SELECT id FROM hospitals WHERE user_id = $1',
-      [userId]
-    );
-
-    if (hospitalResult.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Hospital not found' 
-      });
+    const bloodGroup = normalizeBloodGroup(blood_group);
+    const units = Number(units_required);
+    if (!bloodGroup || !Number.isFinite(units) || units <= 0 || units > 1000 || Math.round(units * 100) !== units * 100) {
+      return res.status(400).json({ success: false, message: 'A valid blood group and positive amount up to 1000 units are required.' });
     }
 
+    client = await pool.connect();
+    await client.query('BEGIN');
+    const hospitalResult = await client.query('SELECT id FROM hospitals WHERE user_id = $1', [userId]);
+    if (!hospitalResult.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ success: false, message: 'Hospital not found.' });
+    }
     const hospitalId = hospitalResult.rows[0].id;
-
-    // First, check total available units
-    const totalResult = await pool.query(
-      `SELECT SUM(units_available) as total 
-       FROM blood_bank 
-       WHERE hospital_id = $1 AND blood_group = $2 
+    const stockResult = await client.query(
+      `UPDATE blood_bank SET units_available = units_available - $1,
+         last_updated = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+       WHERE hospital_id = $2 AND blood_group = $3 AND units_available >= $1
          AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
-         AND units_available > 0`,
-      [hospitalId, blood_group]
+       RETURNING id, units_available`,
+      [units, hospitalId, bloodGroup]
     );
-
-    const totalAvailable = parseInt(totalResult.rows[0]?.total || 0);
-    
-    if (totalAvailable < units_required) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Not enough ${blood_group} blood. Available: ${totalAvailable}, Requested: ${units_required}` 
-      });
+    if (!stockResult.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: `Insufficient unexpired ${bloodGroup} blood stock.` });
     }
-
-    // Use FIFO (First In First Out) - use oldest blood first
-    let remainingUnits = units_required;
-    let usedBatches = [];
-
-    while (remainingUnits > 0) {
-      const result = await pool.query(
-        `SELECT id, units_available, batch_number, expiry_date 
-         FROM blood_bank 
-         WHERE hospital_id = $1 AND blood_group = $2 
-           AND units_available > 0 AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
-         ORDER BY expiry_date ASC NULLS LAST
-         LIMIT 1`,
-        [hospitalId, blood_group]
-      );
-
-      if (result.rows.length === 0) {
-        break;
-      }
-
-      const batch = result.rows[0];
-      const unitsToUse = Math.min(batch.units_available, remainingUnits);
-
-      await pool.query(
-        `UPDATE blood_bank 
-         SET units_available = units_available - $1 
-         WHERE id = $2`,
-        [unitsToUse, batch.id]
-      );
-
-      usedBatches.push({
-        batch_number: batch.batch_number || 'N/A',
-        units_used: unitsToUse,
-        expiry_date: batch.expiry_date,
-      });
-
-      remainingUnits -= unitsToUse;
-    }
-
-    // Update donation history
-    if (usedBatches.length > 0) {
-      for (const batch of usedBatches) {
-        await pool.query(
-          `UPDATE blood_donation_history 
-           SET status = 'used', used_at = CURRENT_TIMESTAMP, used_for = $1
-           WHERE batch_number = $2 AND hospital_id = $3`,
-          [used_for || 'Patient use', batch.batch_number, hospitalId]
-        );
-      }
-    }
+    await client.query(
+      `INSERT INTO blood_inventory_transactions
+         (hospital_id, blood_bank_id, blood_group, transaction_type, units, reference_type, created_by)
+       VALUES ($1, $2, $3, 'ISSUED', $4, 'STOCK_USAGE', $5)`,
+      [hospitalId, stockResult.rows[0].id, bloodGroup, units, userId]
+    );
+    await client.query('COMMIT');
+    await emitBloodInventoryChanged(req, hospitalId);
+    const usedBatches = [{ units_used: units }];
 
     res.json({
       success: true,
       message: `${units_required} unit(s) of ${blood_group} blood used successfully`,
       data: {
-        blood_group,
-        units_used: units_required,
+        blood_group: bloodGroup,
+        units_used: units,
         batches_used: usedBatches,
         used_for: used_for || 'Patient use',
       },
     });
   } catch (error) {
+    if (client) await client.query('ROLLBACK').catch(() => {});
     console.error('Use blood units error:', error);
     res.status(500).json({ 
       success: false, 
       message: 'Server error', 
       error: error.message 
     });
+  } finally {
+    client?.release();
   }
 };
 

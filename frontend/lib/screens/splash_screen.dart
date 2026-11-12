@@ -10,7 +10,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -18,15 +19,19 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 2));
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
-    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
+    _controller =
+        AnimationController(vsync: this, duration: const Duration(seconds: 2));
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
+    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
     _controller.forward();
     Future.delayed(const Duration(seconds: 3), () {
       if (!context.mounted) return;
       if (!context.mounted) return;
       if (!mounted) return;
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+      Navigator.pushReplacement(context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()));
     });
   }
 
@@ -44,7 +49,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF0A4D68), Color(0xFF088395), Color(0xFF0A4D68)],
+            colors: [Color(0xFF142D4E), Color(0xFF0D9488), Color(0xFF142D4E)],
           ),
         ),
         child: Center(
@@ -60,9 +65,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
-                      boxShadow: [BoxShadow(color: Colors.white.withValues(alpha: 0.3), blurRadius: 30, offset: const Offset(0, 10))],
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            blurRadius: 30,
+                            offset: const Offset(0, 10))
+                      ],
                     ),
-                    child: const Icon(Icons.local_hospital, size: 80, color: Colors.white),
+                    child: const Icon(Icons.local_hospital,
+                        size: 80, color: Colors.white),
                   ),
                   const SizedBox(height: 30),
                   Text(
@@ -72,14 +83,23 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
-                      shadows: [Shadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 2))],
+                      shadows: [
+                        Shadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2))
+                      ],
                     ),
                   ),
                   const SizedBox(height: 20),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(30)),
-                    child: const Text('Emergency Response System', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(30)),
+                    child: const Text('Emergency Response System',
+                        style: TextStyle(color: Colors.white70, fontSize: 14)),
                   ),
                   const SizedBox(height: 60),
                   const CircularProgressIndicator(color: Colors.white),

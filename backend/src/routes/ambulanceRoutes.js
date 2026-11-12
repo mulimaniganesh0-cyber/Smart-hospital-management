@@ -9,6 +9,7 @@ router.get('/nearby', ambulanceController.getNearbyAmbulances);
 
 // ==================== PATIENT ROUTES ====================
 router.post('/book', protect, ambulanceController.bookAmbulance);
+router.post('/booking/location-update', protect, authorize('patient'), ambulanceController.updateBookingPatientLocation);
 router.get('/bookings', protect, ambulanceController.getMyAmbulanceBookings);
 router.get('/booking/:bookingId', protect, ambulanceController.getAmbulanceBookingDetails);
 
@@ -17,6 +18,7 @@ router.post('/register', protect, authorize('hospital'), ambulanceController.reg
 router.get('/hospital', protect, authorize('hospital'), ambulanceController.getHospitalAmbulances);
 router.put('/:ambulanceId', protect, authorize('hospital'), ambulanceController.updateAmbulance);
 router.put('/:ambulanceId/availability', protect, authorize('hospital'), ambulanceController.updateAmbulanceAvailability);
+router.put('/:ambulanceId/deactivate', protect, authorize('hospital'), ambulanceController.deactivateAmbulance);
 router.put('/assign/:bookingId', protect, authorize('hospital'), ambulanceController.assignAmbulanceToBooking);
 router.put('/booking/:bookingId/status', protect, authorize('hospital'), ambulanceController.updateBookingStatus);
 router.get('/hospital/bookings', protect, authorize('hospital'), ambulanceController.getHospitalAmbulanceBookings);

@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
 const { protect, authorize } = require('../middleware/auth');
+const driverOnboarding = require('../controllers/driverOnboardingController');
 
 router.use(protect, authorize('admin'));
 
@@ -11,6 +12,8 @@ router.get('/dashboard/stats', adminController.getDashboardStats);
 
 // User management
 router.get('/users', adminController.getAllUsers);
+router.get('/drivers/private-applications', driverOnboarding.listPrivateApplications);
+router.put('/drivers/private-applications/:driverId/review', driverOnboarding.reviewPrivateApplication);
 
 // Hospital management
 router.get('/hospitals', adminController.getAllHospitalsWithResources);

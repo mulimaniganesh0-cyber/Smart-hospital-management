@@ -1,5 +1,6 @@
 // lib/screens/hospital/hospital_blood_bank.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import '../../services/api_service.dart';
 
 class HospitalBloodBank extends StatefulWidget {
@@ -15,7 +16,16 @@ class _HospitalBloodBankState extends State<HospitalBloodBank> {
   Map<String, dynamic> _summary = {};
   String? _errorMessage;
 
-  final List<String> _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  final List<String> _bloodGroups = [
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'AB+',
+    'AB-',
+    'O+',
+    'O-'
+  ];
 
   @override
   void initState() {
@@ -25,71 +35,72 @@ class _HospitalBloodBankState extends State<HospitalBloodBank> {
     });
   }
 
- // In hospital_blood_bank.dart - Update _loadBloodBank method
+  // In hospital_blood_bank.dart - Update _loadBloodBank method
 
-Future<void> _loadBloodBank() async {
-  setState(() {
-    _isLoading = true;
-    _errorMessage = null;
-  });
+  Future<void> _loadBloodBank() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-  try {
-    final response = await ApiService.getHospitalBloodBank();
-    
-    if (response['success'] == true) {
-      final data = response['data'];
-      
-      // Handle both response formats
-      if (data != null) {
-        // If data has 'blood_stock' field (from our API)
-        if (data['blood_stock'] is List) {
-          _bloodStock = (data['blood_stock'] as List)
-              .whereType<Map>()
-              .map((item) => Map<String, dynamic>.from(item))
-              .toList();
-          _summary = data['summary'] is Map
-              ? Map<String, dynamic>.from(data['summary'])
-              : {};
-        } 
-        // If data is a list directly
-        else if (data is List) {
-          _bloodStock = data
-              .whereType<Map>()
-              .map((item) => Map<String, dynamic>.from(item))
-              .toList();
-          _summary = {
-            'total_units': _bloodStock.fold<int>(0, (sum, item) {
-  final value = item['units_available'] ?? 0;
-  return sum + (value is int ? value : (value as num).toInt());
-}),
-            'expiring_soon': 0,
-            'expired': 0,
-          };
+    try {
+      final response = await ApiService.getHospitalBloodBank();
+
+      if (response['success'] == true) {
+        final data = response['data'];
+
+        // Handle both response formats
+        if (data != null) {
+          // If data has 'blood_stock' field (from our API)
+          if (data['blood_stock'] is List) {
+            _bloodStock = (data['blood_stock'] as List)
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList();
+            _summary = data['summary'] is Map
+                ? Map<String, dynamic>.from(data['summary'])
+                : {};
+          }
+          // If data is a list directly
+          else if (data is List) {
+            _bloodStock = data
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList();
+            _summary = {
+              'total_units': _bloodStock.fold<int>(0, (sum, item) {
+                final value = item['units_available'] ?? 0;
+                return sum + (value is int ? value : (value as num).toInt());
+              }),
+              'expiring_soon': 0,
+              'expired': 0,
+            };
+          }
+          // If data has 'stock' field
+          else if (data['stock'] != null) {
+            _bloodStock = (data['stock'] as List)
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList();
+            _summary = data['summary'] is Map
+                ? Map<String, dynamic>.from(data['summary'])
+                : {};
+          }
         }
-        // If data has 'stock' field
-        else if (data['stock'] != null) {
-          _bloodStock = (data['stock'] as List)
-              .whereType<Map>()
-              .map((item) => Map<String, dynamic>.from(item))
-              .toList();
-          _summary = data['summary'] is Map
-              ? Map<String, dynamic>.from(data['summary'])
-              : {};
-        }
+
+        debugPrint(' Loaded ${_bloodStock.length} blood stocks');
+      } else {
+        _errorMessage = response['message'] ?? 'Failed to load blood bank';
+        debugPrint(' Failed to load blood bank: $_errorMessage');
       }
-      
-      debugPrint(' Loaded ${_bloodStock.length} blood stocks');
-    } else {
-      _errorMessage = response['message'] ?? 'Failed to load blood bank';
-      debugPrint(' Failed to load blood bank: $_errorMessage');
+    } catch (e) {
+      _errorMessage = 'Network error: $e';
+      debugPrint(' Network error: $e');
+    } finally {
+      setState(() => _isLoading = false);
     }
-  } catch (e) {
-    _errorMessage = 'Network error: $e';
-    debugPrint(' Network error: $e');
-  } finally {
-    setState(() => _isLoading = false);
   }
-}
+
   Future<void> _addBloodStock() async {
     String selectedGroup = 'A+';
     int units = 10;
@@ -111,7 +122,8 @@ Future<void> _loadBloodBank() async {
                     border: OutlineInputBorder(),
                   ),
                   items: _bloodGroups.map((group) {
-                    return DropdownMenuItem(value: group, child: Text(group));
+                    return DropdownMenuItem(
+                        value: group, child: Text(_bloodGroupLabel(group)));
                   }).toList(),
                   onChanged: (value) => setState(() => selectedGroup = value!),
                 ),
@@ -123,7 +135,8 @@ Future<void> _loadBloodBank() async {
                     labelText: 'Units',
                     border: OutlineInputBorder(),
                   ),
-                  onChanged: (value) => setState(() => units = int.tryParse(value) ?? 0),
+                  onChanged: (value) =>
+                      setState(() => units = int.tryParse(value) ?? 0),
                 ),
                 const SizedBox(height: 16),
                 ListTile(
@@ -160,7 +173,7 @@ Future<void> _loadBloodBank() async {
                   });
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
+                  backgroundColor: AppColors.success,
                 ),
                 child: const Text('Add'),
               ),
@@ -179,16 +192,40 @@ Future<void> _loadBloodBank() async {
           expiryDate: result['expiry_date'],
         );
         if (response['success'] == true) {
-          if (!context.mounted) return;
-          if (!context.mounted) return;
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Blood stock added successfully'), backgroundColor: Colors.green),
-          );
           await _loadBloodBank();
+          if (!mounted) return;
+          final expected = _asInt(response['data']?['group_units_available']);
+          final refreshed = _bloodStock.firstWhere(
+            (item) => item['blood_group'] == result['blood_group'],
+            orElse: () => const <String, dynamic>{},
+          );
+          if (expected > 0 &&
+              _asInt(refreshed['units_available']) != expected) {
+            throw StateError(
+                'Inventory refresh did not match the saved total.');
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Blood stock added successfully'),
+                backgroundColor: AppColors.success),
+          );
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content:
+                    Text(response['message'] ?? 'Could not add blood stock.'),
+                backgroundColor: AppColors.error),
+          );
         }
       } catch (e) {
         debugPrint('Error adding blood stock: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Could not add blood stock: $e'),
+                backgroundColor: AppColors.error),
+          );
+        }
       } finally {
         setState(() => _isLoading = false);
       }
@@ -214,7 +251,8 @@ Future<void> _loadBloodBank() async {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const Icon(Icons.error_outline,
+                          size: 64, color: AppColors.error),
                       const SizedBox(height: 16),
                       Text(_errorMessage!),
                       const SizedBox(height: 16),
@@ -232,15 +270,22 @@ Future<void> _loadBloodBank() async {
                       padding: const EdgeInsets.all(12),
                       child: Row(
                         children: [
-                          _buildSummaryCard('Total Units', _asInt(_summary['total_units']), Colors.blue),
+                          _buildSummaryCard(
+                              'Total Units',
+                              _asInt(_summary['total_units']),
+                              AppColors.primary),
                           const SizedBox(width: 8),
-                          _buildSummaryCard('Near Expiry', _asInt(_summary['expiring_soon']), Colors.orange),
+                          _buildSummaryCard(
+                              'Near Expiry',
+                              _asInt(_summary['expiring_soon']),
+                              AppColors.warning),
                           const SizedBox(width: 8),
-                          _buildSummaryCard('Expired', _asInt(_summary['expired']), Colors.red),
+                          _buildSummaryCard('Expired',
+                              _asInt(_summary['expired']), AppColors.error),
                         ],
                       ),
                     ),
-                    
+
                     // Add Button
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -251,16 +296,16 @@ Future<void> _loadBloodBank() async {
                           icon: const Icon(Icons.add),
                           label: const Text('Add Blood Stock'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
+                            backgroundColor: AppColors.success,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                         ),
                       ),
                     ),
-                    
+
                     const SizedBox(height: 8),
-                    
+
                     // Blood Stock List
                     Expanded(
                       child: _bloodStock.isEmpty
@@ -268,7 +313,8 @@ Future<void> _loadBloodBank() async {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.inventory, size: 64, color: Colors.grey),
+                                  Icon(Icons.inventory,
+                                      size: 64, color: Colors.grey),
                                   SizedBox(height: 16),
                                   Text('No blood stock available'),
                                   SizedBox(height: 8),
@@ -293,22 +339,27 @@ Future<void> _loadBloodBank() async {
                                         Container(
                                           padding: const EdgeInsets.all(8),
                                           decoration: BoxDecoration(
-                                            color: Colors.red.shade50,
-                                            borderRadius: BorderRadius.circular(8),
+                                            color: AppColors.error
+                                                .withValues(alpha: 0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
                                           ),
                                           child: const Icon(
                                             Icons.bloodtype,
-                                            color: Colors.red,
+                                            color: AppColors.error,
                                             size: 30,
                                           ),
                                         ),
                                         const SizedBox(width: 16),
                                         Expanded(
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
                                               Text(
-                                                stock['blood_group'] ?? 'Unknown',
+                                                _bloodGroupLabel(
+                                                    stock['blood_group'] ??
+                                                        'Unknown'),
                                                 style: const TextStyle(
                                                   fontSize: 18,
                                                   fontWeight: FontWeight.bold,
@@ -324,23 +375,59 @@ Future<void> _loadBloodBank() async {
                                               if (stock['expiry_date'] != null)
                                                 Text(
                                                   'Expires: ${stock['expiry_date']?.toString().split('T')[0] ?? ''}',
-                                                  style: TextStyle(
+                                                  style: const TextStyle(
                                                     fontSize: 12,
-                                                    color: Colors.orange.shade700,
+                                                    color: AppColors.warning,
                                                   ),
                                                 ),
+                                              for (final rawBatch
+                                                  in (stock['batches']
+                                                          as List? ??
+                                                      const []))
+                                                if (rawBatch is Map)
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                            top: 6),
+                                                    child: Row(
+                                                      children: [
+                                                        Expanded(
+                                                          child: Text(
+                                                            '${rawBatch['batch_number'] ?? 'Batch ${rawBatch['id']}'} · ${rawBatch['units_available']} units · ${rawBatch['expiry_date'] ?? 'No expiry'}',
+                                                            style:
+                                                                const TextStyle(
+                                                                    fontSize:
+                                                                        12),
+                                                          ),
+                                                        ),
+                                                        TextButton.icon(
+                                                          onPressed: () =>
+                                                              _editBloodStock({
+                                                            ...Map<String,
+                                                                    dynamic>.from(
+                                                                rawBatch),
+                                                            'blood_group': stock[
+                                                                'blood_group'],
+                                                          }),
+                                                          icon: const Icon(
+                                                              Icons.edit,
+                                                              size: 15),
+                                                          label: const Text(
+                                                              'Edit batch'),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
                                             ],
                                           ),
                                         ),
                                         Row(
                                           children: [
                                             IconButton(
-                                              icon: const Icon(Icons.edit, color: Colors.blue),
-                                              onPressed: () => _editBloodStock(stock),
-                                            ),
-                                            IconButton(
-                                              icon: const Icon(Icons.delete, color: Colors.red),
-                                              onPressed: () => _deleteBloodStock(stock),
+                                              icon: const Icon(Icons.delete,
+                                                  color: AppColors.error),
+                                              onPressed: () =>
+                                                  _deleteBloodStock(stock),
                                             ),
                                           ],
                                         ),
@@ -393,18 +480,22 @@ Future<void> _loadBloodBank() async {
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
+  String _bloodGroupLabel(String group) => group == 'A+' ? 'A+ve' : group;
+
   Future<void> _editBloodStock(Map<String, dynamic> stock) async {
     int units = _asInt(stock['units_available']);
-    DateTime selectedDate = stock['expiry_date'] != null 
+    final storedDate = stock['expiry_date'] != null
         ? DateTime.parse(stock['expiry_date'])
         : DateTime.now().add(const Duration(days: 30));
+    DateTime selectedDate =
+        storedDate.isBefore(DateTime.now()) ? DateTime.now() : storedDate;
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
-            title: Text('Update ${stock['blood_group']} Stock'),
+            title: Text('Edit ${_bloodGroupLabel(stock['blood_group'])} Batch'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -415,7 +506,8 @@ Future<void> _loadBloodBank() async {
                     labelText: 'Units',
                     border: OutlineInputBorder(),
                   ),
-                  onChanged: (value) => setState(() => units = int.tryParse(value) ?? 0),
+                  onChanged: (value) =>
+                      setState(() => units = int.tryParse(value) ?? 0),
                 ),
                 const SizedBox(height: 16),
                 ListTile(
@@ -452,7 +544,7 @@ Future<void> _loadBloodBank() async {
                   });
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
+                  backgroundColor: AppColors.primary,
                 ),
                 child: const Text('Update'),
               ),
@@ -469,18 +561,42 @@ Future<void> _loadBloodBank() async {
           bloodGroup: result['blood_group'],
           units: result['units'],
           expiryDate: result['expiry_date'],
+          batchId: _asInt(stock['id']),
         );
         if (response['success'] == true) {
-          if (!context.mounted) return;
-          if (!context.mounted) return;
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Blood stock updated successfully'), backgroundColor: Colors.green),
-          );
           await _loadBloodBank();
+          if (!mounted) return;
+          final expected = _asInt(response['data']?['group_units_available']);
+          final refreshed = _bloodStock.firstWhere(
+            (item) => item['blood_group'] == result['blood_group'],
+            orElse: () => const <String, dynamic>{},
+          );
+          if (_asInt(refreshed['units_available']) != expected) {
+            throw StateError(
+                'Inventory refresh did not match the saved total.');
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Blood stock updated successfully'),
+                backgroundColor: AppColors.success),
+          );
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content:
+                    Text(response['message'] ?? 'Could not update this batch.'),
+                backgroundColor: AppColors.error),
+          );
         }
       } catch (e) {
         debugPrint('Error updating blood stock: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Could not update this batch: $e'),
+                backgroundColor: AppColors.error),
+          );
+        }
       } finally {
         setState(() => _isLoading = false);
       }
@@ -492,7 +608,8 @@ Future<void> _loadBloodBank() async {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Blood Stock'),
-        content: Text('Are you sure you want to delete ${stock['blood_group']} blood stock?'),
+        content: Text(
+            'Are you sure you want to delete ${stock['blood_group']} blood stock?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -500,7 +617,7 @@ Future<void> _loadBloodBank() async {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Delete'),
           ),
         ],
@@ -510,13 +627,16 @@ Future<void> _loadBloodBank() async {
     if (confirm == true) {
       setState(() => _isLoading = true);
       try {
-        final response = await ApiService.deleteBloodStock(stock['blood_group']);
+        final response =
+            await ApiService.deleteBloodStock(stock['blood_group']);
         if (response['success'] == true) {
           if (!context.mounted) return;
           if (!context.mounted) return;
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${stock['blood_group']} blood stock deleted'), backgroundColor: Colors.green),
+            SnackBar(
+                content: Text('${stock['blood_group']} blood stock deleted'),
+                backgroundColor: AppColors.success),
           );
           await _loadBloodBank();
         }

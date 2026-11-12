@@ -1,5 +1,6 @@
 // lib/screens/hospital/hospital_resource_requests.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import '../../providers/hospital_provider.dart';
 import '../../services/api_service.dart';
@@ -129,7 +130,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('All Requests'),
-        backgroundColor: const Color(0xFF0A4D68),
+        backgroundColor: const Color(0xFF142D4E),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -145,7 +146,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.error_outline,
-                          size: 64, color: Colors.red),
+                          size: 64, color: AppColors.error),
                       const SizedBox(height: 16),
                       Text(_errorMessage!),
                       const SizedBox(height: 16),
@@ -164,24 +165,24 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                       child: Row(
                         children: [
                           _buildStatsCard('Total', _requests.length,
-                              Colors.blue, Icons.list),
+                              AppColors.primary, Icons.list),
                           const SizedBox(width: 8),
                           _buildStatsCard(
                               'Pending',
                               _getCountByStatus('pending'),
-                              Colors.orange,
+                              AppColors.warning,
                               Icons.pending),
                           const SizedBox(width: 8),
                           _buildStatsCard(
                               'Fulfilled',
                               _getCountByStatus('fulfilled'),
-                              Colors.green,
+                              AppColors.success,
                               Icons.check_circle),
                           const SizedBox(width: 8),
                           _buildStatsCard(
                               'Rejected',
                               _getCountByStatus('rejected'),
-                              Colors.red,
+                              AppColors.error,
                               Icons.cancel),
                         ],
                       ),
@@ -216,7 +217,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                                     onSelected: (selected) {
                                       setState(() => _selectedType = type);
                                     },
-                                    selectedColor: const Color(0xFF0A4D68)
+                                    selectedColor: const Color(0xFF142D4E)
                                         .withValues(alpha: 0.2),
                                   ),
                                 );
@@ -244,7 +245,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                                     onSelected: (selected) {
                                       setState(() => _selectedFilter = filter);
                                     },
-                                    selectedColor: const Color(0xFF0A4D68)
+                                    selectedColor: const Color(0xFF142D4E)
                                         .withValues(alpha: 0.2),
                                   ),
                                 );
@@ -342,7 +343,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
 
     // Determine icon and color based on type
     final icon = isBlood ? Icons.water_drop : Icons.medical_services;
-    final color = isBlood ? Colors.red : Colors.blue;
+    final color = isBlood ? AppColors.error : AppColors.primary;
     final typeLabel = isBlood ? ' Blood Request' : ' Resource Request';
     final detailLabel = isBlood
         ? '$bloodGroup ($quantity units)'
@@ -478,7 +479,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                     child: ElevatedButton(
                       onPressed: () => _showFulfillDialog(context, request),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
+                        backgroundColor: AppColors.success,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -493,8 +494,8 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                       onPressed: () =>
                           _updateRequestStatus(request, 'rejected'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
+                        foregroundColor: AppColors.error,
+                        side: const BorderSide(color: AppColors.error),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -513,17 +514,19 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
+                  color: AppColors.success.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.shade200),
+                  border: Border.all(
+                      color: AppColors.success.withValues(alpha: 0.1)),
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.check_circle, color: Colors.green, size: 16),
+                    Icon(Icons.check_circle,
+                        color: AppColors.success, size: 16),
                     SizedBox(width: 8),
                     Text(
                       ' Fulfilled successfully',
-                      style: TextStyle(color: Colors.green, fontSize: 12),
+                      style: TextStyle(color: AppColors.success, fontSize: 12),
                     ),
                   ],
                 ),
@@ -535,17 +538,18 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: AppColors.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade200),
+                  border:
+                      Border.all(color: AppColors.error.withValues(alpha: 0.1)),
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.cancel, color: Colors.red, size: 16),
+                    Icon(Icons.cancel, color: AppColors.error, size: 16),
                     SizedBox(width: 8),
                     Text(
                       ' Request rejected',
-                      style: TextStyle(color: Colors.red, fontSize: 12),
+                      style: TextStyle(color: AppColors.error, fontSize: 12),
                     ),
                   ],
                 ),
@@ -560,13 +564,13 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return Colors.orange;
+        return AppColors.warning;
       case 'approved':
-        return Colors.blue;
+        return AppColors.primary;
       case 'fulfilled':
-        return Colors.green;
+        return AppColors.success;
       case 'rejected':
-        return Colors.red;
+        return AppColors.error;
       default:
         return Colors.grey;
     }
@@ -587,7 +591,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
         title: Row(
           children: [
             Icon(isBlood ? Icons.water_drop : Icons.medical_services,
-                color: isBlood ? Colors.red : Colors.blue),
+                color: isBlood ? AppColors.error : AppColors.primary),
             const SizedBox(width: 12),
             Text(
                 isBlood ? 'Fulfill Blood Request' : 'Fulfill Resource Request'),
@@ -602,7 +606,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -613,7 +617,8 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
                   const SizedBox(height: 8),
                   Text(
                     ' This will decrease available ${isBlood ? 'blood units' : 'resources'}',
-                    style: TextStyle(fontSize: 12, color: Colors.orange[700]),
+                    style:
+                        const TextStyle(fontSize: 12, color: AppColors.warning),
                   ),
                 ],
               ),
@@ -631,7 +636,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
               _updateRequestStatus(request, 'fulfilled');
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.success,
             ),
             child: const Text(' Fulfill'),
           ),
@@ -668,7 +673,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(' Request ${status}ed successfully'),
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.success,
             ),
           );
 
@@ -686,7 +691,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(response['message'] ?? 'Failed to update request'),
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.error,
             ),
           );
         }
@@ -696,7 +701,7 @@ class _HospitalResourceRequestsState extends State<HospitalResourceRequests> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }

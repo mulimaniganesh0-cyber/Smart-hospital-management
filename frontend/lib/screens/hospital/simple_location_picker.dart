@@ -1,5 +1,6 @@
 // lib/screens/hospital/simple_location_picker.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:geocoding/geocoding.dart';
 import '../../services/location_service.dart';
 
@@ -63,7 +64,7 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 20),
-            
+
             // Address Field
             TextField(
               controller: _addressController,
@@ -76,9 +77,12 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
               maxLines: 2,
             ),
             const SizedBox(height: 16),
-            OutlinedButton.icon(onPressed: _loadingLocation ? null : _useCurrentLocation, icon: const Icon(Icons.my_location), label: const Text('Use Current Location')),
+            OutlinedButton.icon(
+                onPressed: _loadingLocation ? null : _useCurrentLocation,
+                icon: const Icon(Icons.my_location),
+                label: const Text('Use Current Location')),
             const SizedBox(height: 12),
-            
+
             // Latitude Field
             TextField(
               controller: _latitudeController,
@@ -88,10 +92,11 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
                 border: OutlineInputBorder(),
                 hintText: 'e.g., 28.6139',
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
             ),
             const SizedBox(height: 16),
-            
+
             // Longitude Field
             TextField(
               controller: _longitudeController,
@@ -101,38 +106,43 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
                 border: OutlineInputBorder(),
                 hintText: 'e.g., 77.2090',
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
             ),
             const SizedBox(height: 16),
-            OutlinedButton.icon(onPressed: _loadingLocation ? null : _searchAddress, icon: const Icon(Icons.search), label: const Text('Search Address')),
+            OutlinedButton.icon(
+                onPressed: _loadingLocation ? null : _searchAddress,
+                icon: const Icon(Icons.search),
+                label: const Text('Search Address')),
             const SizedBox(height: 24),
-            
+
             // Help Text
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade200),
+                border:
+                    Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
               ),
-              child: Column(
+              child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.blue.shade700),
-                      const SizedBox(width: 8),
+                      Icon(Icons.info_outline, color: AppColors.primary),
+                      SizedBox(width: 8),
                       Text(
                         'How to find coordinates:',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade700,
+                          color: AppColors.primary,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
+                  SizedBox(height: 8),
+                  Text(
                     '1. Open Google Maps on your phone\n'
                     '2. Long press on the hospital location\n'
                     '3. Copy the coordinates that appear\n'
@@ -142,25 +152,27 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
                 ],
               ),
             ),
-            
+
             const Spacer(),
-            
+
             // Preview
-            if (_latitudeController.text.isNotEmpty && _longitudeController.text.isNotEmpty)
+            if (_latitudeController.text.isNotEmpty &&
+                _longitudeController.text.isNotEmpty)
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
+                  color: AppColors.success.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green.shade200),
+                  border: Border.all(
+                      color: AppColors.success.withValues(alpha: 0.1)),
                 ),
                 child: Column(
                   children: [
-                    const Icon(Icons.check_circle, color: Colors.green),
+                    const Icon(Icons.check_circle, color: AppColors.success),
                     const SizedBox(height: 8),
-                    Text(
+                    const Text(
                       'Location ready to save',
-                      style: TextStyle(color: Colors.green.shade700),
+                      style: TextStyle(color: AppColors.success),
                     ),
                     Text(
                       'Lat: ${_latitudeController.text}, Lng: ${_longitudeController.text}',
@@ -180,7 +192,7 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please enter both latitude and longitude'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
         ),
       );
       return;
@@ -189,18 +201,24 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
     final double? lat = double.tryParse(_latitudeController.text);
     final double? lng = double.tryParse(_longitudeController.text);
 
-    if (lat == null || lng == null || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    if (lat == null ||
+        lng == null ||
+        lat < -90 ||
+        lat > 90 ||
+        lng < -180 ||
+        lng > 180) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter valid numbers for latitude and longitude'),
-          backgroundColor: Colors.red,
+          content:
+              Text('Please enter valid numbers for latitude and longitude'),
+          backgroundColor: AppColors.error,
         ),
       );
       return;
     }
 
-    final address = _addressController.text.isNotEmpty 
-        ? _addressController.text 
+    final address = _addressController.text.isNotEmpty
+        ? _addressController.text
         : 'Location at $lat, $lng';
 
     widget.onLocationSelected(lat, lng, address);
@@ -211,18 +229,40 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
     setState(() => _loadingLocation = true);
     try {
       final position = await LocationService.getCurrentLocation();
-      if (position == null) throw Exception('Location permission was not granted or location services are off');
+      if (position == null) {
+        throw Exception(
+            'Location permission was not granted or location services are off');
+      }
       _latitudeController.text = position.latitude.toStringAsFixed(6);
       _longitudeController.text = position.longitude.toStringAsFixed(6);
-      final places = await placemarkFromCoordinates(position.latitude, position.longitude);
-      if (places.isNotEmpty) _addressController.text = [places.first.name, places.first.street, places.first.locality, places.first.administrativeArea, places.first.postalCode].whereType<String>().where((v) => v.isNotEmpty).join(', ');
+      final places =
+          await placemarkFromCoordinates(position.latitude, position.longitude);
+      if (places.isNotEmpty) {
+        _addressController.text = [
+          places.first.name,
+          places.first.street,
+          places.first.locality,
+          places.first.administrativeArea,
+          places.first.postalCode
+        ].whereType<String>().where((v) => v.isNotEmpty).join(', ');
+      }
       if (mounted) setState(() {});
-    } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e'))); }
-    finally { if (mounted) setState(() => _loadingLocation = false); }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _loadingLocation = false);
+    }
   }
 
   Future<void> _searchAddress() async {
-    if (_addressController.text.trim().isEmpty) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a hospital name or address first'))); return; }
+    if (_addressController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Enter a hospital name or address first')));
+      return;
+    }
     setState(() => _loadingLocation = true);
     try {
       final results = await locationFromAddress(_addressController.text.trim());
@@ -230,7 +270,13 @@ class _SimpleLocationPickerState extends State<SimpleLocationPicker> {
       _latitudeController.text = results.first.latitude.toStringAsFixed(6);
       _longitudeController.text = results.first.longitude.toStringAsFixed(6);
       if (mounted) setState(() {});
-    } catch (e) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Address search failed: $e'))); }
-    finally { if (mounted) setState(() => _loadingLocation = false); }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Address search failed: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _loadingLocation = false);
+    }
   }
 }

@@ -47,11 +47,59 @@ async function ensureDonationCampaignSchema(pool) {
   // The campaign form permits half-unit donations; keep live inventory and
   // campaign records at the same precision.
   await pool.query(`
-    ALTER TABLE blood_bank ALTER COLUMN units_available TYPE NUMERIC(8,2) USING units_available::NUMERIC(8,2);
-    ALTER TABLE blood_donation_records ALTER COLUMN units_donated TYPE NUMERIC(8,2) USING units_donated::NUMERIC(8,2);
-    ALTER TABLE blood_donation_registrations ALTER COLUMN units_donated TYPE NUMERIC(8,2) USING units_donated::NUMERIC(8,2);
-    ALTER TABLE blood_donation_history ALTER COLUMN units_donated TYPE NUMERIC(8,2) USING units_donated::NUMERIC(8,2);
-    ALTER TABLE blood_donation_campaigns ALTER COLUMN total_blood_collected TYPE NUMERIC(10,2) USING total_blood_collected::NUMERIC(10,2);
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'blood_bank'
+          AND column_name = 'units_available'
+          AND (data_type <> 'numeric' OR numeric_precision IS DISTINCT FROM 8 OR numeric_scale IS DISTINCT FROM 2)
+      ) THEN
+        DROP TRIGGER IF EXISTS blood_bank_batches_sync ON blood_bank;
+        ALTER TABLE blood_bank ALTER COLUMN units_available TYPE NUMERIC(8,2) USING units_available::NUMERIC(8,2);
+        IF to_regprocedure('sync_blood_bank_batches_from_aggregate()') IS NOT NULL THEN
+          CREATE TRIGGER blood_bank_batches_sync
+            AFTER INSERT OR UPDATE OF units_available ON blood_bank
+            FOR EACH ROW EXECUTE FUNCTION sync_blood_bank_batches_from_aggregate();
+        END IF;
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'blood_donation_records'
+          AND column_name = 'units_donated'
+          AND (data_type <> 'numeric' OR numeric_precision IS DISTINCT FROM 8 OR numeric_scale IS DISTINCT FROM 2)
+      ) THEN
+        ALTER TABLE blood_donation_records ALTER COLUMN units_donated TYPE NUMERIC(8,2) USING units_donated::NUMERIC(8,2);
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'blood_donation_registrations'
+          AND column_name = 'units_donated'
+          AND (data_type <> 'numeric' OR numeric_precision IS DISTINCT FROM 8 OR numeric_scale IS DISTINCT FROM 2)
+      ) THEN
+        ALTER TABLE blood_donation_registrations ALTER COLUMN units_donated TYPE NUMERIC(8,2) USING units_donated::NUMERIC(8,2);
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'blood_donation_history'
+          AND column_name = 'units_donated'
+          AND (data_type <> 'numeric' OR numeric_precision IS DISTINCT FROM 8 OR numeric_scale IS DISTINCT FROM 2)
+      ) THEN
+        ALTER TABLE blood_donation_history ALTER COLUMN units_donated TYPE NUMERIC(8,2) USING units_donated::NUMERIC(8,2);
+      END IF;
+
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = current_schema() AND table_name = 'blood_donation_campaigns'
+          AND column_name = 'total_blood_collected'
+          AND (data_type <> 'numeric' OR numeric_precision IS DISTINCT FROM 10 OR numeric_scale IS DISTINCT FROM 2)
+      ) THEN
+        ALTER TABLE blood_donation_campaigns ALTER COLUMN total_blood_collected TYPE NUMERIC(10,2) USING total_blood_collected::NUMERIC(10,2);
+      END IF;
+    END $$;
   `);
 
   // Backfill the ownership key from the campaign for registrations created by

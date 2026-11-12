@@ -1,5 +1,6 @@
 // lib/screens/admin/admin_hospital_detail.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import '../../services/api_service.dart';
 
 class AdminHospitalDetailScreen extends StatefulWidget {
@@ -13,7 +14,8 @@ class AdminHospitalDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<AdminHospitalDetailScreen> createState() => _AdminHospitalDetailScreenState();
+  State<AdminHospitalDetailScreen> createState() =>
+      _AdminHospitalDetailScreenState();
 }
 
 class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
@@ -45,12 +47,14 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
     });
 
     try {
-      final resourcesResponse = await ApiService.getAdminHospitalResources(widget.hospitalId);
+      final resourcesResponse =
+          await ApiService.getAdminHospitalResources(widget.hospitalId);
       if (resourcesResponse['success'] && resourcesResponse['data'] != null) {
         _hospitalData = resourcesResponse['data'];
       }
 
-      final bloodResponse = await ApiService.getAdminHospitalBloodBank(widget.hospitalId);
+      final bloodResponse =
+          await ApiService.getAdminHospitalBloodBank(widget.hospitalId);
       if (bloodResponse['success']) {
         _bloodBank = List<Map<String, dynamic>>.from(bloodResponse['data']);
       }
@@ -67,7 +71,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
         widget.hospitalId,
         {field: value},
       );
-      
+
       if (response['success'] && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Resource updated successfully')),
@@ -90,7 +94,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
         bloodGroup,
         units,
       );
-      
+
       if (response['success'] && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Blood stock updated successfully')),
@@ -110,11 +114,13 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
   Widget build(BuildContext context) {
     // Safely get values using _toInt helper
     final generalBedsTotal = _toInt(_hospitalData?['general_beds_total']);
-    final generalBedsAvailable = _toInt(_hospitalData?['general_beds_available']);
+    final generalBedsAvailable =
+        _toInt(_hospitalData?['general_beds_available']);
     final icuBedsTotal = _toInt(_hospitalData?['icu_beds_total']);
     final icuBedsAvailable = _toInt(_hospitalData?['icu_beds_available']);
     final ventilatorsTotal = _toInt(_hospitalData?['ventilators_total']);
-    final ventilatorsAvailable = _toInt(_hospitalData?['ventilators_available']);
+    final ventilatorsAvailable =
+        _toInt(_hospitalData?['ventilators_available']);
     final oxygenBedsTotal = _toInt(_hospitalData?['oxygen_beds_total']);
     final oxygenBedsAvailable = _toInt(_hospitalData?['oxygen_beds_available']);
 
@@ -135,7 +141,8 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const Icon(Icons.error_outline,
+                          size: 64, color: AppColors.error),
                       const SizedBox(height: 16),
                       Text(_errorMessage!),
                       const SizedBox(height: 16),
@@ -153,7 +160,8 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                       // Hospital Info Card
                       Card(
                         elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
@@ -161,49 +169,71 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                             children: [
                               const Text(
                                 'Hospital Information',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                style: TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 16),
-                              _buildInfoRow(Icons.location_on, 'Address', _hospitalData?['address'] ?? 'N/A'),
-                              _buildInfoRow(Icons.phone, 'Phone', _hospitalData?['phone'] ?? 'N/A'),
-                              _buildInfoRow(Icons.email, 'Email', _hospitalData?['email'] ?? 'N/A'),
-                              _buildInfoRow(Icons.business, 'City', _hospitalData?['city'] ?? 'N/A'),
-                              _buildInfoRow(Icons.verified, 'Status', 
-                                (_hospitalData?['is_verified'] ?? false) ? 'Verified' : 'Pending'),
-                              _buildInfoRow(Icons.calendar_today, 'Registered', 
-                                _hospitalData?['created_at']?.toString().split('T')[0] ?? 'N/A'),
+                              _buildInfoRow(Icons.location_on, 'Address',
+                                  _hospitalData?['address'] ?? 'N/A'),
+                              _buildInfoRow(Icons.phone, 'Phone',
+                                  _hospitalData?['phone'] ?? 'N/A'),
+                              _buildInfoRow(Icons.email, 'Email',
+                                  _hospitalData?['email'] ?? 'N/A'),
+                              _buildInfoRow(Icons.business, 'City',
+                                  _hospitalData?['city'] ?? 'N/A'),
+                              _buildInfoRow(
+                                  Icons.verified,
+                                  'Status',
+                                  (_hospitalData?['is_verified'] ?? false)
+                                      ? 'Verified'
+                                      : 'Pending'),
+                              _buildInfoRow(
+                                  Icons.calendar_today,
+                                  'Registered',
+                                  _hospitalData?['created_at']
+                                          ?.toString()
+                                          .split('T')[0] ??
+                                      'N/A'),
                             ],
                           ),
                         ),
                       ),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       // Resources Card
                       Card(
                         elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Text(
                                     'Resources Management',
-                                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: Colors.blue.shade50,
+                                      color: AppColors.primary
+                                          .withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
                                       'Last updated: ${_hospitalData?['resources_updated_at']?.toString().split('T')[0] ?? 'N/A'}',
-                                      style: TextStyle(fontSize: 10, color: Colors.blue.shade700),
+                                      style: const TextStyle(
+                                          fontSize: 10,
+                                          color: AppColors.primary),
                                     ),
                                   ),
                                 ],
@@ -215,7 +245,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                                 available: generalBedsAvailable,
                                 field: 'general_beds_total',
                                 availableField: 'general_beds_available',
-                                color: Colors.blue,
+                                color: AppColors.primary,
                                 onUpdate: _updateResource,
                               ),
                               const SizedBox(height: 12),
@@ -225,7 +255,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                                 available: icuBedsAvailable,
                                 field: 'icu_beds_total',
                                 availableField: 'icu_beds_available',
-                                color: Colors.red,
+                                color: AppColors.error,
                                 onUpdate: _updateResource,
                               ),
                               const SizedBox(height: 12),
@@ -235,7 +265,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                                 available: ventilatorsAvailable,
                                 field: 'ventilators_total',
                                 availableField: 'ventilators_available',
-                                color: Colors.green,
+                                color: AppColors.success,
                                 onUpdate: _updateResource,
                               ),
                               const SizedBox(height: 12),
@@ -245,41 +275,49 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                                 available: oxygenBedsAvailable,
                                 field: 'oxygen_beds_total',
                                 availableField: 'oxygen_beds_available',
-                                color: Colors.purple,
+                                color: AppColors.secondary,
                                 onUpdate: _updateResource,
                               ),
                             ],
                           ),
                         ),
                       ),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       // Blood Bank Card
                       Card(
                         elevation: 2,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Text(
                                     'Blood Bank',
-                                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold),
                                   ),
                                   ElevatedButton.icon(
-                                    onPressed: () => _showAddBloodDialog(context),
+                                    onPressed: () =>
+                                        _showAddBloodDialog(context),
                                     icon: const Icon(Icons.add, size: 16),
                                     label: const Text('Add Blood'),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.purple,
+                                      backgroundColor: AppColors.secondary,
                                       foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 8),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(8)),
                                     ),
                                   ),
                                 ],
@@ -295,12 +333,14 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                                   child: const Center(
                                     child: Column(
                                       children: [
-                                        Icon(Icons.inventory, size: 48, color: Colors.grey),
+                                        Icon(Icons.inventory,
+                                            size: 48, color: Colors.grey),
                                         SizedBox(height: 12),
                                         Text('No blood stock available'),
                                         Text(
                                           'Click "Add Blood" to add blood units',
-                                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                                          style: TextStyle(
+                                              fontSize: 12, color: Colors.grey),
                                         ),
                                       ],
                                     ),
@@ -311,46 +351,79 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                                   spacing: 8,
                                   runSpacing: 8,
                                   children: _bloodBank.map((stock) {
-                                    final units = _toInt(stock['units_available']);
+                                    final units =
+                                        _toInt(stock['units_available']);
                                     final isLow = units < 10;
                                     final isCritical = units == 0;
                                     return Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 8),
                                       decoration: BoxDecoration(
-                                        color: isCritical ? Colors.red.shade100 : isLow ? Colors.orange.shade50 : Colors.green.shade50,
+                                        color: isCritical
+                                            ? AppColors.error
+                                                .withValues(alpha: 0.1)
+                                            : isLow
+                                                ? AppColors.warning
+                                                    .withValues(alpha: 0.1)
+                                                : AppColors.success
+                                                    .withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(12),
                                         border: Border.all(
-                                          color: isCritical ? Colors.red.shade300 : isLow ? Colors.orange.shade200 : Colors.green.shade200,
+                                          color: isCritical
+                                              ? AppColors.error
+                                                  .withValues(alpha: 0.1)
+                                              : isLow
+                                                  ? AppColors.warning
+                                                      .withValues(alpha: 0.1)
+                                                  : AppColors.success
+                                                      .withValues(alpha: 0.1),
                                         ),
                                       ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               Text(
-                                                stock['blood_group'] ?? 'Unknown',
+                                                stock['blood_group'] ??
+                                                    'Unknown',
                                                 style: TextStyle(
                                                   fontSize: 14,
                                                   fontWeight: FontWeight.bold,
-                                                  color: isCritical ? Colors.red.shade800 : isLow ? Colors.orange.shade800 : Colors.green.shade800,
+                                                  color: isCritical
+                                                      ? AppColors.error
+                                                      : isLow
+                                                          ? Colors
+                                                              .orange.shade800
+                                                          : Colors
+                                                              .green.shade800,
                                                 ),
                                               ),
                                               Text(
                                                 '$units units',
                                                 style: TextStyle(
                                                   fontSize: 12,
-                                                  color: isCritical ? Colors.red.shade600 : isLow ? Colors.orange.shade600 : Colors.green.shade600,
+                                                  color: isCritical
+                                                      ? AppColors.error
+                                                      : isLow
+                                                          ? Colors
+                                                              .orange.shade600
+                                                          : Colors
+                                                              .green.shade600,
                                                 ),
                                               ),
                                             ],
                                           ),
                                           const SizedBox(width: 8),
                                           IconButton(
-                                            icon: const Icon(Icons.edit, size: 16),
-                                            onPressed: () => _showEditBloodDialog(context, stock),
+                                            icon: const Icon(Icons.edit,
+                                                size: 16),
+                                            onPressed: () =>
+                                                _showEditBloodDialog(
+                                                    context, stock),
                                             padding: EdgeInsets.zero,
                                             constraints: const BoxConstraints(
                                               minWidth: 30,
@@ -366,30 +439,31 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                           ),
                         ),
                       ),
-                      
+
                       const SizedBox(height: 16),
-                      
+
                       // Danger Zone
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.red.shade50,
+                          color: AppColors.error.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.red.shade200),
+                          border: Border.all(
+                              color: AppColors.error.withValues(alpha: 0.1)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            const Row(
                               children: [
-                                Icon(Icons.warning, color: Colors.red.shade700),
-                                const SizedBox(width: 8),
+                                Icon(Icons.warning, color: AppColors.error),
+                                SizedBox(width: 8),
                                 Text(
                                   'Danger Zone',
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.red.shade700,
+                                    color: AppColors.error,
                                   ),
                                 ),
                               ],
@@ -397,7 +471,8 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                             const SizedBox(height: 12),
                             Text(
                               'Deleting this hospital will permanently remove all associated data including resources, staff, appointments, and patient records.',
-                              style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                              style: TextStyle(
+                                  color: Colors.grey[700], fontSize: 12),
                             ),
                             const SizedBox(height: 12),
                             SizedBox(
@@ -407,9 +482,11 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                                 icon: const Icon(Icons.delete),
                                 label: const Text('Delete Hospital'),
                                 style: OutlinedButton.styleFrom(
-                                  foregroundColor: Colors.red,
-                                  side: const BorderSide(color: Colors.red),
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  foregroundColor: AppColors.error,
+                                  side:
+                                      const BorderSide(color: AppColors.error),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
                                 ),
                               ),
                             ),
@@ -431,7 +508,8 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
           const SizedBox(width: 8),
           SizedBox(
             width: 80,
-            child: Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+            child: Text(label,
+                style: TextStyle(color: Colors.grey[600], fontSize: 12)),
           ),
           Expanded(
             child: Text(
@@ -487,7 +565,8 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                   const SizedBox(width: 8),
                   Text(
                     title,
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                 ],
               ),
@@ -523,9 +602,10 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
             children: [
               _buildStatItem('Total', total.toString(), Colors.grey),
               const SizedBox(width: 16),
-              _buildStatItem('Available', available.toString(), Colors.green),
+              _buildStatItem(
+                  'Available', available.toString(), AppColors.success),
               const SizedBox(width: 16),
-              _buildStatItem('Occupied', occupied.toString(), Colors.red),
+              _buildStatItem('Occupied', occupied.toString(), AppColors.error),
             ],
           ),
           const SizedBox(height: 8),
@@ -541,12 +621,14 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                     onUpdate,
                   ),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.blue,
-                    side: BorderSide(color: Colors.blue.shade300),
+                    foregroundColor: AppColors.primary,
+                    side: BorderSide(
+                        color: AppColors.primary.withValues(alpha: 0.1)),
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     minimumSize: const Size(0, 30),
                   ),
-                  child: const Text('Update Total', style: TextStyle(fontSize: 11)),
+                  child: const Text('Update Total',
+                      style: TextStyle(fontSize: 11)),
                 ),
               ),
               const SizedBox(width: 8),
@@ -560,12 +642,14 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                     onUpdate,
                   ),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.green,
-                    side: BorderSide(color: Colors.green.shade300),
+                    foregroundColor: AppColors.success,
+                    side: BorderSide(
+                        color: AppColors.success.withValues(alpha: 0.1)),
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     minimumSize: const Size(0, 30),
                   ),
-                  child: const Text('Update Available', style: TextStyle(fontSize: 11)),
+                  child: const Text('Update Available',
+                      style: TextStyle(fontSize: 11)),
                 ),
               ),
             ],
@@ -581,7 +665,8 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
         children: [
           Text(
             value,
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color),
+            style: TextStyle(
+                fontSize: 14, fontWeight: FontWeight.bold, color: color),
           ),
           Text(
             label,
@@ -600,7 +685,8 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
     return Icons.medical_services;
   }
 
-  void _showUpdateDialog(BuildContext context, String title, String field, int currentValue, Function(String, int) onUpdate) {
+  void _showUpdateDialog(BuildContext context, String title, String field,
+      int currentValue, Function(String, int) onUpdate) {
     final controller = TextEditingController(text: currentValue.toString());
 
     showDialog(
@@ -643,7 +729,16 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
   void _showAddBloodDialog(BuildContext context) {
     String selectedGroup = 'A+';
     final unitsController = TextEditingController(text: '10');
-    final List<String> bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    final List<String> bloodGroups = [
+      'A+',
+      'A-',
+      'B+',
+      'B-',
+      'AB+',
+      'AB-',
+      'O+',
+      'O-'
+    ];
 
     showDialog(
       context: context,
@@ -687,7 +782,8 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                 _updateBloodStock(selectedGroup, units);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppColors.secondary),
             child: const Text('Add'),
           ),
         ],
@@ -696,7 +792,8 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
   }
 
   void _showEditBloodDialog(BuildContext context, Map<String, dynamic> stock) {
-    final unitsController = TextEditingController(text: stock['units_available'].toString());
+    final unitsController =
+        TextEditingController(text: stock['units_available'].toString());
 
     showDialog(
       context: context,
@@ -737,7 +834,7 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
       builder: (context) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.warning, color: Colors.red),
+            Icon(Icons.warning, color: AppColors.error),
             SizedBox(width: 8),
             Text('Delete Hospital'),
           ],
@@ -751,16 +848,18 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: AppColors.error.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade200),
+                border:
+                    Border.all(color: AppColors.error.withValues(alpha: 0.1)),
               ),
               child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'ÃƒÂ¢Ã…Â¡Ã‚Â ÃƒÂ¯Ã‚Â¸Ã‚Â This action cannot be undone!',
-                    style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        color: AppColors.error, fontWeight: FontWeight.bold),
                   ),
                   SizedBox(height: 8),
                   Text(
@@ -780,13 +879,15 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              final response = await ApiService.deleteHospital(widget.hospitalId);
+              final response =
+                  await ApiService.deleteHospital(widget.hospitalId);
               if (response['success'] && mounted) {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('${widget.hospitalName} deleted successfully'),
-                    backgroundColor: Colors.green,
+                    content:
+                        Text('${widget.hospitalName} deleted successfully'),
+                    backgroundColor: AppColors.success,
                   ),
                 );
                 if (!context.mounted) return;
@@ -795,13 +896,14 @@ class _AdminHospitalDetailScreenState extends State<AdminHospitalDetailScreen> {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(response['message'] ?? 'Failed to delete hospital'),
-                    backgroundColor: Colors.red,
+                    content: Text(
+                        response['message'] ?? 'Failed to delete hospital'),
+                    backgroundColor: AppColors.error,
                   ),
                 );
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Delete'),
           ),
         ],

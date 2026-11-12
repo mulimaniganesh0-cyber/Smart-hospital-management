@@ -1,5 +1,6 @@
 // lib/screens/hospital/hospital_home_screen.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:intl/intl.dart';
@@ -18,6 +19,7 @@ import 'hospital_ambulances.dart';
 import 'hospital_resource_requests.dart';
 import 'hospital_profile.dart';
 import 'hospital_campaigns.dart';
+import 'hospital_gallery.dart';
 import '../../widgets/app_ui.dart';
 import '../../widgets/notification_center.dart';
 
@@ -42,6 +44,7 @@ class _HospitalHomeScreenState extends State<HospitalHomeScreen> {
     const HospitalCampaigns(), // Index 6: Camps
     const HospitalResourceRequests(), // Index 7: Requests (Blood + Resource requests)
     const HospitalProfile(), // Index 8: Profile
+    const HospitalGallery(), // Index 9: Hospital photo gallery
   ];
 
   // Method to navigate to a specific tab from anywhere
@@ -49,6 +52,39 @@ class _HospitalHomeScreenState extends State<HospitalHomeScreen> {
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  Future<void> _showMoreMobileSections() async {
+    const options = <(int, String, IconData)>[
+      (3, 'Staff', Icons.people_outline),
+      (4, 'Ambulances', Icons.local_taxi_outlined),
+      (5, 'Blood bank', Icons.bloodtype_outlined),
+      (6, 'Campaigns', Icons.campaign_outlined),
+      (8, 'Hospital profile', Icons.business_outlined),
+      (9, 'Gallery', Icons.photo_library_outlined),
+    ];
+    final selected = await showModalBottomSheet<int>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Text('Hospital workspace',
+                  style: Theme.of(sheetContext).textTheme.titleLarge),
+            ),
+            ...options.map((option) => ListTile(
+                  leading: Icon(option.$3),
+                  title: Text(option.$2),
+                  onTap: () => Navigator.pop(sheetContext, option.$1),
+                )),
+          ],
+        ),
+      ),
+    );
+    if (selected != null && mounted) navigateToTab(selected);
   }
 
   @override
@@ -90,26 +126,66 @@ class _HospitalHomeScreenState extends State<HospitalHomeScreen> {
           icon: Icon(Icons.business_outlined),
           selectedIcon: Icon(Icons.business),
           label: Text('Profile')),
+      NavigationRailDestination(
+          icon: Icon(Icons.photo_library_outlined),
+          selectedIcon: Icon(Icons.photo_library),
+          label: Text('Gallery')),
     ];
     return LayoutBuilder(builder: (context, constraints) {
       final desktop = constraints.maxWidth >= 1000;
       return Scaffold(
         body: desktop
             ? Row(children: [
-                NavigationRail(
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: navigateToTab,
-                  labelType: NavigationRailLabelType.all,
-                  leading: const Padding(
-                      padding: EdgeInsets.fromLTRB(8, 18, 8, 20),
-                      child: Column(children: [
-                        Icon(Icons.health_and_safety,
-                            color: CareGuideColors.teal),
-                        SizedBox(height: 6),
-                        Text('CareGuide',
-                            style: TextStyle(fontWeight: FontWeight.w800))
-                      ])),
-                  destinations: destinations,
+                SizedBox(
+                  width: constraints.maxWidth >= 1300 ? 232 : 216,
+                  child: Column(children: [
+                    const SizedBox(
+                        height: 58,
+                        child: Center(
+                            child:
+                                Row(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.health_and_safety,
+                              color: CareGuideColors.teal),
+                          SizedBox(width: 9),
+                          Text('CareSync',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w800, fontSize: 17)),
+                        ]))),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 8, horizontal: 10),
+                        itemCount: destinations.length,
+                        itemBuilder: (context, index) {
+                          final selected = _selectedIndex == index;
+                          final destination = destinations[index];
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: ListTile(
+                              dense: true,
+                              selected: selected,
+                              selectedColor: CareGuideColors.navy,
+                              selectedTileColor: CareGuideColors.mint,
+                              leading: selected
+                                  ? destination.selectedIcon
+                                  : destination.icon,
+                              title: destination.label,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12)),
+                              onTap: () => navigateToTab(index),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Text('Hospital workspace',
+                            style: TextStyle(
+                                color: CareGuideColors.muted, fontSize: 12))),
+                  ]),
                 ),
                 const VerticalDivider(width: 1),
                 Expanded(child: _screens[_selectedIndex]),
@@ -118,11 +194,17 @@ class _HospitalHomeScreenState extends State<HospitalHomeScreen> {
         bottomNavigationBar: desktop
             ? null
             : NavigationBar(
-                selectedIndex: _selectedIndex,
+                selectedIndex: _selectedIndex <= 2
+                    ? _selectedIndex
+                    : _selectedIndex == 7
+                        ? 3
+                        : 4,
                 onDestinationSelected: (index) {
-                  setState(() {
-                    _selectedIndex = index;
-                  });
+                  if (index == 4) {
+                    _showMoreMobileSections();
+                  } else {
+                    navigateToTab(index == 3 ? 7 : index);
+                  }
                 },
                 destinations: const [
                   NavigationDestination(
@@ -141,34 +223,14 @@ class _HospitalHomeScreenState extends State<HospitalHomeScreen> {
                     label: 'Appointments',
                   ),
                   NavigationDestination(
-                    icon: Icon(Icons.people_outline),
-                    selectedIcon: Icon(Icons.people),
-                    label: 'Staff',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.local_taxi_outlined),
-                    selectedIcon: Icon(Icons.local_taxi),
-                    label: 'Ambulances',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.bloodtype),
-                    selectedIcon: Icon(Icons.bloodtype),
-                    label: 'Blood Bank',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.campaign_outlined),
-                    selectedIcon: Icon(Icons.campaign),
-                    label: 'Camps',
-                  ),
-                  NavigationDestination(
                     icon: Icon(Icons.request_page_outlined),
                     selectedIcon: Icon(Icons.request_page),
                     label: 'Requests',
                   ),
                   NavigationDestination(
-                    icon: Icon(Icons.business_outlined),
-                    selectedIcon: Icon(Icons.business),
-                    label: 'Profile',
+                    icon: Icon(Icons.grid_view_outlined),
+                    selectedIcon: Icon(Icons.grid_view),
+                    label: 'More',
                   ),
                 ],
               ),
@@ -221,7 +283,12 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
     setState(() => _dailyQrLoading = true);
     final response = await ApiService.getTodayHospitalQr();
     if (!mounted) return;
-    setState(() { _dailyQr = response['success'] == true && response['qr'] is Map ? Map<String, dynamic>.from(response['qr']) : null; _dailyQrLoading = false; });
+    setState(() {
+      _dailyQr = response['success'] == true && response['qr'] is Map
+          ? Map<String, dynamic>.from(response['qr'])
+          : null;
+      _dailyQrLoading = false;
+    });
   }
 
   Future<Uint8List?> _qrPng() async {
@@ -242,27 +309,95 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
     if (png == null) return null;
     final doc = pw.Document();
     final date = _dailyQr?['date']?.toString() ?? '';
-    doc.addPage(pw.Page(build: (_) => pw.Center(child: pw.Column(mainAxisSize: pw.MainAxisSize.min, children: [
-      pw.Text('SCAN FOR TOKEN', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)), pw.SizedBox(height: 18), pw.Image(pw.MemoryImage(png), width: 260, height: 260), pw.SizedBox(height: 14), pw.Text('Today\'s Queue QR • $date'), pw.Text('Scan using Smart Hospital App • Valid Today Only')
-    ]))));
+    doc.addPage(pw.Page(
+        build: (_) => pw.Center(
+                child: pw.Column(mainAxisSize: pw.MainAxisSize.min, children: [
+              pw.Text('SCAN FOR TOKEN',
+                  style: pw.TextStyle(
+                      fontSize: 24, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 18),
+              pw.Image(pw.MemoryImage(png), width: 260, height: 260),
+              pw.SizedBox(height: 14),
+              pw.Text('Today\'s Queue QR • $date'),
+              pw.Text('Scan using Smart Hospital App • Valid Today Only')
+            ]))));
     return doc;
   }
 
-  Future<void> _downloadQr() async { final doc = await _qrDocument(); if (doc != null) await Printing.sharePdf(bytes: await doc.save(), filename: 'hospital-daily-queue-qr.pdf'); }
-  Future<void> _printQr() async { final doc = await _qrDocument(); if (doc != null) await Printing.layoutPdf(onLayout: (_) async => doc.save()); }
+  Future<void> _downloadQr() async {
+    final doc = await _qrDocument();
+    if (doc != null) {
+      await Printing.sharePdf(
+          bytes: await doc.save(), filename: 'hospital-daily-queue-qr.pdf');
+    }
+  }
+
+  Future<void> _printQr() async {
+    final doc = await _qrDocument();
+    if (doc != null) {
+      await Printing.layoutPdf(onLayout: (_) async => doc.save());
+    }
+  }
 
   Widget _dailyQrCard(String hospitalName) {
-    if (_dailyQrLoading) return const Card(child: Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())));
-    if (_dailyQr == null) return Card(child: ListTile(title: const Text('Daily patient queue QR unavailable'), subtitle: const Text('Check your connection and try again.'), trailing: IconButton(onPressed: _loadDailyQr, icon: const Icon(Icons.refresh))));
+    if (_dailyQrLoading) {
+      return const Card(
+          child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator())));
+    }
+    if (_dailyQr == null) {
+      return Card(
+          child: ListTile(
+              title: const Text('Daily patient queue QR unavailable'),
+              subtitle: const Text('Check your connection and try again.'),
+              trailing: IconButton(
+                  onPressed: _loadDailyQr, icon: const Icon(Icons.refresh))));
+    }
     final date = DateTime.tryParse(_dailyQr!['date']?.toString() ?? '');
-    final label = date == null ? (_dailyQr!['date'] ?? '') : DateFormat('dd MMMM yyyy').format(date);
-    return Card(child: Padding(padding: const EdgeInsets.all(18), child: Column(children: [
-      const Text('SCAN TO BOOK APPOINTMENT', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)), const SizedBox(height: 12),
-      QrImageView(data: _dailyQr!['payload'] as String, size: 250, backgroundColor: Colors.white), const SizedBox(height: 12),
-      Text(hospitalName, style: const TextStyle(fontWeight: FontWeight.bold)), Text('Today\'s QR • $label'), const SizedBox(height: 4),
-      const Text('● Active until 11:59 PM', style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600)), const Text('Patients can scan this QR to book an appointment.'), const SizedBox(height: 12),
-      Wrap(spacing: 8, runSpacing: 8, alignment: WrapAlignment.center, children: [OutlinedButton.icon(onPressed: _loadDailyQr, icon: const Icon(Icons.refresh), label: const Text('Refresh QR')), OutlinedButton.icon(onPressed: _downloadQr, icon: const Icon(Icons.download), label: const Text('Download QR')), FilledButton.icon(onPressed: _printQr, icon: const Icon(Icons.print), label: const Text('Print QR'))])
-    ])));
+    final label = date == null
+        ? (_dailyQr!['date'] ?? '')
+        : DateFormat('dd MMMM yyyy').format(date);
+    return Card(
+        child: Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(children: [
+              const Text('SCAN TO BOOK APPOINTMENT',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              QrImageView(
+                  data: _dailyQr!['payload'] as String,
+                  size: 150,
+                  backgroundColor: Colors.white),
+              const SizedBox(height: 12),
+              Text(hospitalName,
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text('Today\'s QR • $label'),
+              const SizedBox(height: 4),
+              const Text('● Active until 11:59 PM',
+                  style: TextStyle(
+                      color: AppColors.success, fontWeight: FontWeight.w600)),
+              const Text('Patients can scan this QR to book an appointment.'),
+              const SizedBox(height: 12),
+              Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    OutlinedButton.icon(
+                        onPressed: _loadDailyQr,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Refresh QR')),
+                    OutlinedButton.icon(
+                        onPressed: _downloadQr,
+                        icon: const Icon(Icons.download),
+                        label: const Text('Download QR')),
+                    FilledButton.icon(
+                        onPressed: _printQr,
+                        icon: const Icon(Icons.print),
+                        label: const Text('Print QR'))
+                  ])
+            ])));
   }
 
   Future<void> _connectSocketListeners() async {
@@ -419,103 +554,73 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
               ),
               const SizedBox(height: 20),
 
-              _dailyQrCard(hospitalData?['name']?.toString() ?? 'Hospital'),
-              const SizedBox(height: 20),
-
-              // Metrics Grid - Row 1
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildMetricCard(
+              const CareGuideSectionHeader(
+                  title: 'Hospital overview',
+                  subtitle: 'Live capacity and operations at a glance'),
+              const SizedBox(height: 12),
+              LayoutBuilder(builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 1100
+                    ? 4
+                    : constraints.maxWidth >= 650
+                        ? 3
+                        : 2;
+                final metrics = <Widget>[
+                  _buildMetricCard(
                       title: 'Total Patients',
                       value: _stats['total_patients'].toString(),
                       icon: Icons.people,
-                      color: Colors.blue,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildMetricCard(
-                      title: 'Beds Available',
+                      color: CareGuideColors.navy),
+                  _buildMetricCard(
+                      title: 'General beds free',
                       value: _stats['general_beds_available'].toString(),
                       icon: Icons.king_bed,
-                      color: Colors.green,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Metrics Grid - Row 2
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildMetricCard(
-                      title: 'ICU Available',
+                      color: CareGuideColors.success),
+                  _buildMetricCard(
+                      title: 'ICU beds free',
                       value: _stats['icu_beds_available'].toString(),
                       icon: Icons.local_hospital,
-                      color: Colors.red,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildMetricCard(
-                      title: 'Today\'s Appts',
+                      color: CareGuideColors.teal),
+                  _buildMetricCard(
+                      title: 'Today’s appointments',
                       value: _stats['today_appointments'].toString(),
                       icon: Icons.calendar_today,
-                      color: Colors.orange,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Metrics Grid - Row 3
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildMetricCard(
-                      title: 'Active Emergencies',
+                      color: CareGuideColors.warning),
+                  _buildMetricCard(
+                      title: 'Active emergencies',
                       value: _stats['active_emergencies'].toString(),
                       icon: Icons.emergency,
-                      color: Colors.redAccent,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildMetricCard(
-                      title: 'Ambulances',
+                      color: CareGuideColors.danger),
+                  _buildMetricCard(
+                      title: 'Ambulances ready',
                       value:
                           '${_stats['ambulances_available']}/${_stats['ambulances_total']}',
                       icon: Icons.local_shipping,
-                      color: Colors.teal,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Metrics Grid - Row 4
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildMetricCard(
-                      title: 'Doctors Available',
+                      color: CareGuideColors.teal),
+                  _buildMetricCard(
+                      title: 'Doctors available',
                       value: _stats['doctors_available'].toString(),
                       icon: Icons.person,
-                      color: Colors.indigo,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildMetricCard(
-                      title: 'Blood Units',
+                      color: CareGuideColors.navy),
+                  _buildMetricCard(
+                      title: 'Blood units',
                       value: _stats['blood_bank_total_units'].toString(),
                       icon: Icons.bloodtype,
-                      color: Colors.pink,
-                    ),
+                      color: CareGuideColors.danger),
+                ];
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: columns,
+                    mainAxisSpacing: 12,
+                    crossAxisSpacing: 12,
+                    mainAxisExtent: 176,
                   ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
+                  itemCount: metrics.length,
+                  itemBuilder: (context, index) => metrics[index],
+                );
+              }),
+              const SizedBox(height: 22),
               // Quick Actions Header
               const Text(
                 'Quick Actions',
@@ -530,7 +635,7 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
                     child: _buildQuickActionCard(
                       icon: Icons.medical_services,
                       title: 'Resources',
-                      color: Colors.blue,
+                      color: AppColors.primary,
                       onTap: () => _navigateToTab(1), // Resources tab
                     ),
                   ),
@@ -539,7 +644,7 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
                     child: _buildQuickActionCard(
                       icon: Icons.bloodtype,
                       title: 'Blood Bank',
-                      color: Colors.red,
+                      color: AppColors.error,
                       onTap: () => _navigateToTab(5), // Blood Bank tab
                     ),
                   ),
@@ -552,7 +657,7 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
                     child: _buildQuickActionCard(
                       icon: Icons.request_page,
                       title: 'Requests',
-                      color: Colors.purple,
+                      color: AppColors.secondary,
                       badge: totalPendingRequests > 0
                           ? totalPendingRequests
                           : null,
@@ -564,13 +669,17 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
                     child: _buildQuickActionCard(
                       icon: Icons.calendar_today,
                       title: 'Appointments',
-                      color: Colors.orange,
+                      color: AppColors.warning,
                       onTap: () => _navigateToTab(2), // Appointments tab
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
+
+              const SizedBox(height: 8),
+              _dailyQrCard(hospitalData?['name']?.toString() ?? 'Hospital'),
+              const SizedBox(height: 18),
 
               // Pending Requests Summary
               if (totalPendingRequests > 0)
@@ -637,6 +746,8 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
           const SizedBox(height: 4),
           Text(
             title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(color: Colors.grey[600], fontSize: 12),
           ),
         ],
@@ -672,7 +783,7 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: const BoxDecoration(
-                        color: Colors.red,
+                        color: AppColors.error,
                         shape: BoxShape.circle,
                       ),
                       constraints: const BoxConstraints(
@@ -711,7 +822,7 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
     required int totalPendingRequests,
   }) {
     return Card(
-      color: Colors.orange.shade50,
+      color: AppColors.warning.withValues(alpha: 0.1),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -719,14 +830,15 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
           children: [
             Row(
               children: [
-                const Icon(Icons.notifications_active, color: Colors.orange),
+                const Icon(Icons.notifications_active,
+                    color: AppColors.warning),
                 const SizedBox(width: 8),
                 Text(
                   '$totalPendingRequests Pending Request${totalPendingRequests > 1 ? 's' : ''}',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
-                    color: Colors.orange,
+                    color: AppColors.warning,
                   ),
                 ),
               ],
@@ -746,14 +858,14 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
                       child: Column(
                         children: [
                           const Icon(Icons.bloodtype,
-                              color: Colors.red, size: 24),
+                              color: AppColors.error, size: 24),
                           const SizedBox(height: 4),
                           Text(
                             '$pendingBloodRequests',
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              color: Colors.red,
+                              color: AppColors.error,
                             ),
                           ),
                           const Text(
@@ -778,14 +890,14 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
                       child: Column(
                         children: [
                           const Icon(Icons.medical_services,
-                              color: Colors.purple, size: 24),
+                              color: AppColors.secondary, size: 24),
                           const SizedBox(height: 4),
                           Text(
                             '$pendingResourceRequests',
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
-                              color: Colors.purple,
+                              color: AppColors.secondary,
                             ),
                           ),
                           const Text(
@@ -811,7 +923,7 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: const CircleAvatar(
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
           child: Icon(Icons.emergency, color: Colors.white),
         ),
         title: Text(emergency['patient_name'] ?? 'Unknown Patient'),
@@ -819,12 +931,12 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.red.withValues(alpha: 0.1),
+            color: AppColors.error.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
             emergency['status'] ?? 'Pending',
-            style: const TextStyle(color: Colors.red, fontSize: 12),
+            style: const TextStyle(color: AppColors.error, fontSize: 12),
           ),
         ),
         onTap: () => _showEmergencyDetails(context, emergency),
@@ -877,11 +989,19 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
           ),
           TextButton(
             onPressed: () async {
-              final response = await ApiService.respondToSosDispatch(emergency['id'], 'reject');
+              final response = await ApiService.respondToSosDispatch(
+                  emergency['id'], 'reject');
               if (!context.mounted) return;
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(response['success'] == true ? 'Emergency rejected; escalation continues.' : (response['message'] ?? 'Unable to reject emergency'))));
-              if (response['success'] == true && context.mounted) Provider.of<HospitalProvider>(context, listen: false).loadHospitalData();
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(response['success'] == true
+                      ? 'Emergency rejected; escalation continues.'
+                      : (response['message'] ??
+                          'Unable to reject emergency'))));
+              if (response['success'] == true && context.mounted) {
+                Provider.of<HospitalProvider>(context, listen: false)
+                    .loadHospitalData();
+              }
             },
             child: const Text('Reject'),
           ),
@@ -909,7 +1029,7 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
     if (ambulances.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('No ambulance is currently available'),
-          backgroundColor: Colors.red));
+          backgroundColor: AppColors.error));
       return;
     }
     int selected = ambulances.first['id'] as int;
@@ -947,7 +1067,7 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                       content: Text('Ambulance assigned'),
-                                      backgroundColor: Colors.green));
+                                      backgroundColor: AppColors.success));
                             }
                             if (context.mounted) {
                               Provider.of<HospitalProvider>(context,
@@ -959,7 +1079,7 @@ class _HospitalDashboardState extends State<HospitalDashboard> {
                                 SnackBar(
                                     content: Text(result['message'] ??
                                         'Could not assign ambulance'),
-                                    backgroundColor: Colors.red));
+                                    backgroundColor: AppColors.error));
                           }
                         },
                         child: const Text('Assign'))
@@ -1028,7 +1148,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                             setState(() => _selectedFilter = filter);
                           },
                           selectedColor:
-                              const Color(0xFF0A4D68).withValues(alpha: 0.2),
+                              const Color(0xFF142D4E).withValues(alpha: 0.2),
                         ),
                       );
                     },
@@ -1100,7 +1220,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                       onPressed: () => _updateStatus(
                           context, appointment['id'], 'confirmed', provider),
                       style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.green),
+                          foregroundColor: AppColors.success),
                       child: const Text('Confirm'),
                     ),
                   ),
@@ -1109,8 +1229,8 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                     child: OutlinedButton(
                       onPressed: () => _updateStatus(
                           context, appointment['id'], 'cancelled', provider),
-                      style:
-                          OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                      style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.error),
                       child: const Text('Cancel'),
                     ),
                   ),
@@ -1126,13 +1246,13 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'confirmed':
-        return Colors.green;
+        return AppColors.success;
       case 'completed':
-        return Colors.blue;
+        return AppColors.primary;
       case 'cancelled':
-        return Colors.red;
+        return AppColors.error;
       default:
-        return Colors.orange;
+        return AppColors.warning;
     }
   }
 

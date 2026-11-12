@@ -1,5 +1,6 @@
 // lib/screens/hospital/hospital_appointments.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import '../../providers/hospital_provider.dart';
 import '../../services/api_service.dart';
@@ -26,11 +27,11 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
   ];
 
   final Map<String, Color> _filterColors = {
-    'all': const Color(0xFF0A4D68),
-    'pending': Colors.orange,
-    'confirmed': Colors.green,
-    'completed': Colors.blue,
-    'cancelled': Colors.red,
+    'all': const Color(0xFF142D4E),
+    'pending': AppColors.warning,
+    'confirmed': AppColors.success,
+    'completed': AppColors.primary,
+    'cancelled': AppColors.error,
   };
 
   @override
@@ -61,7 +62,6 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
       // Always refresh from the hospital-scoped API. Provider data may be stale
       // when a patient creates an appointment after the dashboard was loaded.
       final response = await ApiService.getHospitalAppointments();
-      debugPrint('Hospital appointments response: $response');
 
       if (response['success'] == true) {
         _appointments = List<Map<String, dynamic>>.from(response['data'] ?? []);
@@ -110,12 +110,12 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
           SnackBar(
             content: Text('Appointment ${status.toUpperCase()}'),
             backgroundColor: status == 'confirmed'
-                ? Colors.green
+                ? AppColors.success
                 : status == 'completed'
-                    ? Colors.blue
+                    ? AppColors.primary
                     : status == 'cancelled'
-                        ? Colors.red
-                        : Colors.orange,
+                        ? AppColors.error
+                        : AppColors.warning,
             behavior: SnackBarBehavior.floating,
             duration: const Duration(seconds: 2),
           ),
@@ -134,7 +134,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(response['message'] ?? 'Failed to update status'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -148,7 +148,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Network error: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -174,7 +174,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
       ),
       body: RefreshIndicator(
         onRefresh: _loadAppointments,
-        color: const Color(0xFF0A4D68),
+        color: const Color(0xFF142D4E),
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : _errorMessage != null
@@ -191,7 +191,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                         ElevatedButton(
                           onPressed: _loadAppointments,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A4D68),
+                            backgroundColor: const Color(0xFF142D4E),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12)),
                           ),
@@ -235,7 +235,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                                       label: const Text('Refresh'),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor:
-                                            const Color(0xFF0A4D68),
+                                            const Color(0xFF142D4E),
                                         shape: RoundedRectangleBorder(
                                           borderRadius:
                                               BorderRadius.circular(12),
@@ -271,7 +271,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
         itemBuilder: (context, index) {
           final filter = _filters[index];
           final isSelected = _selectedFilter == filter;
-          final color = _filterColors[filter] ?? const Color(0xFF0A4D68);
+          final color = _filterColors[filter] ?? const Color(0xFF142D4E);
 
           return Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -327,22 +327,22 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
 
     switch (status.toLowerCase()) {
       case 'confirmed':
-        statusColor = Colors.green;
+        statusColor = AppColors.success;
         statusIcon = Icons.check_circle;
         statusText = 'CONFIRMED';
         break;
       case 'completed':
-        statusColor = Colors.blue;
+        statusColor = AppColors.primary;
         statusIcon = Icons.done_all;
         statusText = 'COMPLETED';
         break;
       case 'cancelled':
-        statusColor = Colors.red;
+        statusColor = AppColors.error;
         statusIcon = Icons.cancel;
         statusText = 'CANCELLED';
         break;
       default:
-        statusColor = Colors.orange;
+        statusColor = AppColors.warning;
         statusIcon = Icons.pending;
         statusText = 'PENDING';
     }
@@ -376,10 +376,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [
-                                Color(0xFF0A4D68),
-                                Color(0xFF088395)
-                              ],
+                              colors: [Color(0xFF142D4E), Color(0xFF0D9488)],
                             ),
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -423,7 +420,8 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                     decoration: BoxDecoration(
                       color: statusColor.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                      border:
+                          Border.all(color: statusColor.withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -462,7 +460,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                             icon: Icons.calendar_today,
                             label: 'Date',
                             value: formattedDate,
-                            color: Colors.blue,
+                            color: AppColors.primary,
                           ),
                         ),
                         Expanded(
@@ -470,7 +468,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                             icon: Icons.access_time,
                             label: 'Time',
                             value: appointmentTime,
-                            color: Colors.orange,
+                            color: AppColors.warning,
                           ),
                         ),
                       ],
@@ -483,7 +481,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                             icon: Icons.medical_services,
                             label: 'Doctor',
                             value: doctorName,
-                            color: Colors.purple,
+                            color: AppColors.secondary,
                           ),
                         ),
                         Expanded(
@@ -491,7 +489,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                             icon: Icons.phone,
                             label: 'Contact',
                             value: appointment['patient_phone'] ?? 'N/A',
-                            color: Colors.teal,
+                            color: AppColors.secondary,
                           ),
                         ),
                       ],
@@ -507,33 +505,34 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
+                    color: AppColors.warning.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.amber.shade200),
+                    border: Border.all(
+                        color: AppColors.warning.withValues(alpha: 0.1)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.description,
-                          size: 18, color: Colors.amber.shade700),
+                      const Icon(Icons.description,
+                          size: 18, color: AppColors.warning),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'Symptoms / Reason',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.amber.shade800,
+                                color: AppColors.warning,
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               symptoms,
-                              style: TextStyle(
-                                  fontSize: 13, color: Colors.amber.shade900),
+                              style: const TextStyle(
+                                  fontSize: 13, color: AppColors.warning),
                             ),
                           ],
                         ),
@@ -555,8 +554,8 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                         icon: const Icon(Icons.close, size: 18),
                         label: const Text('Cancel'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                          side: const BorderSide(color: Colors.red),
+                          foregroundColor: AppColors.error,
+                          side: const BorderSide(color: AppColors.error),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
@@ -571,7 +570,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                         icon: const Icon(Icons.check, size: 18),
                         label: const Text('Confirm'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
+                          backgroundColor: AppColors.success,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
@@ -591,7 +590,7 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
                     icon: const Icon(Icons.done_all, size: 18),
                     label: const Text('Mark as Completed'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -635,7 +634,8 @@ class _HospitalAppointmentsState extends State<HospitalAppointments> {
               const SizedBox(height: 2),
               Text(
                 value,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                style:
+                    const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
                 overflow: TextOverflow.ellipsis,
               ),
             ],

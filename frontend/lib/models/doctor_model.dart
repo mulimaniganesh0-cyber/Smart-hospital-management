@@ -11,7 +11,16 @@ class Doctor {
   final String? description;
   final bool isActive;
 
-  const Doctor({required this.id, required this.hospitalId, required this.name, this.qualification, this.specialization, this.experienceYears, this.experienceDisplay, this.description, required this.isActive});
+  const Doctor(
+      {required this.id,
+      required this.hospitalId,
+      required this.name,
+      this.qualification,
+      this.specialization,
+      this.experienceYears,
+      this.experienceDisplay,
+      this.description,
+      required this.isActive});
 
   factory Doctor.fromJson(Map<String, dynamic> json) => Doctor(
         id: (json['id'] as num?)?.toInt() ?? 0,
@@ -22,6 +31,7 @@ class Doctor {
         experienceYears: (json['experience_years'] as num?)?.toInt(),
         experienceDisplay: json['experience_display']?.toString(),
         description: json['bio']?.toString() ?? json['description']?.toString(),
-        isActive: json['is_active'] != false && json['availability_status'] != false,
+        isActive:
+            json['is_active'] != false && json['availability_status'] != false,
       );
 }

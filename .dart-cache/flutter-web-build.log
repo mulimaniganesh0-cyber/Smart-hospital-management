@@ -1,0 +1,91 @@
+Compiling lib\main.dart for the Web...                          
+Unexpected wasm dry run failure (1):
+Found incompatibilities with WebAssembly.
+
+package:share_plus/src/share_plus_web.dart 1:1 - dart:html unsupported (0)
+package:geolocator_web/src/html_geolocation_manager.dart 1:1 - dart:html unsupported (0)
+package:geolocator_web/src/html_permissions_manager.dart 1:1 - dart:html unsupported (0)
+package:geolocator_web/src/utils.dart 2:1 - dart:html unsupported (0)
+
+PathNotFoundException: Cannot retrieve modification time, path = 'D:\Smart-hospital-management\.dart-cache\.dart-tool\dart-flutter-telemetry.config' (OS Error: The system cannot find the path specified, errno = 3)
+#0      _Link.throwIfError (dart:io/link.dart:358)
+#1      _File.lastModifiedSync (dart:io/file_impl.dart:527)
+#2      ForwardingFile.lastModifiedSync (package:file/src/forwarding/forwarding_file.dart:58)
+#3      ConfigHandler.telemetryEnabled (package:unified_analytics/src/config_handler.dart:59)
+#4      AnalyticsImpl.telemetryEnabled (package:unified_analytics/src/analytics.dart:499)
+#5      DartdevRunner.runCommand (package:dartdev/dartdev.dart:266)
+<asynchronous suspension>
+#6      runDartdev (package:dartdev/dartdev.dart:51)
+<asynchronous suspension>
+#7      main (file:///C:/b/s/w/ir/x/w/sdk/pkg/dartdev/bin/dartdev.dart:13)
+<asynchronous suspension>
+
+
+Use --no-wasm-dry-run to disable these warnings.
+Target dart2wasm failed: PathNotFoundException: Cannot retrieve modification time, path = 'D:\Smart-hospital-management\.dart-cache\.dart-tool\dart-flutter-telemetry.config' (OS Error: The system cannot find the path specified, errno = 3)
+#0      _File.throwIfError (dart:io/file_impl.dart:779:7)
+#1      _File.lastModifiedSync (dart:io/file_impl.dart:527:5)
+#2      ForwardingFile.lastModifiedSync (package:file/src/forwarding/forwarding_file.dart:57:43)
+#3      ConfigHandler.telemetryEnabled (package:unified_analytics/src/config_handler.dart:59:52)
+#4      AnalyticsImpl.telemetryEnabled (package:unified_analytics/src/analytics.dart:499:47)
+#5      AnalyticsImpl.okToSend (package:unified_analytics/src/analytics.dart:490:7)
+#6      AnalyticsImpl.send (package:unified_analytics/src/analytics.dart:609:10)
+#7      Dart2WasmTarget._handleDryRunResult (package:flutter_tools/src/build_system/targets/web.dart:532:16)
+#8      Dart2WasmTarget.build (package:flutter_tools/src/build_system/targets/web.dart:366:13)
+<asynchronous suspension>
+#9      _BuildInstance._invokeInternal (package:flutter_tools/src/build_system/build_system.dart:937:9)
+<asynchronous suspension>
+#10     Future.wait.<anonymous closure> (dart:async/future.dart:546:21)
+<asynchronous suspension>
+#11     _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:875:32)
+<asynchronous suspension>
+#12     Future.wait.<anonymous closure> (dart:async/future.dart:546:21)
+<asynchronous suspension>
+#13     _BuildInstance.invokeTarget (package:flutter_tools/src/build_system/build_system.dart:875:32)
+<asynchronous suspension>
+#14     FlutterBuildSystem.build (package:flutter_tools/src/build_system/build_system.dart:684:16)
+<asynchronous suspension>
+#15     WebBuilder.buildWeb (package:flutter_tools/src/web/compile.dart:107:34)
+<asynchronous suspension>
+#16     BuildWebCommand.runCommand (package:flutter_tools/src/commands/build_web.dart:300:5)
+<asynchronous suspension>
+#17     FlutterCommand.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command.dart:1590:27)
+<asynchronous suspension>
+#18     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#19     CommandRunner.runCommand (package:args/command_runner.dart:212:13)
+<asynchronous suspension>
+#20     FlutterCommandRunner.runCommand.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:496:9)
+<asynchronous suspension>
+#21     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#22     FlutterCommandRunner.runCommand (package:flutter_tools/src/runner/flutter_command_runner.dart:431:5)
+<asynchronous suspension>
+#23     FlutterCommandRunner.run.<anonymous closure> (package:flutter_tools/src/runner/flutter_command_runner.dart:307:33)
+<asynchronous suspension>
+#24     run.<anonymous closure>.<anonymous closure> (package:flutter_tools/runner.dart:104:11)
+<asynchronous suspension>
+#25     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#26     main (package:flutter_tools/executable.dart:103:3)
+<asynchronous suspension>
+
+Compiling lib\main.dart for the Web...                             62.8s
+
+Unhandled exception:
+PathNotFoundException: Cannot retrieve modification time, path = 'D:\Smart-hospital-management\.dart-cache\.dart-tool\dart-flutter-telemetry.config' (OS Error: The system cannot find the path specified, errno = 3)
+#0      _File.throwIfError (dart:io/file_impl.dart:779:7)
+#1      _File.lastModifiedSync (dart:io/file_impl.dart:527:5)
+#2      ForwardingFile.lastModifiedSync (package:file/src/forwarding/forwarding_file.dart:57:43)
+#3      ConfigHandler.telemetryEnabled (package:unified_analytics/src/config_handler.dart:59:52)
+#4      AnalyticsImpl.telemetryEnabled (package:unified_analytics/src/analytics.dart:499:47)
+#5      AnalyticsImpl.okToSend (package:unified_analytics/src/analytics.dart:490:7)
+#6      AnalyticsImpl.send (package:unified_analytics/src/analytics.dart:609:10)
+#7      _handleToolErrorImpl (package:flutter_tools/runner.dart:246:23)
+#8      _handleToolError (package:flutter_tools/runner.dart:173:40)
+#9      run.<anonymous closure>.<anonymous closure> (package:flutter_tools/runner.dart:120:18)
+<asynchronous suspension>
+#10     AppContext.run.<anonymous closure> (package:flutter_tools/src/base/context.dart:154:19)
+<asynchronous suspension>
+#11     main (package:flutter_tools/executable.dart:103:3)
+<asynchronous suspension>

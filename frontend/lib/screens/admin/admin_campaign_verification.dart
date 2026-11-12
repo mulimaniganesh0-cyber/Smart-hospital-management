@@ -1,5 +1,6 @@
 // lib/screens/admin/admin_campaign_verification.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import '../../services/api_service.dart';
 
 class AdminCampaignVerification extends StatefulWidget {
@@ -100,7 +101,7 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Campaign Management'),
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -116,7 +117,7 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Icon(Icons.error_outline,
-                          size: 64, color: Colors.red),
+                          size: 64, color: AppColors.error),
                       const SizedBox(height: 16),
                       Text(_errorMessage!),
                       const SizedBox(height: 16),
@@ -175,7 +176,8 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
                               onSelected: (selected) {
                                 setState(() => _selectedFilter = filter);
                               },
-                              selectedColor: Colors.red.shade100,
+                              selectedColor:
+                                  AppColors.error.withValues(alpha: 0.1),
                             ),
                           );
                         },
@@ -226,14 +228,15 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _buildStatCard('Total', total.toString(), Colors.blue),
-            _buildStatCard('Pending', pending.toString(), Colors.orange),
-            _buildStatCard('Approved', approved.toString(), Colors.green),
-            _buildStatCard('Active', active.toString(), Colors.red),
-            _buildStatCard('Completed', completed.toString(), Colors.purple),
-            _buildStatCard('🩸 Collected', '$collected units', Colors.red),
+            _buildStatCard('Total', total.toString(), AppColors.primary),
+            _buildStatCard('Pending', pending.toString(), AppColors.warning),
+            _buildStatCard('Approved', approved.toString(), AppColors.success),
+            _buildStatCard('Active', active.toString(), AppColors.error),
             _buildStatCard(
-                '👤 Registered', registered.toString(), Colors.green),
+                'Completed', completed.toString(), AppColors.secondary),
+            _buildStatCard('🩸 Collected', '$collected units', AppColors.error),
+            _buildStatCard(
+                '👤 Registered', registered.toString(), AppColors.success),
           ],
         ),
       ),
@@ -281,7 +284,9 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-          color: isPending ? Colors.orange.shade300 : Colors.grey.shade200,
+          color: isPending
+              ? AppColors.warning.withValues(alpha: 0.1)
+              : Colors.grey.shade200,
           width: isPending ? 2 : 1,
         ),
       ),
@@ -295,11 +300,11 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child:
-                      const Icon(Icons.bloodtype, color: Colors.red, size: 24),
+                  child: const Icon(Icons.bloodtype,
+                      color: AppColors.error, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -325,24 +330,24 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
                     color: status == 'approved' || status == 'active'
-                        ? Colors.green.withValues(alpha: 0.1)
+                        ? AppColors.success.withValues(alpha: 0.1)
                         : status == 'pending'
-                            ? Colors.orange.withValues(alpha: 0.1)
+                            ? AppColors.warning.withValues(alpha: 0.1)
                             : status == 'completed'
-                                ? Colors.blue.withValues(alpha: 0.1)
-                                : Colors.red.withValues(alpha: 0.1),
+                                ? AppColors.primary.withValues(alpha: 0.1)
+                                : AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     status.toUpperCase(),
                     style: TextStyle(
                       color: status == 'approved' || status == 'active'
-                          ? Colors.green
+                          ? AppColors.success
                           : status == 'pending'
-                              ? Colors.orange
+                              ? AppColors.warning
                               : status == 'completed'
-                                  ? Colors.blue
-                                  : Colors.red,
+                                  ? AppColors.primary
+                                  : AppColors.error,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
@@ -423,14 +428,14 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.red.shade100,
+                          color: AppColors.error.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           group,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 10,
-                            color: Colors.red.shade700,
+                            color: AppColors.error,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -445,7 +450,7 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
                     child: ElevatedButton(
                       onPressed: () => _approveCampaign(campaign['id']),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
+                        backgroundColor: AppColors.success,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
@@ -458,8 +463,8 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
                       onPressed: () => _rejectCampaign(
                           campaign['id'], campaign['campaign_name']),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
+                        foregroundColor: AppColors.error,
+                        side: const BorderSide(color: AppColors.error),
                       ),
                       child: const Text('❌ Reject'),
                     ),
@@ -473,17 +478,19 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Row(
                     children: [
-                      Icon(Icons.info_outline, size: 16, color: Colors.blue),
+                      Icon(Icons.info_outline,
+                          size: 16, color: AppColors.primary),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Campaign approved. Hospital can now activate it.',
-                          style: TextStyle(fontSize: 12, color: Colors.blue),
+                          style:
+                              TextStyle(fontSize: 12, color: AppColors.primary),
                         ),
                       ),
                     ],
@@ -496,17 +503,19 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade50,
+                    color: AppColors.success.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Row(
                     children: [
-                      Icon(Icons.check_circle, size: 16, color: Colors.green),
+                      Icon(Icons.check_circle,
+                          size: 16, color: AppColors.success),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Campaign is currently active',
-                          style: TextStyle(fontSize: 12, color: Colors.green),
+                          style:
+                              TextStyle(fontSize: 12, color: AppColors.success),
                         ),
                       ),
                     ],
@@ -519,17 +528,19 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.purple.shade50,
+                    color: AppColors.secondary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Row(
                     children: [
-                      Icon(Icons.celebration, size: 16, color: Colors.purple),
+                      Icon(Icons.celebration,
+                          size: 16, color: AppColors.secondary),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Campaign completed successfully! 🎉',
-                          style: TextStyle(fontSize: 12, color: Colors.purple),
+                          style: TextStyle(
+                              fontSize: 12, color: AppColors.secondary),
                         ),
                       ),
                     ],
@@ -542,17 +553,18 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Row(
                     children: [
-                      Icon(Icons.cancel, size: 16, color: Colors.red),
+                      Icon(Icons.cancel, size: 16, color: AppColors.error),
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Campaign rejected',
-                          style: TextStyle(fontSize: 12, color: Colors.red),
+                          style:
+                              TextStyle(fontSize: 12, color: AppColors.error),
                         ),
                       ),
                     ],
@@ -601,7 +613,7 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.success,
             ),
             child: const Text('Approve'),
           ),
@@ -615,7 +627,7 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ Campaign approved successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
         _loadData();
@@ -623,7 +635,7 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(response['message'] ?? 'Failed to approve campaign'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -663,13 +675,13 @@ class _AdminCampaignVerificationState extends State<AdminCampaignVerification> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('❌ Campaign rejected'),
-                  backgroundColor: Colors.red,
+                  backgroundColor: AppColors.error,
                 ),
               );
               _loadData();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.error,
             ),
             child: const Text('Reject'),
           ),

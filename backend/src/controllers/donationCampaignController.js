@@ -552,7 +552,6 @@ exports.recordDonation = async (req, res) => {
       ]
     );
 
-    console.log('✅ Donation record created:', recordResult.rows[0]);
 
     // Update registration status
     await client.query(

@@ -1,6 +1,8 @@
 // lib/screens/hospital/hospital_ambulances.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import '../../services/api_service.dart';
+import 'hospital_drivers.dart';
 
 class HospitalAmbulances extends StatefulWidget {
   const HospitalAmbulances({super.key});
@@ -82,7 +84,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Ambulance Management'),
-          backgroundColor: const Color(0xFF0A4D68),
+          backgroundColor: const Color(0xFF142D4E),
           bottom: const TabBar(
             tabs: [
               Tab(text: ' Ambulances', icon: Icon(Icons.local_taxi)),
@@ -90,6 +92,13 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
             ],
           ),
           actions: [
+            IconButton(
+                icon: const Icon(Icons.badge_outlined),
+                tooltip: 'Manage drivers',
+                onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const HospitalDriversScreen()))),
             IconButton(
               icon: const Icon(Icons.add),
               onPressed: () => _showAddAmbulanceDialog(context),
@@ -110,7 +119,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Icon(Icons.error_outline,
-                            size: 64, color: Colors.red),
+                            size: 64, color: AppColors.error),
                         const SizedBox(height: 16),
                         Text(_errorMessage!),
                         const SizedBox(height: 16),
@@ -147,7 +156,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.local_taxi, color: Color(0xFF0A4D68)),
+            Icon(Icons.local_taxi, color: Color(0xFF142D4E)),
             SizedBox(width: 12),
             Text('Add Ambulance',
                 style: TextStyle(fontWeight: FontWeight.bold)),
@@ -212,17 +221,18 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.info, size: 16, color: Colors.blue),
+                    Icon(Icons.info, size: 16, color: AppColors.primary),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Ambulance will be available for emergency bookings immediately.',
-                        style: TextStyle(fontSize: 12, color: Colors.blue),
+                        style:
+                            TextStyle(fontSize: 12, color: AppColors.primary),
                       ),
                     ),
                   ],
@@ -244,7 +254,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Please fill all required fields'),
-                    backgroundColor: Colors.red,
+                    backgroundColor: AppColors.error,
                   ),
                 );
                 return;
@@ -266,7 +276,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(' Ambulance added successfully'),
-                      backgroundColor: Colors.green,
+                      backgroundColor: AppColors.success,
                     ),
                   );
                   await _loadData();
@@ -276,7 +286,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                     SnackBar(
                       content: Text(
                           response['message'] ?? 'Failed to add ambulance'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppColors.error,
                     ),
                   );
                 }
@@ -286,7 +296,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Error: $e'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppColors.error,
                     ),
                   );
                 }
@@ -297,7 +307,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0A4D68),
+              backgroundColor: const Color(0xFF142D4E),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
@@ -325,7 +335,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(
           children: [
-            Icon(Icons.edit, color: Colors.blue),
+            Icon(Icons.edit, color: AppColors.primary),
             SizedBox(width: 12),
             Text('Edit Ambulance',
                 style: TextStyle(fontWeight: FontWeight.bold)),
@@ -400,8 +410,9 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ambulance updated successfully'),
-                      backgroundColor: Colors.green,
+                      content: Text(
+                          'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ambulance updated successfully'),
+                      backgroundColor: AppColors.success,
                     ),
                   );
                   await _loadData();
@@ -412,7 +423,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Error: $e'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppColors.error,
                     ),
                   );
                 }
@@ -423,7 +434,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0A4D68),
+              backgroundColor: const Color(0xFF142D4E),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
@@ -450,7 +461,8 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
             content: Text(isAvailable
                 ? ' Ambulance is now available'
                 : ' Ambulance is now busy'),
-            backgroundColor: isAvailable ? Colors.green : Colors.orange,
+            backgroundColor:
+                isAvailable ? AppColors.success : AppColors.warning,
           ),
         );
         await _loadData();
@@ -459,7 +471,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
           SnackBar(
             content:
                 Text(response['message'] ?? 'Failed to update availability'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -468,7 +480,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -489,7 +501,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No available ambulances to assign'),
-          backgroundColor: Colors.orange,
+          backgroundColor: AppColors.warning,
         ),
       );
       return;
@@ -513,7 +525,8 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
-                  leading: const Icon(Icons.local_taxi, color: Colors.blue),
+                  leading:
+                      const Icon(Icons.local_taxi, color: AppColors.primary),
                   title: Text(ambulance['vehicle_number'] ?? 'Ambulance'),
                   subtitle:
                       Text('Driver: ${ambulance['driver_name'] ?? 'N/A'}'),
@@ -532,7 +545,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                             content: Text(' Ambulance assigned successfully'),
-                            backgroundColor: Colors.green,
+                            backgroundColor: AppColors.success,
                           ),
                         );
                         await _loadData();
@@ -542,7 +555,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                           SnackBar(
                             content:
                                 Text(response['message'] ?? 'Failed to assign'),
-                            backgroundColor: Colors.red,
+                            backgroundColor: AppColors.error,
                           ),
                         );
                       }
@@ -552,7 +565,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text('Error: $e'),
-                            backgroundColor: Colors.red,
+                            backgroundColor: AppColors.error,
                           ),
                         );
                       }
@@ -606,7 +619,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(' Booking rejected'),
-                      backgroundColor: Colors.orange,
+                      backgroundColor: AppColors.warning,
                     ),
                   );
                   await _loadData();
@@ -615,7 +628,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(response['message'] ?? 'Failed to reject'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppColors.error,
                     ),
                   );
                 }
@@ -625,7 +638,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Error: $e'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppColors.error,
                     ),
                   );
                 }
@@ -636,7 +649,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.error,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
@@ -647,7 +660,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
     );
   }
 
-  Future<void> _deleteAmbulance(int ambulanceId) async {
+  Future<void> _deactivateAmbulance(int ambulanceId) async {
     if (_isProcessing) return;
 
     showDialog(
@@ -655,8 +668,9 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Delete Ambulance'),
-        content: const Text('Are you sure you want to delete this ambulance?'),
+        title: const Text('Deactivate ambulance?'),
+        content: const Text(
+            'This ambulance will be removed from active service. Historical trip records will be retained. Ambulances with active trips cannot be deactivated.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -669,14 +683,15 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
 
               try {
                 final response =
-                    await ApiService.deleteHospitalAmbulance(ambulanceId);
+                    await ApiService.deactivateHospitalAmbulance(ambulanceId);
 
                 if (response['success'] && mounted) {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text(' Ambulance deleted successfully'),
-                      backgroundColor: Colors.green,
+                      content:
+                          Text('Ambulance deactivated; trip history retained.'),
+                      backgroundColor: AppColors.success,
                     ),
                   );
                   await _loadData();
@@ -684,8 +699,9 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                   if (!context.mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(response['message'] ?? 'Failed to delete'),
-                      backgroundColor: Colors.red,
+                      content: Text(response['message'] ??
+                          'Could not deactivate ambulance'),
+                      backgroundColor: AppColors.error,
                     ),
                   );
                 }
@@ -695,7 +711,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Error: $e'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppColors.error,
                     ),
                   );
                 }
@@ -706,7 +722,7 @@ class _HospitalAmbulancesState extends State<HospitalAmbulances> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.error,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
@@ -748,7 +764,7 @@ class AmbulancesList extends StatelessWidget {
               icon: const Icon(Icons.add),
               label: const Text('Add Ambulance'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0A4D68),
+                backgroundColor: const Color(0xFF142D4E),
               ),
             ),
           ],
@@ -771,6 +787,7 @@ class AmbulancesList extends StatelessWidget {
   Widget _buildAmbulanceCard(BuildContext context,
       Map<String, dynamic> ambulance, _HospitalAmbulancesState state) {
     final isAvailable = ambulance['is_available'] ?? true;
+    final isActive = ambulance['is_active'] != false;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -786,13 +803,14 @@ class AmbulancesList extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color:
-                        isAvailable ? Colors.green.shade50 : Colors.red.shade50,
+                    color: isAvailable
+                        ? AppColors.success.withValues(alpha: 0.1)
+                        : AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     Icons.local_taxi,
-                    color: isAvailable ? Colors.green : Colors.red,
+                    color: isAvailable ? AppColors.success : AppColors.error,
                     size: 30,
                   ),
                 ),
@@ -823,15 +841,25 @@ class AmbulancesList extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isAvailable
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : Colors.red.withValues(alpha: 0.1),
+                    color: !isActive
+                        ? Colors.grey.withValues(alpha: 0.12)
+                        : isAvailable
+                            ? AppColors.success.withValues(alpha: 0.1)
+                            : AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    isAvailable ? 'Available' : 'Busy',
+                    !isActive
+                        ? 'Inactive'
+                        : isAvailable
+                            ? 'Available'
+                            : 'Busy',
                     style: TextStyle(
-                      color: isAvailable ? Colors.green : Colors.red,
+                      color: !isActive
+                          ? Colors.grey
+                          : isAvailable
+                              ? AppColors.success
+                              : AppColors.error,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -862,7 +890,7 @@ class AmbulancesList extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: state._isProcessing
+                    onPressed: state._isProcessing || !isActive
                         ? null
                         : () => state._toggleAmbulanceAvailability(
                             ambulance['id'], !isAvailable),
@@ -871,9 +899,12 @@ class AmbulancesList extends StatelessWidget {
                     label: Text(
                         isAvailable ? 'Mark as Busy' : 'Mark as Available'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: isAvailable ? Colors.red : Colors.green,
+                      foregroundColor:
+                          isAvailable ? AppColors.error : AppColors.success,
                       side: BorderSide(
-                          color: isAvailable ? Colors.red : Colors.green),
+                          color: isAvailable
+                              ? AppColors.error
+                              : AppColors.success),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),
@@ -882,8 +913,10 @@ class AmbulancesList extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () =>
-                        state._showEditAmbulanceDialog(context, ambulance),
+                    onPressed: isActive
+                        ? () =>
+                            state._showEditAmbulanceDialog(context, ambulance)
+                        : null,
                     icon: const Icon(Icons.edit, size: 18),
                     label: const Text('Edit'),
                     style: OutlinedButton.styleFrom(
@@ -895,13 +928,16 @@ class AmbulancesList extends StatelessWidget {
                 const SizedBox(width: 8),
                 Container(
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => state._deleteAmbulance(ambulance['id']),
-                    tooltip: 'Delete',
+                    icon: const Icon(Icons.archive_outlined,
+                        color: AppColors.error),
+                    onPressed: state._isProcessing || !isActive
+                        ? null
+                        : () => state._deactivateAmbulance(ambulance['id']),
+                    tooltip: 'Deactivate ambulance',
                   ),
                 ),
               ],
@@ -969,7 +1005,7 @@ class BookingsList extends StatelessWidget {
             Row(
               children: [
                 const CircleAvatar(
-                  backgroundColor: Colors.orange,
+                  backgroundColor: AppColors.warning,
                   child: Icon(Icons.person, color: Colors.white),
                 ),
                 const SizedBox(width: 12),
@@ -995,13 +1031,13 @@ class BookingsList extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
+                    color: AppColors.warning.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     booking['status'] ?? 'Pending',
                     style: const TextStyle(
-                      color: Colors.orange,
+                      color: AppColors.warning,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1061,7 +1097,7 @@ class BookingsList extends StatelessWidget {
                     icon: const Icon(Icons.local_taxi, size: 18),
                     label: const Text('Assign Ambulance'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: AppColors.success,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
@@ -1077,8 +1113,8 @@ class BookingsList extends StatelessWidget {
                     icon: const Icon(Icons.cancel, size: 18),
                     label: const Text('Reject'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.red,
-                      side: const BorderSide(color: Colors.red),
+                      foregroundColor: AppColors.error,
+                      side: const BorderSide(color: AppColors.error),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12)),
                     ),

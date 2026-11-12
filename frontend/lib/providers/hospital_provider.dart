@@ -164,8 +164,6 @@ class HospitalProvider extends ChangeNotifier {
     _notify();
 
     try {
-      debugPrint('Adding staff via provider: $staffData');
-
       final response = await ApiService.addHospitalStaff(staffData);
       debugPrint('Add staff response: ${response['success']}');
 
@@ -378,6 +376,25 @@ class HospitalProvider extends ChangeNotifier {
 
       if (response['success'] == true) {
         await loadHospitalData();
+        final totalValue = response['data'] is Map
+            ? response['data']['group_units_available']
+            : null;
+        final expectedTotal = totalValue == null
+            ? null
+            : num.tryParse(totalValue.toString())?.toInt();
+        final refreshed = _bloodStock.firstWhere(
+          (item) =>
+              item['blood_group'] == ApiService.canonicalBloodGroup(bloodGroup),
+          orElse: () => const <String, dynamic>{},
+        );
+        if (expectedTotal != null &&
+            num.tryParse(refreshed['units_available']?.toString() ?? '')
+                    ?.toInt() !=
+                expectedTotal) {
+          _errorMessage =
+              'Stock was added, but the refreshed inventory total does not match. Please refresh and check this blood group.';
+          return false;
+        }
         return true;
       }
       _errorMessage = response['message'] ?? 'Failed to add blood stock';
@@ -393,8 +410,8 @@ class HospitalProvider extends ChangeNotifier {
   }
 
 // Also add the updateBloodStock method if missing
-  Future<bool> updateBloodStock(
-      String bloodGroup, int units, String expiryDate) async {
+  Future<bool> updateBloodStock(String bloodGroup, int units, String expiryDate,
+      {int? batchId}) async {
     _isLoading = true;
     _notify();
 
@@ -403,15 +420,38 @@ class HospitalProvider extends ChangeNotifier {
         bloodGroup: bloodGroup,
         units: units,
         expiryDate: expiryDate,
+        batchId: batchId,
       );
 
       if (response['success'] == true) {
         await loadHospitalData();
+        final returnedTotalValue = response['data'] is Map
+            ? response['data']['group_units_available']
+            : null;
+        final returnedTotal = returnedTotalValue == null
+            ? null
+            : num.tryParse(returnedTotalValue.toString())?.toInt();
+        final refreshed = _bloodStock.firstWhere(
+          (item) =>
+              item['blood_group'] == ApiService.canonicalBloodGroup(bloodGroup),
+          orElse: () => const <String, dynamic>{},
+        );
+        if (returnedTotal != null &&
+            num.tryParse(refreshed['units_available']?.toString() ?? '')
+                    ?.toInt() !=
+                returnedTotal) {
+          _errorMessage =
+              'Stock was saved, but refreshed inventory does not match. Refresh and check this blood group.';
+          return false;
+        }
         return true;
       }
+      _errorMessage =
+          response['message']?.toString() ?? 'Could not update blood stock.';
       return false;
     } catch (e) {
       debugPrint('Update blood stock error: $e');
+      _errorMessage = 'Could not update blood stock: $e';
       return false;
     } finally {
       _isLoading = false;

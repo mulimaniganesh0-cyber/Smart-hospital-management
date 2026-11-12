@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -23,8 +24,8 @@ class ChatbotScreen extends StatefulWidget {
 }
 
 class _ChatbotScreenState extends State<ChatbotScreen> {
-  static const _brand = Color(0xFF0A4D68);
-  static const _accent = Color(0xFF088395);
+  static const _brand = Color(0xFF142D4E);
+  static const _accent = Color(0xFF0D9488);
 
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
@@ -71,8 +72,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     debugPrint('[Location] Requesting best available location...');
     try {
       final position = await LocationService.getBestAvailableLocation();
-      debugPrint(
-          '[Location] Location accepted; latitude=${position.latitude}; longitude=${position.longitude}; accuracy=${position.accuracy}m');
+      debugPrint('[Location] A location fix was obtained.');
       if (!mounted) return position;
       setState(() {
         _position = position;
@@ -80,7 +80,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       });
       return position;
     } on PatientLocationException catch (error) {
-      debugPrint('[Location] Unable to obtain location: ${error.message}');
+      debugPrint('[Location] Location access is unavailable.');
       if (!mounted) return null;
       final message = error.message.toLowerCase();
       setState(() {
@@ -380,7 +380,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
       setState(() => _position = position);
       debugPrint(
           'PATIENT LIVE LOCATION latitude: ${position.latitude}, longitude: ${position.longitude}, accuracy: ${position.accuracy}, timestamp: ${position.timestamp}');
-      final entranceIsValid = hospital.entranceLatitude != null &&
+      final entranceIsValid = hospital.entranceVerified &&
+          hospital.entranceLatitude != null &&
           hospital.entranceLongitude != null &&
           hospital.entranceLatitude! >= -90 &&
           hospital.entranceLatitude! <= 90 &&
@@ -493,8 +494,8 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         _openSos();
         return;
       case 'REQUEST_AMBULANCE':
-        Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => const AmbulanceBookingScreen()));
+        Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const AmbulanceBookingScreen()));
         return;
       case 'BOOK_APPOINTMENT':
       case 'VIEW_HOSPITALS':
@@ -566,7 +567,7 @@ class _LocationBanner extends StatelessWidget {
     final color = active
         ? const Color(0xFF18794E)
         : state == _LocationState.error
-            ? Colors.red.shade700
+            ? AppColors.error
             : const Color(0xFF9A6700);
     final message = switch (state) {
       _LocationState.active => strings.t('locationOn'),
@@ -656,7 +657,7 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.isUser;
-    final bubbleColor = isUser ? const Color(0xFF0A4D68) : Colors.white;
+    final bubbleColor = isUser ? const Color(0xFF142D4E) : Colors.white;
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Row(
@@ -669,7 +670,7 @@ class _MessageBubble extends StatelessWidget {
               radius: 17,
               backgroundColor: Color(0xFFD9F0F3),
               child: Icon(Icons.health_and_safety_outlined,
-                  color: Color(0xFF0A4D68), size: 19),
+                  color: Color(0xFF142D4E), size: 19),
             ),
             const SizedBox(width: 8),
           ],
@@ -724,7 +725,7 @@ class _MessageBubble extends StatelessWidget {
                       FilledButton.icon(
                           onPressed: onSos,
                           style: FilledButton.styleFrom(
-                              backgroundColor: Colors.red),
+                              backgroundColor: AppColors.error),
                           icon: const Icon(Icons.sos),
                           label: Text(strings.t('sos'))),
                     ],
@@ -850,8 +851,8 @@ class _ChatHospitalCard extends StatelessWidget {
                       style: TextStyle(
                           fontSize: 13,
                           color: hospital.bloodAvailable == true
-                              ? Colors.green.shade700
-                              : Colors.red.shade700,
+                              ? AppColors.success
+                              : AppColors.error,
                           fontWeight: FontWeight.w700),
                     )),
               if (responseType == 'bed_results')
@@ -892,6 +893,7 @@ class _ChatHospitalCard extends StatelessWidget {
             ])),
       );
 }
+
 class _BedAvailabilitySummary extends StatelessWidget {
   const _BedAvailabilitySummary({required this.hospital, this.focusedResource});
   final HospitalRecommendation hospital;
@@ -1011,10 +1013,9 @@ class _Composer extends StatelessWidget {
               onPressed: enabled ? onSend : null,
               icon: const Icon(Icons.arrow_upward_rounded),
               style: IconButton.styleFrom(
-                  backgroundColor: const Color(0xFF0A4D68)),
+                  backgroundColor: const Color(0xFF142D4E)),
             ),
           ],
         ),
       );
 }
-

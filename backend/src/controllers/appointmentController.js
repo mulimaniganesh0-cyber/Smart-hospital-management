@@ -32,6 +32,33 @@ function scheduleInputValid(schedule) {
     (!schedule.break_end_time || timePattern.test(String(schedule.break_end_time)));
 }
 
+function scheduleValidationError(schedules) {
+  if (!schedules.length) return 'Enable at least one working period before saving.';
+  const byWeekday = new Map();
+  for (const schedule of schedules) {
+    if (!scheduleInputValid(schedule)) return 'Provide valid working hours and a slot duration between 1 and 480 minutes.';
+    const start = canonicalTime(schedule.start_time);
+    const end = canonicalTime(schedule.end_time);
+    const durationSeconds = Number(schedule.slot_duration_minutes) * 60;
+    const [startHour, startMinute] = start.slice(0, 5).split(':').map(Number);
+    const [endHour, endMinute] = end.slice(0, 5).split(':').map(Number);
+    if ((endHour * 3600 + endMinute * 60) - (startHour * 3600 + startMinute * 60) < durationSeconds) {
+      return 'Slot duration must fit inside every working period.';
+    }
+    const day = Number(schedule.weekday);
+    const periods = byWeekday.get(day) || [];
+    periods.push({ start, end });
+    byWeekday.set(day, periods);
+  }
+  for (const periods of byWeekday.values()) {
+    periods.sort((a, b) => a.start.localeCompare(b.start));
+    for (let index = 1; index < periods.length; index++) {
+      if (periods[index].start < periods[index - 1].end) return 'Working hours cannot overlap.';
+    }
+  }
+  return null;
+}
+
 exports.getDoctorSchedule = async (req, res) => {
   try {
     const hospitalId = await hospitalForUser(pool, req.user.id);
@@ -49,7 +76,8 @@ exports.replaceDoctorSchedule = async (req, res) => {
     const hospitalId = await hospitalForUser(client, req.user.id);
     const doctorId = Number(req.params.doctorId);
     const schedules = req.body?.schedules;
-    if (!hospitalId || !Number.isInteger(doctorId) || !Array.isArray(schedules) || !schedules.every(scheduleInputValid)) return res.status(400).json({ success: false, message: 'Provide valid weekly schedule rows (weekday 0-6, start_time, end_time, slot_duration_minutes)' });
+    const validationError = !Array.isArray(schedules) ? 'Provide weekly schedule rows.' : scheduleValidationError(schedules);
+    if (!hospitalId || !Number.isInteger(doctorId) || validationError) return res.status(400).json({ success: false, message: validationError || 'Valid doctor required' });
     await client.query('BEGIN');
     const doctor = await client.query('SELECT id FROM doctors WHERE id=$1 AND hospital_id=$2 FOR UPDATE', [doctorId, hospitalId]);
     if (!doctor.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ success: false, message: 'Doctor not found at this hospital' }); }

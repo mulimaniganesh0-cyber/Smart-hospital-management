@@ -14,6 +14,7 @@ class SocketService {
   bool isConnected = false;
   bool _isInitialized = false;
   Future<void>? _connectFuture;
+  final Set<String> _assignmentSubscriptions = <String>{};
 
   SocketService._();
 
@@ -24,46 +25,53 @@ class SocketService {
 
   Future<void> _connect() async {
     try {
-    final prefs = await SharedPreferences.getInstance();
-    final userJson = prefs.getString('user');
-    final token = prefs.getString('token');
-    if (userJson == null || token == null) return;
+      final prefs = await SharedPreferences.getInstance();
+      final userJson = prefs.getString('user');
+      final token = prefs.getString('token');
+      if (userJson == null || token == null) return;
 
-    socket = io.io(ApiService.socketUrl, <String, dynamic>{
-      'transports': ['websocket'],
-      // Start exactly once below. This prevents a second connection attempt
-      // when authentication and a dashboard both request the singleton.
-      'autoConnect': false,
-      'reconnection': true,
-      'reconnectionAttempts': 5,
-      'reconnectionDelay': 1000,
-      'auth': {'token': token},
-    });
-    _isInitialized = true;
+      socket = io.io(ApiService.socketUrl, <String, dynamic>{
+        'transports': ['websocket'],
+        // Start exactly once below. This prevents a second connection attempt
+        // when authentication and a dashboard both request the singleton.
+        'autoConnect': false,
+        'reconnection': true,
+        'reconnectionAttempts': 5,
+        'reconnectionDelay': 1000,
+        'auth': {'token': token},
+      });
+      _isInitialized = true;
 
-    socket.onConnect((_) {
-      debugPrint('Socket connected');
-      isConnected = true;
+      socket.onConnect((_) {
+        debugPrint('Socket connected');
+        isConnected = true;
 
-      // Join user-specific room
-      final user = Map<String, dynamic>.from(jsonDecode(userJson));
-      if (user['user_type'] == 'hospital') {
-        socket.emit('join-hospital');
-      } else if (user['user_type'] == 'patient') {
-        socket.emit('join-patient');
-      }
-    });
+        // Join user-specific room
+        final user = Map<String, dynamic>.from(jsonDecode(userJson));
+        if (user['user_type'] == 'hospital') {
+          socket.emit('join-hospital');
+        } else if (user['user_type'] == 'patient') {
+          socket.emit('join-patient');
+        }
+        for (final subscription in _assignmentSubscriptions) {
+          final separator = subscription.indexOf(':');
+          socket.emit('assignment:subscribe', {
+            'type': subscription.substring(0, separator),
+            'id': int.tryParse(subscription.substring(separator + 1)),
+          });
+        }
+      });
 
-    socket.onDisconnect((_) {
-      debugPrint('Socket disconnected');
-      isConnected = false;
-    });
+      socket.onDisconnect((_) {
+        debugPrint('Socket disconnected');
+        isConnected = false;
+      });
 
-    socket.onConnectError((error) {
-      debugPrint('Socket connection error: $error');
-    });
+      socket.onConnectError((error) {
+        debugPrint('Socket connection error: $error');
+      });
 
-    socket.connect();
+      socket.connect();
     } finally {
       _connectFuture = null;
     }
@@ -105,13 +113,53 @@ class SocketService {
 
   void onEmergencyLifecycle(Function(dynamic) callback) {
     if (!_isInitialized) return;
-    for (final event in const ['emergency:accepted', 'emergency:responding', 'emergency:ambulance_assigned', 'emergency:dispatched', 'emergency:arrived', 'emergency:resolved', 'emergency:completed', 'emergency:cancelled']) {
+    for (final event in const [
+      'emergency:accepted',
+      'emergency:responding',
+      'emergency:ambulance_assigned',
+      'emergency:dispatched',
+      'emergency:arrived',
+      'emergency:resolved',
+      'emergency:completed',
+      'emergency:cancelled',
+      'emergency:driver_status_updated',
+      'emergency:assignment_revoked',
+      'ambulance:location_updated'
+    ]) {
       socket.on(event, callback);
+    }
+  }
+
+  void onPatientLocation(Function(dynamic) callback) {
+    if (_isInitialized) socket.on('patient:location_updated', callback);
+  }
+
+  void offPatientLocation(Function(dynamic) callback) {
+    if (_isInitialized) socket.off('patient:location_updated', callback);
+  }
+
+  void subscribeAssignment(String type, int id) {
+    if (!['booking', 'emergency'].contains(type) || id < 1) return;
+    _assignmentSubscriptions.add('$type:$id');
+    if (_isInitialized && isConnected) {
+      socket.emit('assignment:subscribe', {'type': type, 'id': id});
     }
   }
 
   void onAmbulanceBooking(Function(dynamic) callback) {
     if (_isInitialized) socket.on('ambulance:booking_created', callback);
+  }
+
+  void onAmbulanceBookingLifecycle(Function(dynamic) callback) {
+    if (!_isInitialized) return;
+    for (final event in const [
+      'ambulance:booking_created',
+      'ambulance:booking_status_updated',
+      'ambulance:booking_completed',
+      'ambulance:booking_cancelled'
+    ]) {
+      socket.on(event, callback);
+    }
   }
 
   void onNotificationNew(Function(dynamic) callback) {

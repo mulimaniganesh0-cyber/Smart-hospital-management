@@ -1,5 +1,6 @@
 // lib/screens/hospital/hospital_resources.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import '../../providers/hospital_provider.dart';
 import '../../services/api_service.dart';
@@ -50,7 +51,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 64, color: Colors.orange),
+              const Icon(Icons.error_outline,
+                  size: 64, color: AppColors.warning),
               const SizedBox(height: 16),
               Text(
                 provider.errorMessage ?? 'Unable to load resources',
@@ -93,13 +95,15 @@ class _HospitalResourcesState extends State<HospitalResources> {
               Tab(text: 'Resources', icon: Icon(Icons.medical_services)),
               Tab(text: 'Requests', icon: Icon(Icons.assignment)),
             ],
-          ), /*
+          ),
+          /*
             tabs: [
               Tab(text: ' Resources', icon: Icon(Icons.medical_services)),
               Tab(text: ' Requests', icon: Icon(Icons.assignment)),
             ],
           ),
-          */ actions: [
+          */
+          actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: () => provider.loadHospitalData(),
@@ -149,7 +153,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF0A4D68), Color(0xFF088395)],
+                  colors: [Color(0xFF142D4E), Color(0xFF0D9488)],
                 ),
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -162,7 +166,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
-                  foregroundColor: const Color(0xFF0A4D68),
+                  foregroundColor: const Color(0xFF142D4E),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -171,51 +175,56 @@ class _HospitalResourcesState extends State<HospitalResources> {
               ),
             ),
             const SizedBox(height: 16),
-            
-            // Resource Cards
-            _buildResourceCard(
-              context,
-              title: 'General Beds',
-              icon: Icons.king_bed,
-              color: Colors.blue,
-              total: generalTotal,
-              available: generalAvailable,
-              resourceType: 'generalBeds',
-              provider: provider,
-            ),
-            const SizedBox(height: 16),
-            _buildResourceCard(
-              context,
-              title: 'ICU Beds',
-              icon: Icons.local_hospital,
-              color: Colors.red,
-              total: icuTotal,
-              available: icuAvailable,
-              resourceType: 'icuBeds',
-              provider: provider,
-            ),
-            const SizedBox(height: 16),
-            _buildResourceCard(
-              context,
-              title: 'Ventilators',
-              icon: Icons.air,
-              color: Colors.green,
-              total: ventTotal,
-              available: ventAvailable,
-              resourceType: 'ventilators',
-              provider: provider,
-            ),
-            const SizedBox(height: 16),
-            _buildResourceCard(
-              context,
-              title: 'Oxygen Supported Beds',
-              icon: Icons.medical_services,
-              color: Colors.purple,
-              total: oxygenTotal,
-              available: oxygenAvailable,
-              resourceType: 'oxygenBeds',
-              provider: provider,
-            ),
+
+            // Resource cards use bounded widths and natural heights so the
+            // vertical scroll view never gives them an unbounded flex axis.
+            LayoutBuilder(builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 680 ? 2 : 1;
+              final cardWidth = columns == 2
+                  ? (constraints.maxWidth - 12) / 2
+                  : constraints.maxWidth;
+              final cards = <Widget>[
+                _buildResourceCard(context,
+                    title: 'General Beds',
+                    icon: Icons.king_bed,
+                    color: AppColors.primary,
+                    total: generalTotal,
+                    available: generalAvailable,
+                    resourceType: 'generalBeds',
+                    provider: provider),
+                _buildResourceCard(context,
+                    title: 'ICU Beds',
+                    icon: Icons.local_hospital,
+                    color: AppColors.error,
+                    total: icuTotal,
+                    available: icuAvailable,
+                    resourceType: 'icuBeds',
+                    provider: provider),
+                _buildResourceCard(context,
+                    title: 'Ventilators',
+                    icon: Icons.air,
+                    color: AppColors.success,
+                    total: ventTotal,
+                    available: ventAvailable,
+                    resourceType: 'ventilators',
+                    provider: provider),
+                _buildResourceCard(context,
+                    title: 'Oxygen Supported Beds',
+                    icon: Icons.medical_services,
+                    color: AppColors.secondary,
+                    total: oxygenTotal,
+                    available: oxygenAvailable,
+                    resourceType: 'oxygenBeds',
+                    provider: provider),
+              ];
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: cards
+                    .map((card) => SizedBox(width: cardWidth, child: card))
+                    .toList(),
+              );
+            }),
             const SizedBox(height: 16),
             _buildBloodBankSection(context, provider),
           ],
@@ -225,22 +234,23 @@ class _HospitalResourcesState extends State<HospitalResources> {
   }
 
   // ==================== ADD NEW RESOURCE DIALOG ====================
-  
-  Future<void> _showAddNewResourceDialog(BuildContext context, HospitalProvider provider) async {
+
+  Future<void> _showAddNewResourceDialog(
+      BuildContext context, HospitalProvider provider) async {
     String selectedResourceType = 'generalBeds';
     int totalCount = 10;
     int availableCount = 10;
-    
+
     final totalController = TextEditingController(text: '10');
     final availableController = TextEditingController(text: '10');
-    
+
     final Map<String, String> resourceTypeMap = {
       'General Beds': 'generalBeds',
       'ICU Beds': 'icuBeds',
       'Ventilators': 'ventilators',
       'Oxygen Supported Beds': 'oxygenBeds',
     };
-    
+
     final List<String> resourceTypes = resourceTypeMap.keys.toList();
 
     final result = await showDialog<Map<String, dynamic>>(
@@ -257,12 +267,12 @@ class _HospitalResourcesState extends State<HospitalResources> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0A4D68).withValues(alpha: 0.1),
+                    color: const Color(0xFF142D4E).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
                     Icons.add_circle_outline,
-                    color: Color(0xFF0A4D68),
+                    color: Color(0xFF142D4E),
                     size: 28,
                   ),
                 ),
@@ -301,7 +311,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
                                 Icon(
                                   _getResourceIcon(resourceTypeMap[type]!),
                                   size: 20,
-                                  color: _getResourceColor(resourceTypeMap[type]!),
+                                  color:
+                                      _getResourceColor(resourceTypeMap[type]!),
                                 ),
                                 const SizedBox(width: 8),
                                 Text(type),
@@ -357,18 +368,21 @@ class _HospitalResourcesState extends State<HospitalResources> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
+                      color: AppColors.warning.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.shade200),
+                      border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.1)),
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                        Icon(Icons.info_outline,
+                            color: AppColors.warning, size: 20),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             'Available count cannot exceed total count.',
-                            style: TextStyle(fontSize: 12, color: Colors.orange),
+                            style: TextStyle(
+                                fontSize: 12, color: AppColors.warning),
                           ),
                         ),
                       ],
@@ -386,12 +400,12 @@ class _HospitalResourcesState extends State<HospitalResources> {
                 onPressed: () {
                   totalCount = int.tryParse(totalController.text) ?? 0;
                   availableCount = int.tryParse(availableController.text) ?? 0;
-                  
+
                   if (totalCount <= 0) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Total count must be greater than 0'),
-                        backgroundColor: Colors.red,
+                        backgroundColor: AppColors.error,
                       ),
                     );
                     return;
@@ -399,8 +413,9 @@ class _HospitalResourcesState extends State<HospitalResources> {
                   if (availableCount > totalCount) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Available count cannot exceed total count'),
-                        backgroundColor: Colors.red,
+                        content:
+                            Text('Available count cannot exceed total count'),
+                        backgroundColor: AppColors.error,
                       ),
                     );
                     return;
@@ -412,7 +427,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
                   });
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0A4D68),
+                  backgroundColor: const Color(0xFF142D4E),
                 ),
                 child: const Text('Add Resource'),
               ),
@@ -421,22 +436,22 @@ class _HospitalResourcesState extends State<HospitalResources> {
         },
       ),
     );
-
     if (result != null && context.mounted) {
       setState(() => _isProcessing = true);
-      
+
       try {
         final success = await provider.addNewResource(
           result['resourceType'],
           result['total'],
           result['available'],
         );
-        
+
         if (success && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(' ${_getResourceDisplayName(result['resourceType'])} added successfully'),
-              backgroundColor: Colors.green,
+              content: Text(
+                  ' ${_getResourceDisplayName(result['resourceType'])} added successfully'),
+              backgroundColor: AppColors.success,
             ),
           );
           await provider.loadHospitalData();
@@ -444,7 +459,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(' Failed to add resource. Please try again.'),
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.error,
             ),
           );
         }
@@ -453,7 +468,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error: $e'),
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.error,
             ),
           );
         }
@@ -481,13 +496,13 @@ class _HospitalResourcesState extends State<HospitalResources> {
   Color _getResourceColor(String resourceType) {
     switch (resourceType) {
       case 'generalBeds':
-        return Colors.blue;
+        return AppColors.primary;
       case 'icuBeds':
-        return Colors.red;
+        return AppColors.error;
       case 'ventilators':
-        return Colors.green;
+        return AppColors.success;
       case 'oxygenBeds':
-        return Colors.purple;
+        return AppColors.secondary;
       default:
         return Colors.grey;
     }
@@ -545,18 +560,23 @@ class _HospitalResourcesState extends State<HospitalResources> {
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     '${(percentage * 100).toInt()}%',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: color),
                   ),
                 ),
               ],
@@ -566,8 +586,9 @@ class _HospitalResourcesState extends State<HospitalResources> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildStat('Total', total.toString(), Colors.grey),
-                _buildStat('Available', available.toString(), Colors.green),
-                _buildStat('Occupied', occupied.toString(), Colors.red),
+                _buildStat(
+                    'Available', available.toString(), AppColors.success),
+                _buildStat('Occupied', occupied.toString(), AppColors.error),
               ],
             ),
             const SizedBox(height: 12),
@@ -589,19 +610,23 @@ class _HospitalResourcesState extends State<HospitalResources> {
                   width: double.infinity,
                   height: 45,
                   child: ElevatedButton.icon(
-                    onPressed: _isProcessing ? null : () => _freeResource(
-                      context,
-                      title,
-                      resourceType,
-                      provider,
-                      available,
-                      occupied,
-                    ),
+                    onPressed: _isProcessing
+                        ? null
+                        : () => _freeResource(
+                              context,
+                              title,
+                              resourceType,
+                              provider,
+                              available,
+                              occupied,
+                            ),
                     icon: const Icon(Icons.new_releases),
-                    label: Text('Discharge Patient (Free One $title)'), /*
+                    label: Text('Discharge Patient (Free One $title)'),
+                    /*
                     label: Text(' Discharge Patient (Free One $title)'),
-                    */ style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade700,
+                    */
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -622,7 +647,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
                       provider,
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -642,7 +667,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
                       provider,
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                      backgroundColor: AppColors.success,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -664,7 +689,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
       children: [
         Text(
           value,
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
+          style: TextStyle(
+              fontSize: 20, fontWeight: FontWeight.bold, color: color),
         ),
         const SizedBox(height: 2),
         Text(
@@ -676,7 +702,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
   }
 
   // ==================== FREE RESOURCE ====================
-  
+
   Future<void> _freeResource(
     BuildContext context,
     String title,
@@ -692,11 +718,11 @@ class _HospitalResourcesState extends State<HospitalResources> {
       final confirm = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: Row(
+          title: const Row(
             children: [
-              Icon(Icons.new_releases, color: Colors.green.shade700),
-              const SizedBox(width: 8),
-              const Text('Discharge Patient'),
+              Icon(Icons.new_releases, color: AppColors.success),
+              SizedBox(width: 8),
+              Text('Discharge Patient'),
             ],
           ),
           content: Column(
@@ -716,14 +742,16 @@ class _HospitalResourcesState extends State<HospitalResources> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                        const Icon(Icons.check_circle,
+                            color: AppColors.success, size: 16),
                         const SizedBox(width: 8),
                         Text('Available: $currentAvailable'),
                       ],
                     ),
                     Row(
                       children: [
-                        const Icon(Icons.person, color: Colors.red, size: 16),
+                        const Icon(Icons.person,
+                            color: AppColors.error, size: 16),
                         const SizedBox(width: 8),
                         Text('Occupied: $currentOccupied'),
                       ],
@@ -735,18 +763,21 @@ class _HospitalResourcesState extends State<HospitalResources> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
+                  color: AppColors.success.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.shade200),
+                  border: Border.all(
+                      color: AppColors.success.withValues(alpha: 0.1)),
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.info_outline, size: 16, color: Colors.green),
+                    Icon(Icons.info_outline,
+                        size: 16, color: AppColors.success),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'This will free one resource and make it available for other patients.',
-                        style: TextStyle(fontSize: 12, color: Colors.green),
+                        style:
+                            TextStyle(fontSize: 12, color: AppColors.success),
                       ),
                     ),
                   ],
@@ -762,7 +793,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green.shade700,
+                backgroundColor: AppColors.success,
               ),
               child: const Text(' Discharge & Free Resource'),
             ),
@@ -773,20 +804,21 @@ class _HospitalResourcesState extends State<HospitalResources> {
       if (confirm == true && context.mounted) {
         // Call the free resource API
         final response = await ApiService.freeResource(resourceType, 1);
-        
+
         if (response['success'] && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(' Patient discharged. Resource is now available.'),
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.success,
             ),
           );
           await provider.loadHospitalData();
         } else if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(response['message'] ?? ' Failed to free resource. Please try again.'),
-              backgroundColor: Colors.red,
+              content: Text(response['message'] ??
+                  ' Failed to free resource. Please try again.'),
+              backgroundColor: AppColors.error,
             ),
           );
         }
@@ -796,7 +828,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -853,14 +885,14 @@ class _HospitalResourcesState extends State<HospitalResources> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('$field updated to $value'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
       } else if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Update failed. Please try again.'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -869,7 +901,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
 
   // ==================== BLOOD BANK SECTION ====================
 
-  Widget _buildBloodBankSection(BuildContext context, HospitalProvider provider) {
+  Widget _buildBloodBankSection(
+      BuildContext context, HospitalProvider provider) {
     final bloodStock = provider.bloodStock;
 
     return Card(
@@ -880,23 +913,27 @@ class _HospitalResourcesState extends State<HospitalResources> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              runSpacing: 8,
               children: [
                 Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.purple.withValues(alpha: 0.1),
+                        color: AppColors.secondary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.water_drop, color: Colors.purple, size: 24),
+                      child: const Icon(Icons.water_drop,
+                          color: AppColors.secondary, size: 24),
                     ),
                     const SizedBox(width: 12),
                     const Text(
                       'Blood Bank',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -917,7 +954,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
                         icon: const Icon(Icons.add, size: 18),
                         label: const Text('Add Stock'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.purple,
+                          backgroundColor: AppColors.secondary,
                           foregroundColor: Colors.white,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -959,14 +996,24 @@ class _HospitalResourcesState extends State<HospitalResources> {
                   final units = _toInt(stock['units_available']);
                   final threshold = _toInt(stock['minimum_threshold']);
                   final isLow = units < threshold;
-                  
+                  final batches = (stock['batches'] as List? ?? const [])
+                      .whereType<Map>()
+                      .map((batch) => Map<String, dynamic>.from(batch)
+                        ..['blood_group'] = stock['blood_group'])
+                      .toList();
+
                   return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: isLow ? Colors.red.shade50 : Colors.green.shade50,
+                      color: isLow
+                          ? AppColors.error.withValues(alpha: 0.1)
+                          : AppColors.success.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: isLow ? Colors.red.shade200 : Colors.green.shade200,
+                        color: isLow
+                            ? AppColors.error.withValues(alpha: 0.1)
+                            : AppColors.success.withValues(alpha: 0.1),
                       ),
                     ),
                     child: Row(
@@ -977,40 +1024,48 @@ class _HospitalResourcesState extends State<HospitalResources> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              stock['blood_group'] ?? 'Unknown',
+                              _bloodGroupLabel(
+                                  stock['blood_group'] ?? 'Unknown'),
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: isLow ? Colors.red : Colors.green,
+                                color:
+                                    isLow ? AppColors.error : AppColors.success,
                               ),
                             ),
                             Text(
                               '$units units',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isLow ? Colors.red.shade700 : Colors.green.shade700,
+                                color:
+                                    isLow ? AppColors.error : AppColors.success,
                               ),
                             ),
-                            if (stock['expiry_date'] != null)
-                              Text(
-                                'Expires: ${stock['expiry_date']?.toString().split('T')[0] ?? ''}',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.orange.shade700,
+                            for (final batch in batches)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '${batch['batch_number'] ?? 'Batch ${batch['id']}'} · ${_toInt(batch['units_available'])} units${batch['expiry_date'] == null ? '' : ' · ${batch['expiry_date'].toString().split('T')[0]}'}',
+                                      style: const TextStyle(fontSize: 10),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Edit this batch',
+                                      icon: const Icon(Icons.edit, size: 15),
+                                      onPressed: () => _showUpdateBloodDialog(
+                                          context, batch, provider),
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(
+                                          minWidth: 26, minHeight: 26),
+                                    ),
+                                  ],
                                 ),
                               ),
                           ],
                         ),
                         const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.edit, size: 18),
-                          onPressed: () => _showUpdateBloodDialog(context, stock, provider),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 30,
-                            minHeight: 30,
-                          ),
-                        ),
                       ],
                     ),
                   );
@@ -1040,13 +1095,25 @@ class _HospitalResourcesState extends State<HospitalResources> {
     );
   }
 
+  String _bloodGroupLabel(String group) => group == 'A+' ? 'A+ve' : group;
+
   // ==================== BLOOD BANK DIALOGS ====================
 
-  Future<void> _showAddBloodDialog(BuildContext context, HospitalProvider provider) async {
+  Future<void> _showAddBloodDialog(
+      BuildContext context, HospitalProvider provider) async {
     String selectedGroup = 'A+';
     final unitsController = TextEditingController(text: '10');
     DateTime selectedDate = DateTime.now().add(const Duration(days: 30));
-    final List<String> bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    final List<String> bloodGroups = [
+      'A+',
+      'A-',
+      'B+',
+      'B-',
+      'AB+',
+      'AB-',
+      'O+',
+      'O-'
+    ];
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
@@ -1064,7 +1131,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
                     border: OutlineInputBorder(),
                   ),
                   items: bloodGroups.map((group) {
-                    return DropdownMenuItem(value: group, child: Text(group));
+                    return DropdownMenuItem(
+                        value: group, child: Text(_bloodGroupLabel(group)));
                   }).toList(),
                   onChanged: (value) => setState(() => selectedGroup = value!),
                 ),
@@ -1110,11 +1178,13 @@ class _HospitalResourcesState extends State<HospitalResources> {
                     Navigator.pop(context, {
                       'group': selectedGroup,
                       'units': units,
-                      'expiryDate': selectedDate.toIso8601String().split('T')[0],
+                      'expiryDate':
+                          selectedDate.toIso8601String().split('T')[0],
                     });
                   }
                 },
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.purple),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.secondary),
                 child: const Text('Add'),
               ),
             ],
@@ -1122,6 +1192,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
         },
       ),
     );
+    unitsController.dispose();
 
     if (result != null && context.mounted) {
       final success = await provider.addBloodStock(
@@ -1133,10 +1204,17 @@ class _HospitalResourcesState extends State<HospitalResources> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Blood stock added successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
-        await provider.loadHospitalData();
+      } else if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text(provider.errorMessage ?? 'Could not add blood stock.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
       }
     }
   }
@@ -1146,17 +1224,22 @@ class _HospitalResourcesState extends State<HospitalResources> {
     Map<String, dynamic> stock,
     HospitalProvider provider,
   ) async {
-    final unitsController = TextEditingController(text: stock['units_available'].toString());
-    DateTime selectedDate = stock['expiry_date'] != null 
+    final unitsController =
+        TextEditingController(text: stock['units_available'].toString());
+    final originalDate = stock['expiry_date'] != null
         ? DateTime.parse(stock['expiry_date'])
         : DateTime.now().add(const Duration(days: 30));
+    final today = DateUtils.dateOnly(DateTime.now());
+    DateTime selectedDate = DateUtils.dateOnly(originalDate).isBefore(today)
+        ? today
+        : DateUtils.dateOnly(originalDate);
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
-            title: Text('Update ${stock['blood_group']} Stock'),
+            title: Text('Edit ${_bloodGroupLabel(stock['blood_group'])} Batch'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1201,7 +1284,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
                   if (units != null && units >= 0) {
                     Navigator.pop(context, {
                       'units': units,
-                      'expiryDate': selectedDate.toIso8601String().split('T')[0],
+                      'expiryDate':
+                          selectedDate.toIso8601String().split('T')[0],
                     });
                   }
                 },
@@ -1212,21 +1296,30 @@ class _HospitalResourcesState extends State<HospitalResources> {
         },
       ),
     );
+    unitsController.dispose();
 
     if (result != null && context.mounted) {
-      final success = await provider.addBloodStock(
+      final success = await provider.updateBloodStock(
         stock['blood_group'],
         result['units'],
         result['expiryDate'],
+        batchId: int.tryParse(stock['id']?.toString() ?? ''),
       );
       if (success && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Blood stock updated successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
-        await provider.loadHospitalData();
+      } else if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text(provider.errorMessage ?? 'Could not update blood stock.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
       }
     }
   }
@@ -1235,9 +1328,12 @@ class _HospitalResourcesState extends State<HospitalResources> {
 
   Widget _buildRequestsTab(BuildContext context, HospitalProvider provider) {
     final requests = provider.resourceRequests;
-    
-    final pendingRequests = requests.where((r) => r['status'] == 'pending').toList();
-    final fulfilledRequests = requests.where((r) => r['status'] == 'fulfilled' || r['status'] == 'rejected').toList();
+
+    final pendingRequests =
+        requests.where((r) => r['status'] == 'pending').toList();
+    final fulfilledRequests = requests
+        .where((r) => r['status'] == 'fulfilled' || r['status'] == 'rejected')
+        .toList();
 
     if (requests.isEmpty) {
       return const Center(
@@ -1263,9 +1359,11 @@ class _HospitalResourcesState extends State<HospitalResources> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildRequestStats('Pending', pendingRequests.length, Colors.orange),
-              _buildRequestStats('Fulfilled', fulfilledRequests.length, Colors.green),
-              _buildRequestStats('Total', requests.length, Colors.blue),
+              _buildRequestStats(
+                  'Pending', pendingRequests.length, AppColors.warning),
+              _buildRequestStats(
+                  'Fulfilled', fulfilledRequests.length, AppColors.success),
+              _buildRequestStats('Total', requests.length, AppColors.primary),
             ],
           ),
         ),
@@ -1315,7 +1413,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
     );
   }
 
-  Widget _buildRequestCard(Map<String, dynamic> request, bool isPending, HospitalProvider provider) {
+  Widget _buildRequestCard(
+      Map<String, dynamic> request, bool isPending, HospitalProvider provider) {
     final resourceType = request['resource_type'] ?? 'Resource';
     final patientName = request['patient_name'] ?? 'Unknown';
     final quantity = _toInt(request['quantity']);
@@ -1327,27 +1426,27 @@ class _HospitalResourcesState extends State<HospitalResources> {
     switch (resourceType.toLowerCase()) {
       case 'general_bed':
         icon = Icons.king_bed;
-        color = Colors.blue;
+        color = AppColors.primary;
         break;
       case 'icu_bed':
         icon = Icons.local_hospital;
-        color = Colors.red;
+        color = AppColors.error;
         break;
       case 'ventilator':
         icon = Icons.air;
-        color = Colors.green;
+        color = AppColors.success;
         break;
       case 'oxygen_bed':
         icon = Icons.medical_services;
-        color = Colors.purple;
+        color = AppColors.secondary;
         break;
       case 'blood':
         icon = Icons.water_drop;
-        color = Colors.red;
+        color = AppColors.error;
         break;
       default:
         icon = Icons.medical_services;
-        color = Colors.orange;
+        color = AppColors.warning;
     }
 
     return Card(
@@ -1385,21 +1484,25 @@ class _HospitalResourcesState extends State<HospitalResources> {
                       ),
                       Text(
                         'Quantity: $quantity',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: isPending ? Colors.orange.withValues(alpha: 0.1) : Colors.green.withValues(alpha: 0.1),
+                    color: isPending
+                        ? AppColors.warning.withValues(alpha: 0.1)
+                        : AppColors.success.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     status.toUpperCase(),
                     style: TextStyle(
-                      color: isPending ? Colors.orange : Colors.green,
+                      color: isPending ? AppColors.warning : AppColors.success,
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -1416,9 +1519,11 @@ class _HospitalResourcesState extends State<HospitalResources> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _isProcessing ? null : () => _fulfillRequest(request, provider),
+                      onPressed: _isProcessing
+                          ? null
+                          : () => _fulfillRequest(request, provider),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
+                        backgroundColor: AppColors.success,
                       ),
                       child: const Text('Fulfill & Allocate'),
                     ),
@@ -1426,9 +1531,11 @@ class _HospitalResourcesState extends State<HospitalResources> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: _isProcessing ? null : () => _rejectRequest(request, provider),
+                      onPressed: _isProcessing
+                          ? null
+                          : () => _rejectRequest(request, provider),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
+                        foregroundColor: AppColors.error,
                       ),
                       child: const Text('Reject'),
                     ),
@@ -1441,24 +1548,30 @@ class _HospitalResourcesState extends State<HospitalResources> {
                 margin: const EdgeInsets.only(top: 8),
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: status == 'fulfilled' ? Colors.green.shade50 : Colors.red.shade50,
+                  color: status == 'fulfilled'
+                      ? AppColors.success.withValues(alpha: 0.1)
+                      : AppColors.error.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       status == 'fulfilled' ? Icons.check_circle : Icons.cancel,
-                      color: status == 'fulfilled' ? Colors.green : Colors.red,
+                      color: status == 'fulfilled'
+                          ? AppColors.success
+                          : AppColors.error,
                       size: 16,
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      status == 'fulfilled' 
+                      status == 'fulfilled'
                           ? ' Request fulfilled. Resource allocated to patient.'
                           : ' Request rejected.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: status == 'fulfilled' ? Colors.green : Colors.red,
+                        color: status == 'fulfilled'
+                            ? AppColors.success
+                            : AppColors.error,
                       ),
                     ),
                   ],
@@ -1470,7 +1583,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
     );
   }
 
-  Future<void> _fulfillRequest(Map<String, dynamic> request, HospitalProvider provider) async {
+  Future<void> _fulfillRequest(
+      Map<String, dynamic> request, HospitalProvider provider) async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
 
@@ -1489,7 +1603,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
               const SizedBox(height: 12),
               const Text(
                 'This will allocate the requested resource to the patient.',
-                style: TextStyle(color: Colors.green),
+                style: TextStyle(color: AppColors.success),
               ),
               const Text(
                 'Available resources will be reduced automatically.',
@@ -1504,7 +1618,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              style:
+                  ElevatedButton.styleFrom(backgroundColor: AppColors.success),
               child: const Text('Confirm Fulfill'),
             ),
           ],
@@ -1520,10 +1635,9 @@ class _HospitalResourcesState extends State<HospitalResources> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(' Request fulfilled. Resource allocated.'),
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.success,
             ),
           );
-          await provider.loadHospitalData();
         }
       }
     } catch (e) {
@@ -1534,7 +1648,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -1543,7 +1657,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
     }
   }
 
-  Future<void> _rejectRequest(Map<String, dynamic> request, HospitalProvider provider) async {
+  Future<void> _rejectRequest(
+      Map<String, dynamic> request, HospitalProvider provider) async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
 
@@ -1552,7 +1667,8 @@ class _HospitalResourcesState extends State<HospitalResources> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Reject Request'),
-          content: Text('Reject ${request['resource_type']} request from ${request['patient_name']}?'),
+          content: Text(
+              'Reject ${request['resource_type']} request from ${request['patient_name']}?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -1560,7 +1676,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
               child: const Text('Reject'),
             ),
           ],
@@ -1576,7 +1692,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(' Request rejected'),
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.error,
             ),
           );
           await provider.loadHospitalData();
@@ -1590,7 +1706,7 @@ class _HospitalResourcesState extends State<HospitalResources> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }

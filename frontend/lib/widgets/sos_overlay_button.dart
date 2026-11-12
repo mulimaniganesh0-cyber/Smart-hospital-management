@@ -1,5 +1,6 @@
 // lib/widgets/sos_overlay_button.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import '../screens/patient/patient_emergency_request.dart';
 
 class SosButtonWidget extends StatelessWidget {
@@ -33,7 +34,7 @@ class SosButtonWidget extends StatelessWidget {
         icon: Container(
           padding: const EdgeInsets.all(6),
           decoration: const BoxDecoration(
-            color: Colors.red,
+            color: AppColors.error,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
@@ -58,7 +59,7 @@ class SosButtonWidget extends StatelessWidget {
 
     return FloatingActionButton.extended(
       onPressed: () => _triggerSos(context),
-      backgroundColor: Colors.red,
+      backgroundColor: AppColors.error,
       elevation: 6,
       icon: const Icon(Icons.sos, color: Colors.white, size: 28),
       label: const Text(

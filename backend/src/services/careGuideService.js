@@ -250,7 +250,7 @@ async function searchHospitals({ latitude, longitude, specialty, city, hospitalN
   if (bloodBank) filters.push(`EXISTS (SELECT 1 FROM blood_bank bb WHERE bb.hospital_id = h.id AND bb.units_available > 0${bloodGroup ? ` AND bb.blood_group = ${add(bloodGroup)}` : ''})`);
   if (ambulance) filters.push('EXISTS (SELECT 1 FROM ambulances a WHERE a.hospital_id = h.id AND a.is_available = true)');
   const order = bloodGroup ? 'blood_units DESC, distance ASC NULLS LAST' : sort === 'cost' ? 'consultation_cost ASC NULLS LAST, distance ASC NULLS LAST' : sort === 'rating' ? 'h.google_rating DESC NULLS LAST, distance ASC NULLS LAST' : sort === 'beds' ? 'available_beds DESC, distance ASC NULLS LAST' : 'distance ASC NULLS LAST, h.google_rating DESC NULLS LAST';
-  const query = `SELECT h.id, h.name, h.address, h.city, h.phone, h.email, h.latitude, h.longitude, h.entrance_latitude, h.entrance_longitude, h.google_rating, h.google_review_count, h.google_place_id, h.google_maps_url, h.rating_verified, h.rating_last_updated, h.specialties, h.emergency_available,
+  const query = `SELECT h.id, h.name, h.address, h.city, h.phone, h.email, h.latitude, h.longitude, h.entrance_latitude, h.entrance_longitude, h.entrance_verified, h.google_rating, h.google_review_count, h.google_place_id, h.google_maps_url, h.rating_verified, h.rating_last_updated, h.specialties, h.emergency_available,
     COALESCE(hr.general_beds_total, 0) total_beds, COALESCE(hr.general_beds_available, 0) available_beds,
     COALESCE(hr.icu_beds_total, 0) total_icu, COALESCE(hr.icu_beds_available, 0) available_icu,
     COALESCE(hr.ventilators_total, 0) total_ventilators, COALESCE(hr.ventilators_available, 0) available_ventilators,

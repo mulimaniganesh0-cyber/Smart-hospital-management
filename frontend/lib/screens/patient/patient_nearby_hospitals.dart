@@ -2,6 +2,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../services/api_service.dart';
 import '../../services/location_service.dart';
@@ -50,7 +51,9 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
 
   Future<void> _loadSpecialties() async {
     final response = await ApiService.getSpecialties();
-    if (!mounted || response['success'] != true || response['data'] is! List) return;
+    if (!mounted || response['success'] != true || response['data'] is! List) {
+      return;
+    }
     setState(() {
       _specialties = (response['data'] as List)
           .whereType<Map>()
@@ -72,6 +75,24 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
   Future<void> _loadHospitals() async {
     if (!mounted) return;
 
+    if (_nearbyOnly) {
+      try {
+        final position = await LocationService.getFreshPatientLocation();
+        if (!mounted) return;
+        _userLat = position.latitude;
+        _userLng = position.longitude;
+      } on PatientLocationException catch (error) {
+        _userLat = null;
+        _userLng = null;
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _errorMessage = error.message;
+        });
+        return;
+      }
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -80,20 +101,29 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
     try {
       final response = _nearbyOnly
           ? (_userLat == null || _userLng == null
-              ? {'success': false, 'message': 'Location permission is needed for nearby hospitals. You can still browse all hospitals.'}
-              : await ApiService.getNearbyHospitals(_userLat!, _userLng!, radius: _selectedRadius, sortBy: _selectedSort, specialty: _selectedSpecialty))
-          : await ApiService.getAllHospitals(search: _search, specialty: _selectedSpecialty);
+              ? {
+                  'success': false,
+                  'message':
+                      'Location permission is needed for nearby hospitals. You can still browse all hospitals.'
+                }
+              : await ApiService.getNearbyHospitals(_userLat!, _userLng!,
+                  radius: _selectedRadius,
+                  sortBy: _selectedSort,
+                  specialty: _selectedSpecialty))
+          : await ApiService.getAllHospitals(
+              search: _search, specialty: _selectedSpecialty);
 
       if (!mounted) return;
 
       if (response['success'] == true && response['data'] != null) {
         final List<dynamic> hospitalsData = response['data'];
-        
+
         _hospitals = [];
         _rawHospitals = [];
         for (var data in hospitalsData) {
           try {
-            final Map<String, dynamic> hospitalMap = Map<String, dynamic>.from(data);
+            final Map<String, dynamic> hospitalMap =
+                Map<String, dynamic>.from(data);
             final hospital = Hospital.fromJson(hospitalMap);
             _hospitals.add(hospital);
             _rawHospitals.add(hospitalMap);
@@ -127,42 +157,71 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
         _userLat = patientPosition.latitude;
         _userLng = patientPosition.longitude;
       });
-      debugPrint('PATIENT LIVE LOCATION latitude: ${patientPosition.latitude}, longitude: ${patientPosition.longitude}, accuracy: ${patientPosition.accuracy}, timestamp: ${patientPosition.timestamp}');
-      final hasEntrance = hospital.entranceLatitude != null &&
-          hospital.entranceLongitude != null &&
-          hospital.entranceLatitude! >= -90 && hospital.entranceLatitude! <= 90 &&
-          hospital.entranceLongitude! >= -180 && hospital.entranceLongitude! <= 180;
+      final navigationResponse =
+          await ApiService.getHospitalNavigation(hospital.id);
+      if (!mounted) return;
+      final navigationHospital = navigationResponse['hospital'];
+      final navigation = navigationHospital is Map
+          ? Map<String, dynamic>.from(
+              navigationHospital['navigation'] as Map? ?? const {})
+          : const <String, dynamic>{};
+      final navigationType = navigation['type']?.toString();
+      final placeId = navigation['place_id']?.toString();
+      final navLatitude = navigation['latitude'] is num
+          ? (navigation['latitude'] as num).toDouble()
+          : double.tryParse('${navigation['latitude']}');
+      final navLongitude = navigation['longitude'] is num
+          ? (navigation['longitude'] as num).toDouble()
+          : double.tryParse('${navigation['longitude']}');
+      final hasNavigationPoint = navigationType != 'GOOGLE_PLACE' &&
+          navLatitude != null &&
+          navLongitude != null &&
+          navLatitude >= -90 &&
+          navLatitude <= 90 &&
+          navLongitude >= -180 &&
+          navLongitude <= 180;
       final hasHospitalCoordinates = hospital.latitude != null &&
           hospital.longitude != null &&
-          hospital.latitude! >= -90 && hospital.latitude! <= 90 &&
-          hospital.longitude! >= -180 && hospital.longitude! <= 180;
-      if (!hasEntrance && !hasHospitalCoordinates) {
-        _showLocationMessage('Directions are not available for this hospital because its location has not been recorded.');
+          hospital.latitude! >= -90 &&
+          hospital.latitude! <= 90 &&
+          hospital.longitude! >= -180 &&
+          hospital.longitude! <= 180;
+      if (navigationResponse['success'] != true && !hasHospitalCoordinates) {
+        _showLocationMessage(
+            'Directions are not available for this hospital because its location has not been recorded.');
         return;
       }
-      final destinationLat = hasEntrance ? hospital.entranceLatitude! : hospital.latitude!;
-      final destinationLng = hasEntrance ? hospital.entranceLongitude! : hospital.longitude!;
-      debugPrint('HOSPITAL DESTINATION hospital: ${hospital.name}, latitude: $destinationLat, longitude: $destinationLng; using=${hasEntrance ? 'main entrance' : 'hospital coordinates'}');
-      debugPrint('NAVIGATION origin: ${patientPosition.latitude},${patientPosition.longitude}; destination: $destinationLat,$destinationLng');
-
+      // Google Maps URLs cannot consume a Routes navigation-point token. When
+      // one exists, its cached road-side coordinates are the faithful external
+      // Maps destination; never replace them with the building Place ID.
+      final destination = hasNavigationPoint
+          ? '$navLatitude,$navLongitude'
+          : placeId?.isNotEmpty == true
+              ? 'place_id:$placeId'
+              : '${hospital.latitude},${hospital.longitude}';
       final uri = Uri.https('www.google.com', '/maps/dir/', {
         'api': '1',
         'origin': '${patientPosition.latitude},${patientPosition.longitude}',
-        'destination': '$destinationLat,$destinationLng',
+        'destination': destination,
         'travelmode': 'driving',
       });
-      if (!await launchUrl(uri, mode: LaunchMode.externalApplication) && mounted) {
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
+          mounted) {
         _showLocationMessage('Unable to open Google Maps.');
       }
     } on PatientLocationException catch (error) {
       if (mounted) _showLocationMessage(error.message);
     } catch (_) {
-      if (mounted) _showLocationMessage('Unable to get your current location. Please enable GPS/location permission and try again.');
+      if (mounted) {
+        _showLocationMessage(
+            'Unable to get your current location. Please enable GPS/location permission and try again.');
+      }
     }
   }
 
   void _showLocationMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -183,7 +242,7 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
           // Filter & Sort Toolbar
           Container(
             padding: const EdgeInsets.all(12),
-            color: Colors.blue.shade50,
+            color: AppColors.primary.withValues(alpha: 0.1),
             child: Column(
               children: [
                 if (_userLat != null && _userLng != null)
@@ -191,20 +250,35 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                     width: double.infinity,
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                    child: Text('📍 Your current location\n${_userLat!.toStringAsFixed(6)}, ${_userLng!.toStringAsFixed(6)} • Location updated just now', style: const TextStyle(fontSize: 12)),
+                    decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8)),
+                    child: Text(
+                        '📍 Your current location\n${_userLat!.toStringAsFixed(6)}, ${_userLng!.toStringAsFixed(6)} • Location updated just now',
+                        style: const TextStyle(fontSize: 12)),
                   ),
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Nearby hospitals only'),
-                  subtitle: Text(_nearbyOnly ? 'Showing hospitals within the selected radius' : 'Showing all approved hospitals on the platform'),
+                  subtitle: Text(_nearbyOnly
+                      ? 'Showing hospitals within the selected radius'
+                      : 'Showing all approved hospitals on the platform'),
                   value: _nearbyOnly,
-                  onChanged: (value) { setState(() => _nearbyOnly = value); _loadHospitals(); },
+                  onChanged: (value) {
+                    setState(() => _nearbyOnly = value);
+                    _loadHospitals();
+                  },
                 ),
-                if (!_nearbyOnly) TextField(
-                  decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Search name, city, specialty or doctor'),
-                  onSubmitted: (value) { setState(() => _search = value); _loadHospitals(); },
-                ),
+                if (!_nearbyOnly)
+                  TextField(
+                    decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.search),
+                        hintText: 'Search name, city, specialty or doctor'),
+                    onSubmitted: (value) {
+                      setState(() => _search = value);
+                      _loadHospitals();
+                    },
+                  ),
                 if (!_nearbyOnly) const SizedBox(height: 8),
                 if (_specialties.isNotEmpty)
                   DropdownButtonFormField<String>(
@@ -215,70 +289,89 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                       labelText: 'Find healthcare by specialty',
                     ),
                     items: [
-                      const DropdownMenuItem<String>(value: null, child: Text('All specialties')),
-                      ..._specialties.map((specialty) => DropdownMenuItem(value: specialty, child: Text(specialty))),
+                      const DropdownMenuItem<String>(
+                          value: null, child: Text('All specialties')),
+                      ..._specialties.map((specialty) => DropdownMenuItem(
+                          value: specialty, child: Text(specialty))),
                     ],
-                    onChanged: (value) { setState(() => _selectedSpecialty = value); _loadHospitals(); },
+                    onChanged: (value) {
+                      setState(() => _selectedSpecialty = value);
+                      _loadHospitals();
+                    },
                   ),
                 if (_specialties.isNotEmpty) const SizedBox(height: 8),
                 // Radius selection
-                if (_nearbyOnly) Row(
-                  children: [
-                    const Text('Distance:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                    const SizedBox(width: 8),
-                    ...[5.0, 10.0, 20.0].map((r) => Padding(
-                      padding: const EdgeInsets.only(right: 6),
-                      child: ChoiceChip(
-                        label: Text('${r.toInt()} km', style: const TextStyle(fontSize: 11)),
-                        selected: _selectedRadius == r,
-                        onSelected: (sel) {
-                          if (sel) {
-                            setState(() => _selectedRadius = r);
-                            _loadHospitals();
-                          }
-                        },
-                        selectedColor: const Color(0xFF0A4D68),
-                        labelStyle: TextStyle(color: _selectedRadius == r ? Colors.white : Colors.black),
-                      ),
-                    )),
-                  ],
-                ),
+                if (_nearbyOnly)
+                  Row(
+                    children: [
+                      const Text('Distance:',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 12)),
+                      const SizedBox(width: 8),
+                      ...[5.0, 10.0, 20.0].map((r) => Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ChoiceChip(
+                              label: Text('${r.toInt()} km',
+                                  style: const TextStyle(fontSize: 11)),
+                              selected: _selectedRadius == r,
+                              onSelected: (sel) {
+                                if (sel) {
+                                  setState(() => _selectedRadius = r);
+                                  _loadHospitals();
+                                }
+                              },
+                              selectedColor: const Color(0xFF142D4E),
+                              labelStyle: TextStyle(
+                                  color: _selectedRadius == r
+                                      ? Colors.white
+                                      : Colors.black),
+                            ),
+                          )),
+                    ],
+                  ),
                 if (_nearbyOnly) const SizedBox(height: 8),
 
                 // Sort selection
-                if (_nearbyOnly) Row(
-                  children: [
-                    const Text('Sort by:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedSort,
-                            isExpanded: true,
-                            isDense: true,
-                            items: _sortOptions.entries.map((e) => DropdownMenuItem(
-                              value: e.key,
-                              child: Text(e.value, style: const TextStyle(fontSize: 12)),
-                            )).toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() => _selectedSort = val);
-                                _loadHospitals();
-                              }
-                            },
+                if (_nearbyOnly)
+                  Row(
+                    children: [
+                      const Text('Sort by:',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 12)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _selectedSort,
+                              isExpanded: true,
+                              isDense: true,
+                              items: _sortOptions.entries
+                                  .map((e) => DropdownMenuItem(
+                                        value: e.key,
+                                        child: Text(e.value,
+                                            style:
+                                                const TextStyle(fontSize: 12)),
+                                      ))
+                                  .toList(),
+                              onChanged: (val) {
+                                if (val != null) {
+                                  setState(() => _selectedSort = val);
+                                  _loadHospitals();
+                                }
+                              },
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
               ],
             ),
           ),
@@ -292,11 +385,14 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                            const Icon(Icons.error_outline,
+                                size: 64, color: AppColors.error),
                             const SizedBox(height: 16),
                             Text(_errorMessage!),
                             const SizedBox(height: 16),
-                            ElevatedButton(onPressed: _loadHospitals, child: const Text('Retry')),
+                            ElevatedButton(
+                                onPressed: _loadHospitals,
+                                child: const Text('Retry')),
                           ],
                         ),
                       )
@@ -305,11 +401,18 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.local_hospital_outlined, size: 64, color: Colors.grey),
+                                const Icon(Icons.local_hospital_outlined,
+                                    size: 64, color: Colors.grey),
                                 const SizedBox(height: 16),
-                                Text(_nearbyOnly ? 'No hospitals found in this radius' : 'No approved hospitals found', style: const TextStyle(fontSize: 16)),
+                                Text(
+                                    _nearbyOnly
+                                        ? 'No hospitals found in this radius'
+                                        : 'No approved hospitals found',
+                                    style: const TextStyle(fontSize: 16)),
                                 const SizedBox(height: 16),
-                                ElevatedButton(onPressed: _loadHospitals, child: const Text('Refresh')),
+                                ElevatedButton(
+                                    onPressed: _loadHospitals,
+                                    child: const Text('Refresh')),
                               ],
                             ),
                           )
@@ -319,7 +422,8 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                               padding: const EdgeInsets.all(16),
                               itemCount: _hospitals.length,
                               itemBuilder: (context, index) {
-                                return _buildHospitalCard(_hospitals[index], index);
+                                return _buildHospitalCard(
+                                    _hospitals[index], index);
                               },
                             ),
                           ),
@@ -331,27 +435,34 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
 
   Widget _buildHospitalCard(Hospital hospital, int index) {
     final raw = index < _rawHospitals.length ? _rawHospitals[index] : {};
-    final travelTime = raw['travel_time'] ?? math.max(2, (hospital.availableBeds % 15) + 3);
+    final travelTime =
+        raw['travel_time'] ?? math.max(2, (hospital.availableBeds % 15) + 3);
     final waitingTime = raw['waiting_time'] ?? 15;
-    final doctorCount = raw['doctor_count'] ?? 4;
+    final rawDoctorCount = raw['doctor_count'];
+    final int? doctorCount = rawDoctorCount is num
+        ? rawDoctorCount.toInt()
+        : int.tryParse(rawDoctorCount?.toString() ?? '');
     double? parseCoordinate(dynamic value) {
       if (value is num) return value.toDouble();
       return double.tryParse(value?.toString() ?? '');
     }
+
     final lat = parseCoordinate(raw['latitude']);
     final lng = parseCoordinate(raw['longitude']);
 
     // Calculate occupancy percentage
     final occupancyPercent = hospital.totalBeds > 0
-        ? ((hospital.totalBeds - hospital.availableBeds) / hospital.totalBeds * 100)
+        ? ((hospital.totalBeds - hospital.availableBeds) /
+            hospital.totalBeds *
+            100)
         : 0.0;
-    
+
     Color getAvailabilityColor(int available, int total) {
       if (total == 0) return Colors.grey;
       final ratio = available / total;
-      if (ratio > 0.5) return Colors.green;
-      if (ratio > 0.2) return Colors.orange;
-      return Colors.red;
+      if (ratio > 0.5) return AppColors.success;
+      if (ratio > 0.2) return AppColors.warning;
+      return AppColors.error;
     }
 
     return Card(
@@ -371,6 +482,34 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (hospital.coverPhotoUrl?.isNotEmpty == true) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(9),
+                  child: Image.network(
+                    ApiService.resolveHospitalPhotoUrl(hospital.coverPhotoUrl!)
+                        .toString(),
+                    height: 150,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    semanticLabel: '${hospital.name} hospital cover photo',
+                    loadingBuilder: (context, child, progress) => progress ==
+                            null
+                        ? child
+                        : const SizedBox(
+                            height: 150,
+                            child: Center(
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))),
+                    errorBuilder: (context, error, stack) => const SizedBox(
+                      height: 72,
+                      child: Center(
+                          child: Icon(Icons.broken_image_outlined,
+                              color: Colors.grey)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
               // Hospital Name and Rating
               Row(
                 children: [
@@ -384,14 +523,18 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                     ),
                   ),
                   if (hospital.isVerified)
-                    const Icon(Icons.verified, color: Colors.green, size: 16),
+                    const Icon(Icons.verified,
+                        color: AppColors.success, size: 16),
                   const SizedBox(width: 4),
-                  if (hospital.ratingVerified && hospital.googleRating != null) Row(
-                    children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 16),
-                      Text(' ${hospital.googleRating!.toStringAsFixed(1)}${hospital.googleReviewCount == null ? '' : ' (${hospital.googleReviewCount})'}'),
-                    ],
-                  ),
+                  if (hospital.ratingVerified && hospital.googleRating != null)
+                    Row(
+                      children: [
+                        const Icon(Icons.star,
+                            color: AppColors.warning, size: 16),
+                        Text(
+                            ' ${hospital.googleRating!.toStringAsFixed(1)}${hospital.googleReviewCount == null ? '' : ' (${hospital.googleReviewCount})'}'),
+                      ],
+                    ),
                 ],
               ),
               const SizedBox(height: 4),
@@ -409,79 +552,102 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.location_on, size: 14, color: Colors.blue),
+                      const Icon(Icons.location_on,
+                          size: 14, color: AppColors.primary),
                       const SizedBox(width: 4),
-                      Text(hospital.distance, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      Text(hospital.distance,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 12)),
                     ],
                   ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.directions_car, size: 14, color: Colors.green),
+                      const Icon(Icons.directions_car,
+                          size: 14, color: AppColors.success),
                       const SizedBox(width: 4),
-                      Text('$travelTime mins ETA', style: const TextStyle(fontSize: 12)),
+                      Text('$travelTime mins ETA',
+                          style: const TextStyle(fontSize: 12)),
                     ],
                   ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.access_time, size: 14, color: Colors.orange),
+                      const Icon(Icons.access_time,
+                          size: 14, color: AppColors.warning),
                       const SizedBox(width: 4),
-                      Text('Wait: ${waitingTime}m', style: const TextStyle(fontSize: 12)),
+                      Text('Wait: ${waitingTime}m',
+                          style: const TextStyle(fontSize: 12)),
                     ],
                   ),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.person, size: 14, color: Colors.purple),
+                      const Icon(Icons.person,
+                          size: 14, color: AppColors.secondary),
                       const SizedBox(width: 4),
-                      Text('$doctorCount Docs', style: const TextStyle(fontSize: 12)),
+                      Text(
+                          doctorCount == null
+                              ? 'Doctors unavailable'
+                              : '$doctorCount Docs',
+                          style: const TextStyle(fontSize: 12)),
                     ],
                   ),
                 ],
               ),
               const SizedBox(height: 8),
-              
+
               // One-Tap Navigation Button & Emergency tag
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   if (hospital.emergencyServices)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.1),
+                        color: AppColors.error.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Row(
                         children: [
-                          Icon(Icons.emergency, color: Colors.red, size: 12),
+                          Icon(Icons.emergency,
+                              color: AppColors.error, size: 12),
                           SizedBox(width: 4),
-                          Text('24/7 Emergency', style: TextStyle(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold)),
+                          Text('24/7 Emergency',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.error,
+                                  fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
-                  if (lat != null && lng != null) ElevatedButton.icon(
-                    onPressed: () => _launchGoogleMapsNavigation(hospital),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade700,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      visualDensity: VisualDensity.compact,
+                  if (lat != null && lng != null)
+                    ElevatedButton.icon(
+                      onPressed: () => _launchGoogleMapsNavigation(hospital),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      icon: const Icon(Icons.navigation, size: 14),
+                      label: const Text('NAVIGATE',
+                          style: TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.bold)),
                     ),
-                    icon: const Icon(Icons.navigation, size: 14),
-                    label: const Text('NAVIGATE', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                  ),
                 ],
               ),
               const SizedBox(height: 8),
-              
+
               // Specialties
               Wrap(
                 spacing: 4,
                 children: hospital.specialties.take(3).map((specialty) {
                   return Chip(
-                    label: Text(specialty, style: const TextStyle(fontSize: 10)),
+                    label:
+                        Text(specialty, style: const TextStyle(fontSize: 10)),
                     padding: EdgeInsets.zero,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     visualDensity: VisualDensity.compact,
@@ -489,7 +655,7 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                 }).toList(),
               ),
               const SizedBox(height: 8),
-              
+
               // Bed Occupancy Bar
               LinearProgressIndicator(
                 value: hospital.totalBeds > 0
@@ -497,10 +663,11 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                         hospital.totalBeds
                     : 0,
                 backgroundColor: Colors.grey.shade200,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  occupancyPercent > 80 ? Colors.red :
-                  occupancyPercent > 50 ? Colors.orange : Colors.green
-                ),
+                valueColor: AlwaysStoppedAnimation<Color>(occupancyPercent > 80
+                    ? AppColors.error
+                    : occupancyPercent > 50
+                        ? AppColors.warning
+                        : AppColors.success),
                 minHeight: 4,
               ),
               const SizedBox(height: 4),
@@ -508,7 +675,7 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                 'Bed Occupancy: ${occupancyPercent.toStringAsFixed(0)}%',
                 style: const TextStyle(fontSize: 10, color: Colors.grey),
               ),
-              
+
               // Resource Quick View
               const SizedBox(height: 8),
               Container(
@@ -525,21 +692,27 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
                       label: 'ICU',
                       available: hospital.availableIcu,
                       total: hospital.icuBeds,
-                      color: getAvailabilityColor(hospital.availableIcu, hospital.icuBeds),
+                      color: getAvailabilityColor(
+                          hospital.availableIcu, hospital.icuBeds),
                     ),
                     _buildResourceChip(
                       icon: Icons.air,
                       label: 'Vent',
                       available: hospital.availableVentilators,
                       total: hospital.ventilatorCount,
-                      color: getAvailabilityColor(hospital.availableVentilators, hospital.ventilatorCount),
+                      color: getAvailabilityColor(hospital.availableVentilators,
+                          hospital.ventilatorCount),
                     ),
                     _buildResourceChip(
                       icon: Icons.water_drop,
                       label: 'Blood',
                       available: hospital.bloodUnits,
-                      total: 100, // Max blood units reference
-                      color: hospital.bloodUnits > 20 ? Colors.green : Colors.red,
+                      // The schema records available stock per blood group,
+                      // not an artificial hospital-wide capacity.
+                      total: null,
+                      color: hospital.bloodUnits > 20
+                          ? AppColors.success
+                          : AppColors.error,
                     ),
                   ],
                 ),
@@ -555,7 +728,7 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
     required IconData icon,
     required String label,
     required int available,
-    required int total,
+    required int? total,
     required Color color,
   }) {
     return Row(
@@ -563,7 +736,7 @@ class _PatientNearbyHospitalsState extends State<PatientNearbyHospitals> {
         Icon(icon, size: 14, color: color),
         const SizedBox(width: 4),
         Text(
-          '$label: $available${total > 0 ? '/$total' : ''}',
+          '$label: $available${total != null ? '/$total' : ' units'}',
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w500,
@@ -589,7 +762,16 @@ class HospitalDetailScreen extends StatefulWidget {
 }
 
 class _HospitalDetailScreenState extends State<HospitalDetailScreen> {
-  static const _bloodGroups = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+  static const _bloodGroups = [
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'O+',
+    'O-',
+    'AB+',
+    'AB-'
+  ];
   late Future<_HospitalDetailData> _detailFuture;
   String? _selectedBloodGroup;
 
@@ -608,10 +790,12 @@ class _HospitalDetailScreenState extends State<HospitalDetailScreen> {
     ]);
     final resourceResponse = responses[0];
     final bloodResponse = responses[1];
-    final resources = resourceResponse['success'] == true && resourceResponse['data'] is Map
-        ? Map<String, dynamic>.from(resourceResponse['data'] as Map)
-        : <String, dynamic>{};
-    final bloodFailed = bloodResponse['success'] != true || bloodResponse['data'] is! List;
+    final resources =
+        resourceResponse['success'] == true && resourceResponse['data'] is Map
+            ? Map<String, dynamic>.from(resourceResponse['data'] as Map)
+            : <String, dynamic>{};
+    final bloodFailed =
+        bloodResponse['success'] != true || bloodResponse['data'] is! List;
     final bloodStock = <String, int>{};
     if (!bloodFailed) {
       for (final entry in bloodResponse['data'] as List) {
@@ -626,9 +810,9 @@ class _HospitalDetailScreenState extends State<HospitalDetailScreen> {
       }
     }
     debugPrint('[BLOOD BANK] Hospital ID: ${hospital.id}');
-    debugPrint('[BLOOD BANK] API response: $bloodResponse');
     debugPrint('[BLOOD BANK] Parsed stock: $bloodStock');
-    return _HospitalDetailData(resources: resources, bloodStock: bloodStock, bloodFailed: bloodFailed);
+    return _HospitalDetailData(
+        resources: resources, bloodStock: bloodStock, bloodFailed: bloodFailed);
   }
 
   static String? _normaliseBloodGroup(String? value) {
@@ -636,14 +820,30 @@ class _HospitalDetailScreenState extends State<HospitalDetailScreen> {
     if (_bloodGroups.contains(raw)) return raw;
     final valueKey = raw.replaceAll(RegExp('[ _-]+'), '');
     const aliases = {
-      'A+': 'A+', 'APOSITIVE': 'A+', 'APOS': 'A+',
-      'A-': 'A-', 'ANEGATIVE': 'A-', 'ANEG': 'A-',
-      'B+': 'B+', 'BPOSITIVE': 'B+', 'BPOS': 'B+',
-      'B-': 'B-', 'BNEGATIVE': 'B-', 'BNEG': 'B-',
-      'O+': 'O+', 'OPOSITIVE': 'O+', 'OPOS': 'O+',
-      'O-': 'O-', 'ONEGATIVE': 'O-', 'ONEG': 'O-',
-      'AB+': 'AB+', 'ABPOSITIVE': 'AB+', 'ABPOS': 'AB+',
-      'AB-': 'AB-', 'ABNEGATIVE': 'AB-', 'ABNEG': 'AB-',
+      'A+': 'A+',
+      'APOSITIVE': 'A+',
+      'APOS': 'A+',
+      'A-': 'A-',
+      'ANEGATIVE': 'A-',
+      'ANEG': 'A-',
+      'B+': 'B+',
+      'BPOSITIVE': 'B+',
+      'BPOS': 'B+',
+      'B-': 'B-',
+      'BNEGATIVE': 'B-',
+      'BNEG': 'B-',
+      'O+': 'O+',
+      'OPOSITIVE': 'O+',
+      'OPOS': 'O+',
+      'O-': 'O-',
+      'ONEGATIVE': 'O-',
+      'ONEG': 'O-',
+      'AB+': 'AB+',
+      'ABPOSITIVE': 'AB+',
+      'ABPOS': 'AB+',
+      'AB-': 'AB-',
+      'ABNEGATIVE': 'AB-',
+      'ABNEG': 'AB-',
     };
     return aliases[valueKey];
   }
@@ -660,20 +860,32 @@ class _HospitalDetailScreenState extends State<HospitalDetailScreen> {
           final data = snapshot.data ?? const _HospitalDetailData();
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               _buildHospitalHeader(),
               const SizedBox(height: 18),
-              const Text('RESOURCE AVAILABILITY', style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: .5)),
+              _HospitalPhotoGallery(hospital: hospital),
+              const SizedBox(height: 18),
+              const Text('RESOURCE AVAILABILITY',
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700, letterSpacing: .5)),
               const SizedBox(height: 8),
               _buildResourceGrid(data.resources),
               const SizedBox(height: 18),
               Row(children: [
-                const Text('BLOOD BANK', style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: .5)),
+                const Text('BLOOD BANK',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700, letterSpacing: .5)),
                 const Spacer(),
-                if (snapshot.connectionState == ConnectionState.waiting) const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2)),
               ]),
               const SizedBox(height: 8),
-              if (data.bloodFailed && snapshot.connectionState != ConnectionState.waiting)
+              if (data.bloodFailed &&
+                  snapshot.connectionState != ConnectionState.waiting)
                 _buildBloodUnavailable()
               else ...[
                 if (data.bloodStock.isEmpty)
@@ -687,17 +899,28 @@ class _HospitalDetailScreenState extends State<HospitalDetailScreen> {
                 _buildBloodGrid(data.bloodStock),
               ],
               const SizedBox(height: 12),
-              SizedBox(width: double.infinity, child: OutlinedButton.icon(
-                onPressed: data.bloodFailed || _selectedBloodGroup == null ? null : () => _requestBlood(data.bloodStock, _selectedBloodGroup!),
-                icon: const Icon(Icons.water_drop_outlined), label: const Text('Request Blood'),
-              )),
+              SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: data.bloodFailed || _selectedBloodGroup == null
+                        ? null
+                        : () => _requestBlood(
+                            data.bloodStock, _selectedBloodGroup!),
+                    icon: const Icon(Icons.water_drop_outlined),
+                    label: const Text('Request Blood'),
+                  )),
               const SizedBox(height: 12),
               _HospitalDoctorsSection(hospital: hospital),
               const SizedBox(height: 12),
-              SizedBox(width: double.infinity, child: ElevatedButton(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => BookingScreen(hospital: hospital))),
-                child: const Text('Book Appointment'),
-              )),
+              SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => BookingScreen(hospital: hospital))),
+                    child: const Text('Book Appointment'),
+                  )),
             ]),
           );
         },
@@ -706,70 +929,557 @@ class _HospitalDetailScreenState extends State<HospitalDetailScreen> {
   }
 
   Widget _buildHospitalHeader() => Card(
-    margin: EdgeInsets.zero,
-    child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        Expanded(child: Text(hospital.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
-        if (hospital.isVerified) const Icon(Icons.verified, color: Colors.green, size: 20),
-      ]),
-      if (hospital.ratingVerified && hospital.googleRating != null) ...[
-        const SizedBox(height: 4),
-        Row(children: [const Icon(Icons.star, size: 17, color: Colors.amber), const SizedBox(width: 4), Text('${hospital.googleRating!.toStringAsFixed(1)} Google${hospital.googleReviewCount == null ? '' : ' · ${hospital.googleReviewCount} reviews'}')]),
-      ],
-      const SizedBox(height: 6),
-      _headerLine(Icons.location_on_outlined, hospital.address),
-      if (hospital.phone.isNotEmpty) _headerLine(Icons.phone_outlined, hospital.phone),
-    ])),
-  );
+        margin: EdgeInsets.zero,
+        child: Padding(
+            padding: const EdgeInsets.all(14),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(
+                    child: Text(hospital.name,
+                        style: const TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.bold))),
+                if (hospital.isVerified)
+                  const Icon(Icons.verified,
+                      color: AppColors.success, size: 20),
+              ]),
+              if (hospital.ratingVerified && hospital.googleRating != null) ...[
+                const SizedBox(height: 4),
+                Row(children: [
+                  const Icon(Icons.star, size: 17, color: AppColors.warning),
+                  const SizedBox(width: 4),
+                  Text(
+                      '${hospital.googleRating!.toStringAsFixed(1)} Google${hospital.googleReviewCount == null ? '' : ' · ${hospital.googleReviewCount} reviews'}')
+                ]),
+              ],
+              const SizedBox(height: 6),
+              _headerLine(Icons.location_on_outlined, hospital.address),
+              if (hospital.phone.isNotEmpty)
+                _headerLine(Icons.phone_outlined, hospital.phone),
+            ])),
+      );
 
-  Widget _headerLine(IconData icon, String label) => Padding(padding: const EdgeInsets.only(top: 3), child: Row(children: [Icon(icon, size: 16, color: Colors.grey.shade700), const SizedBox(width: 6), Expanded(child: Text(label, style: const TextStyle(fontSize: 13)))]));
+  Widget _headerLine(IconData icon, String label) => Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Row(children: [
+        Icon(icon, size: 16, color: Colors.grey.shade700),
+        const SizedBox(width: 6),
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 13)))
+      ]));
 
   Widget _buildResourceGrid(Map<String, dynamic> values) {
     final resources = [
-      ('General Beds', Icons.king_bed_outlined, _number(values['general_beds_available'], hospital.availableBeds), _number(values['general_beds_total'], hospital.totalBeds)),
-      ('ICU Beds', Icons.local_hospital_outlined, _number(values['icu_beds_available'], hospital.availableIcu), _number(values['icu_beds_total'], hospital.icuBeds)),
-      ('Oxygen Beds', Icons.air_outlined, _number(values['oxygen_beds_available'], hospital.oxygenBedsAvailable), _number(values['oxygen_beds_total'], hospital.oxygenBedsTotal)),
-      ('Ventilators', Icons.monitor_heart_outlined, _number(values['ventilators_available'], hospital.availableVentilators), _number(values['ventilators_total'], hospital.ventilatorCount)),
+      (
+        'General Beds',
+        Icons.king_bed_outlined,
+        _number(values['general_beds_available'], hospital.availableBeds),
+        _number(values['general_beds_total'], hospital.totalBeds)
+      ),
+      (
+        'ICU Beds',
+        Icons.local_hospital_outlined,
+        _number(values['icu_beds_available'], hospital.availableIcu),
+        _number(values['icu_beds_total'], hospital.icuBeds)
+      ),
+      (
+        'Oxygen Beds',
+        Icons.air_outlined,
+        _number(values['oxygen_beds_available'], hospital.oxygenBedsAvailable),
+        _number(values['oxygen_beds_total'], hospital.oxygenBedsTotal)
+      ),
+      (
+        'Ventilators',
+        Icons.monitor_heart_outlined,
+        _number(values['ventilators_available'], hospital.availableVentilators),
+        _number(values['ventilators_total'], hospital.ventilatorCount)
+      ),
     ];
     return LayoutBuilder(builder: (context, constraints) {
-      final columns = constraints.maxWidth >= 820 ? 4 : constraints.maxWidth >= 460 ? 2 : 1;
-      return GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: columns, mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: columns == 1 ? 3.8 : 1.75, children: resources.map((item) => _resourceTile(item.$1, item.$2, item.$3, item.$4)).toList());
+      final columns = constraints.maxWidth >= 820
+          ? 4
+          : constraints.maxWidth >= 460
+              ? 2
+              : 1;
+      return GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: columns,
+          mainAxisSpacing: 8,
+          crossAxisSpacing: 8,
+          childAspectRatio: columns == 1 ? 3.8 : 1.75,
+          children: resources
+              .map((item) => _resourceTile(item.$1, item.$2, item.$3, item.$4))
+              .toList());
     });
   }
 
-  int _number(dynamic value, int fallback) => value is num ? value.round() : int.tryParse(value?.toString() ?? '') ?? fallback;
+  int _number(dynamic value, int fallback) => value is num
+      ? value.round()
+      : int.tryParse(value?.toString() ?? '') ?? fallback;
 
   Widget _resourceTile(String name, IconData icon, int available, int total) {
-    final status = available == 0 ? 'Full' : total > 0 && available / total <= .2 ? 'Limited' : 'Available';
-    final color = status == 'Available' ? Colors.green : status == 'Limited' ? Colors.orange : Colors.red;
-    return Card(margin: EdgeInsets.zero, child: Padding(padding: const EdgeInsets.all(10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
-      Row(children: [Icon(icon, size: 18, color: const Color(0xFF0A4D68)), const SizedBox(width: 5), Expanded(child: Text(name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)))]),
-      const SizedBox(height: 5), Text('$available / $total', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-      Text('$available available', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-      const SizedBox(height: 2), Row(children: [Icon(Icons.circle, size: 8, color: color), const SizedBox(width: 4), Text(status, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600))]),
-    ])));
+    final status = available == 0
+        ? 'Full'
+        : total > 0 && available / total <= .2
+            ? 'Limited'
+            : 'Available';
+    final color = status == 'Available'
+        ? AppColors.success
+        : status == 'Limited'
+            ? AppColors.warning
+            : AppColors.error;
+    return Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(children: [
+                    Icon(icon, size: 18, color: const Color(0xFF142D4E)),
+                    const SizedBox(width: 5),
+                    Expanded(
+                        child: Text(name,
+                            style: const TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w600)))
+                  ]),
+                  const SizedBox(height: 5),
+                  Text('$available / $total',
+                      style: const TextStyle(
+                          fontSize: 17, fontWeight: FontWeight.bold)),
+                  Text('$available available',
+                      style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                  const SizedBox(height: 2),
+                  Row(children: [
+                    Icon(Icons.circle, size: 8, color: color),
+                    const SizedBox(width: 4),
+                    Text(status,
+                        style: TextStyle(
+                            fontSize: 11,
+                            color: color,
+                            fontWeight: FontWeight.w600))
+                  ]),
+                ])));
   }
 
-  Widget _buildBloodGrid(Map<String, int> stock) => LayoutBuilder(builder: (context, constraints) {
-    final columns = constraints.maxWidth >= 720 ? 4 : 2;
-    return GridView.count(shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: columns, mainAxisSpacing: 7, crossAxisSpacing: 7, childAspectRatio: 3.1, children: _bloodGroups.map((group) {
-      final units = stock[group];
-      final text = units == null ? 'Not recorded' : '$units ${units == 1 ? 'unit' : 'units'}';
-      final color = units == null ? Colors.grey : units == 0 ? Colors.red : units <= 5 ? Colors.orange : Colors.green;
-      final isSelected = group == _selectedBloodGroup;
-      return InkWell(onTap: units == null ? null : () => setState(() => _selectedBloodGroup = group), borderRadius: BorderRadius.circular(8), child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7), decoration: BoxDecoration(color: color.withValues(alpha: .08), borderRadius: BorderRadius.circular(8), border: Border.all(color: isSelected ? const Color(0xFF0A4D68) : color.withValues(alpha: .25), width: isSelected ? 2 : 1)), child: Row(children: [Text(group, style: const TextStyle(fontWeight: FontWeight.bold)), const SizedBox(width: 8), Expanded(child: Text(text, textAlign: TextAlign.right, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)))])));
-    }).toList());
-  });
+  Widget _buildBloodGrid(Map<String, int> stock) =>
+      LayoutBuilder(builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 720 ? 4 : 2;
+        return GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: columns,
+            mainAxisSpacing: 7,
+            crossAxisSpacing: 7,
+            childAspectRatio: 3.1,
+            children: _bloodGroups.map((group) {
+              final units = stock[group];
+              final text = units == null
+                  ? 'Not recorded'
+                  : '$units ${units == 1 ? 'unit' : 'units'}';
+              final color = units == null
+                  ? Colors.grey
+                  : units == 0
+                      ? AppColors.error
+                      : units <= 5
+                          ? AppColors.warning
+                          : AppColors.success;
+              final isSelected = group == _selectedBloodGroup;
+              return InkWell(
+                  onTap: units == null
+                      ? null
+                      : () => setState(() => _selectedBloodGroup = group),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 7),
+                      decoration: BoxDecoration(
+                          color: color.withValues(alpha: .08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: isSelected
+                                  ? const Color(0xFF142D4E)
+                                  : color.withValues(alpha: .25),
+                              width: isSelected ? 2 : 1)),
+                      child: Row(children: [
+                        Text(group,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                            child: Text(text,
+                                textAlign: TextAlign.right,
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: color,
+                                    fontWeight: FontWeight.w600)))
+                      ])));
+            }).toList());
+      });
 
-  Widget _buildBloodUnavailable() => Row(children: [const Icon(Icons.cloud_off_outlined, color: Colors.orange), const SizedBox(width: 8), const Expanded(child: Text('Blood availability unavailable')), TextButton(onPressed: () => setState(() => _detailFuture = _loadDetails()), child: const Text('Retry'))]);
+  Widget _buildBloodUnavailable() => Row(children: [
+        const Icon(Icons.cloud_off_outlined, color: AppColors.warning),
+        const SizedBox(width: 8),
+        const Expanded(child: Text('Blood availability unavailable')),
+        TextButton(
+            onPressed: () => setState(() => _detailFuture = _loadDetails()),
+            child: const Text('Retry'))
+      ]);
 
   void _requestBlood(Map<String, int> stock, String selected) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => PatientResourceRequest(hospitalId: hospital.id, hospitalName: hospital.name, resourceType: 'blood', bloodGroup: selected, availableQuantity: stock[selected])));
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => PatientResourceRequest(
+                hospitalId: hospital.id,
+                hospitalName: hospital.name,
+                resourceType: 'blood',
+                bloodGroup: selected,
+                availableQuantity: stock[selected])));
   }
 }
 
+class _HospitalPhotoGallery extends StatefulWidget {
+  const _HospitalPhotoGallery({required this.hospital});
+  final Hospital hospital;
+
+  @override
+  State<_HospitalPhotoGallery> createState() => _HospitalPhotoGalleryState();
+}
+
+class _HospitalPhotoGalleryState extends State<_HospitalPhotoGallery> {
+  late Future<Map<String, dynamic>> _photosFuture;
+  final List<Map<String, dynamic>> _morePhotos = [];
+  bool _loadingMore = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _photosFuture = ApiService.getHospitalPhotos(widget.hospital.id);
+  }
+
+  Future<void> _loadMore(int currentCount) async {
+    if (_loadingMore) return;
+    setState(() => _loadingMore = true);
+    final result = await ApiService.getHospitalPhotos(widget.hospital.id,
+        limit: 24, offset: currentCount);
+    if (!mounted) return;
+    setState(() {
+      if (result['success'] == true && result['data'] is List) {
+        _morePhotos.addAll(List<Map<String, dynamic>>.from(
+          (result['data'] as List)
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item)),
+        ));
+      }
+      _loadingMore = false;
+    });
+    if (result['success'] != true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Could not load more photos. Please retry.')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Hospital photos',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          FutureBuilder<Map<String, dynamic>>(
+            future: _photosFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                    height: 120,
+                    child: Center(child: CircularProgressIndicator()));
+              }
+              final result = snapshot.data;
+              final firstPage = result?['success'] == true &&
+                      result?['data'] is List
+                  ? List<Map<String, dynamic>>.from((result!['data'] as List)
+                      .whereType<Map>()
+                      .map((item) => Map<String, dynamic>.from(item)))
+                  : <Map<String, dynamic>>[];
+              if (result?['success'] != true) {
+                return Card(
+                    child: ListTile(
+                  leading: const Icon(Icons.cloud_off_outlined),
+                  title: const Text('Photos are temporarily unavailable.'),
+                  trailing: IconButton(
+                      tooltip: 'Retry loading photos',
+                      icon: const Icon(Icons.refresh),
+                      onPressed: () => setState(() => _photosFuture =
+                          ApiService.getHospitalPhotos(widget.hospital.id))),
+                ));
+              }
+              final photos = [...firstPage, ..._morePhotos];
+              if (photos.isEmpty) {
+                return Card(
+                    child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Row(children: [
+                    const Icon(Icons.photo_library_outlined,
+                        color: Color(0xFF142D4E)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: Text(
+                            'No hospital photos have been published yet.',
+                            style: TextStyle(color: Colors.grey.shade700))),
+                  ]),
+                ));
+              }
+              return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    LayoutBuilder(builder: (context, constraints) {
+                      final columns = (constraints.maxWidth / 170)
+                          .floor()
+                          .clamp(1, 4)
+                          .toInt();
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: photos.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                          childAspectRatio: 1.25,
+                        ),
+                        itemBuilder: (context, index) {
+                          final photo = photos[index];
+                          final url = photo['thumbnail_url']?.toString() ??
+                              photo['image_url']?.toString() ??
+                              '';
+                          return Semantics(
+                            button: true,
+                            label:
+                                '${photo['caption']?.toString().trim().isNotEmpty == true ? photo['caption'] : _photoCategory(photo['category'])}, hospital photo ${index + 1} of ${photos.length}',
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(9),
+                              onTap: () =>
+                                  _openPhotoViewer(context, photos, index),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(9),
+                                child: Stack(fit: StackFit.expand, children: [
+                                  if (url.isNotEmpty)
+                                    Image.network(
+                                      ApiService.resolveHospitalPhotoUrl(url)
+                                          .toString(),
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stack) =>
+                                          const ColoredBox(
+                                              color: Color(0xFFEAF0F2),
+                                              child: Center(
+                                                  child: Icon(Icons
+                                                      .broken_image_outlined))),
+                                      loadingBuilder: (context, child,
+                                              progress) =>
+                                          progress == null
+                                              ? child
+                                              : const ColoredBox(
+                                                  color: Color(0xFFEAF0F2),
+                                                  child: Center(
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                              strokeWidth: 2))),
+                                    )
+                                  else
+                                    const ColoredBox(
+                                        color: Color(0xFFEAF0F2),
+                                        child: Center(
+                                            child: Icon(Icons.photo_outlined))),
+                                  Align(
+                                    alignment: Alignment.bottomCenter,
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.fromLTRB(
+                                          8, 18, 8, 7),
+                                      decoration: const BoxDecoration(
+                                          gradient: LinearGradient(
+                                              begin: Alignment.topCenter,
+                                              end: Alignment.bottomCenter,
+                                              colors: [
+                                            Colors.transparent,
+                                            Colors.black87
+                                          ])),
+                                      child: Text(
+                                        photo['caption']
+                                                    ?.toString()
+                                                    .trim()
+                                                    .isNotEmpty ==
+                                                true
+                                            ? photo['caption'].toString()
+                                            : _photoCategory(photo['category']),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ),
+                                ]),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }),
+                    if (result?['has_more'] == true)
+                      Center(
+                          child: Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: OutlinedButton.icon(
+                          onPressed: _loadingMore
+                              ? null
+                              : () => _loadMore(photos.length),
+                          icon: _loadingMore
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.expand_more),
+                          label: Text(_loadingMore
+                              ? 'Loading photos…'
+                              : 'Load more photos'),
+                        ),
+                      )),
+                  ]);
+            },
+          ),
+        ],
+      );
+
+  static String _photoCategory(dynamic value) => switch (value?.toString()) {
+        'exterior' => 'Exterior and building',
+        'entrance' => 'Entrance and reception',
+        'emergency' => 'Emergency department',
+        'ward' => 'General wards',
+        'icu' => 'ICU and critical care',
+        'laboratory' => 'Laboratory and diagnostics',
+        'pharmacy' => 'Pharmacy',
+        _ => 'Hospital facility',
+      };
+
+  void _openPhotoViewer(BuildContext context, List<Map<String, dynamic>> photos,
+      int initialIndex) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => _HospitalPhotoViewer(
+              hospitalName: widget.hospital.name,
+              photos: photos,
+              initialIndex: initialIndex,
+              categoryLabel: _photoCategory,
+            )));
+  }
+}
+
+class _HospitalPhotoViewer extends StatefulWidget {
+  const _HospitalPhotoViewer(
+      {required this.hospitalName,
+      required this.photos,
+      required this.initialIndex,
+      required this.categoryLabel});
+  final String hospitalName;
+  final List<Map<String, dynamic>> photos;
+  final int initialIndex;
+  final String Function(dynamic) categoryLabel;
+
+  @override
+  State<_HospitalPhotoViewer> createState() => _HospitalPhotoViewerState();
+}
+
+class _HospitalPhotoViewerState extends State<_HospitalPhotoViewer> {
+  late final PageController _controller =
+      PageController(initialPage: widget.initialIndex);
+  late int _index = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            title: Text(widget.hospitalName),
+            actions: [
+              Center(
+                  child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text('${_index + 1} / ${widget.photos.length}')))
+            ]),
+        body: PageView.builder(
+          controller: _controller,
+          itemCount: widget.photos.length,
+          onPageChanged: (index) => setState(() => _index = index),
+          itemBuilder: (context, index) {
+            final photo = widget.photos[index];
+            final caption = photo['caption']?.toString().trim() ?? '';
+            final category = widget.categoryLabel(photo['category']);
+            final url = photo['image_url']?.toString() ?? '';
+            return Column(children: [
+              Expanded(
+                  child: Center(
+                      child: url.isEmpty
+                          ? const Icon(Icons.broken_image_outlined,
+                              color: Colors.white54, size: 64)
+                          : InteractiveViewer(
+                              minScale: 0.8,
+                              maxScale: 4,
+                              child: Image.network(
+                                ApiService.resolveHospitalPhotoUrl(url)
+                                    .toString(),
+                                fit: BoxFit.contain,
+                                semanticLabel:
+                                    caption.isEmpty ? category : caption,
+                                loadingBuilder: (context, child, progress) =>
+                                    progress == null
+                                        ? child
+                                        : const CircularProgressIndicator(
+                                            color: Colors.white),
+                                errorBuilder: (context, error, stack) =>
+                                    const Icon(Icons.broken_image_outlined,
+                                        color: Colors.white54, size: 64),
+                              )))),
+              Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  child: Column(children: [
+                    Text(caption.isEmpty ? category : caption,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600)),
+                    if (caption.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(category,
+                          style: const TextStyle(color: Colors.white70))
+                    ],
+                  ])),
+            ]);
+          },
+        ),
+      );
+}
+
 class _HospitalDetailData {
-  const _HospitalDetailData({this.resources = const {}, this.bloodStock = const {}, this.bloodFailed = false});
+  const _HospitalDetailData(
+      {this.resources = const {},
+      this.bloodStock = const {},
+      this.bloodFailed = false});
   final Map<String, dynamic> resources;
   final Map<String, int> bloodStock;
   final bool bloodFailed;
@@ -781,32 +1491,68 @@ class _HospitalDoctorsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
-    future: ApiService.getHospitalDoctors(hospital.id),
-    builder: (context, snapshot) {
-      if (snapshot.connectionState != ConnectionState.done) {
-        return const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()));
-      }
-      final data = snapshot.data;
-      final doctors = data?['data'] is List ? List<Map<String, dynamic>>.from((data!['data'] as List).whereType<Map>().map((item) => Map<String, dynamic>.from(item))) : <Map<String, dynamic>>[];
-      if (doctors.isEmpty) return const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Doctors', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), SizedBox(height: 8), Text('Doctor information is not currently provided.')]);
-      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Doctors at ${hospital.name}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        ...doctors.map((doctor) => Card(child: ListTile(
-          leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-          title: Text(doctor['name']?.toString() ?? 'Doctor'),
-          subtitle: Text([doctor['designation'], doctor['specialization'], doctor['qualification'], doctor['experience_display']].where((value) => value != null && value.toString().isNotEmpty).join('\n')),
-          isThreeLine: true,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DoctorProfileScreen(hospital: hospital, doctor: doctor))),
-          trailing: const Icon(Icons.chevron_right),
-        ))),
-      ]);
-    },
-  );
+        future: ApiService.getHospitalDoctors(hospital.id),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(
+                child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: CircularProgressIndicator()));
+          }
+          final data = snapshot.data;
+          final doctors = data?['data'] is List
+              ? List<Map<String, dynamic>>.from((data!['data'] as List)
+                  .whereType<Map>()
+                  .map((item) => Map<String, dynamic>.from(item)))
+              : <Map<String, dynamic>>[];
+          if (doctors.isEmpty) {
+            return const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Doctors',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 8),
+                  Text('Doctor information is not currently provided.')
+                ]);
+          }
+          return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Doctors at ${hospital.name}',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                ...doctors.map((doctor) => Card(
+                        child: ListTile(
+                      leading:
+                          const CircleAvatar(child: Icon(Icons.person_outline)),
+                      title: Text(doctor['name']?.toString() ?? 'Doctor'),
+                      subtitle: Text([
+                        doctor['designation'],
+                        doctor['specialization'],
+                        doctor['qualification'],
+                        doctor['experience_display']
+                      ]
+                          .where((value) =>
+                              value != null && value.toString().isNotEmpty)
+                          .join('\n')),
+                      isThreeLine: true,
+                      onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => DoctorProfileScreen(
+                                  hospital: hospital, doctor: doctor))),
+                      trailing: const Icon(Icons.chevron_right),
+                    ))),
+              ]);
+        },
+      );
 }
 
 class DoctorProfileScreen extends StatelessWidget {
-  const DoctorProfileScreen({super.key, required this.hospital, required this.doctor});
+  const DoctorProfileScreen(
+      {super.key, required this.hospital, required this.doctor});
   final Hospital hospital;
   final Map<String, dynamic> doctor;
 
@@ -814,20 +1560,69 @@ class DoctorProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final available = doctor['availability_status'] == true;
     final fields = <MapEntry<String, dynamic>>[
-      MapEntry('Qualification', doctor['qualification']), MapEntry('Designation', doctor['designation']),
-      MapEntry('Specialization', doctor['specialization']), MapEntry('Department', doctor['department']),
-      MapEntry('Experience', doctor['experience_display'] ?? (doctor['experience_years'] == null ? null : '${doctor['experience_years']} years')),
-      MapEntry('Availability', doctor['availability'] ?? (available ? 'Available' : 'Not currently provided')),
+      MapEntry('Qualification', doctor['qualification']),
+      MapEntry('Designation', doctor['designation']),
+      MapEntry('Specialization', doctor['specialization']),
+      MapEntry('Department', doctor['department']),
+      MapEntry(
+          'Experience',
+          doctor['experience_display'] ??
+              (doctor['experience_years'] == null
+                  ? null
+                  : '${doctor['experience_years']} years')),
+      MapEntry(
+          'Availability',
+          doctor['availability'] ??
+              (available ? 'Available' : 'Not currently provided')),
       MapEntry('Verification', doctor['verification_status']),
     ];
-    return Scaffold(appBar: AppBar(title: const Text('Doctor Profile')), body: ListView(padding: const EdgeInsets.all(16), children: [
-      Center(child: CircleAvatar(radius: 40, backgroundImage: doctor['profile_image'] == null ? null : NetworkImage(doctor['profile_image'].toString()), child: doctor['profile_image'] == null ? const Icon(Icons.person, size: 40) : null)),
-      const SizedBox(height: 12), Center(child: Text(doctor['name']?.toString() ?? 'Doctor', style: Theme.of(context).textTheme.titleLarge)), const SizedBox(height: 18),
-      ...fields.where((entry) => entry.value != null && entry.value.toString().isNotEmpty).map((entry) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Text('${entry.key}: ${entry.value}'))),
-      if (doctor['bio'] != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text(doctor['bio'].toString())),
-      const Divider(height: 30), Text(hospital.name, style: const TextStyle(fontWeight: FontWeight.bold)), Text(hospital.address), const SizedBox(height: 18),
-      SizedBox(width: double.infinity, child: ElevatedButton(onPressed: available ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => BookingScreen(hospital: hospital, initialDoctorId: doctor['id'] as int?))) : null, child: Text(available ? 'Book Appointment' : 'Availability not currently provided'))),
-    ]));
+    return Scaffold(
+        appBar: AppBar(title: const Text('Doctor Profile')),
+        body: ListView(padding: const EdgeInsets.all(16), children: [
+          Center(
+              child: CircleAvatar(
+                  radius: 40,
+                  backgroundImage: doctor['profile_image'] == null
+                      ? null
+                      : NetworkImage(doctor['profile_image'].toString()),
+                  child: doctor['profile_image'] == null
+                      ? const Icon(Icons.person, size: 40)
+                      : null)),
+          const SizedBox(height: 12),
+          Center(
+              child: Text(doctor['name']?.toString() ?? 'Doctor',
+                  style: Theme.of(context).textTheme.titleLarge)),
+          const SizedBox(height: 18),
+          ...fields
+              .where((entry) =>
+                  entry.value != null && entry.value.toString().isNotEmpty)
+              .map((entry) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text('${entry.key}: ${entry.value}'))),
+          if (doctor['bio'] != null)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(doctor['bio'].toString())),
+          const Divider(height: 30),
+          Text(hospital.name,
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(hospital.address),
+          const SizedBox(height: 18),
+          SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                  onPressed: available
+                      ? () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => BookingScreen(
+                                  hospital: hospital,
+                                  initialDoctorId: doctor['id'] as int?)))
+                      : null,
+                  child: Text(available
+                      ? 'Book Appointment'
+                      : 'Availability not currently provided'))),
+        ]));
   }
 }
 
@@ -894,9 +1689,10 @@ class _BookingScreenState extends State<BookingScreen> {
         // Set initial selection
         if (_doctors.isNotEmpty) {
           final requestedId = widget.initialDoctorId?.toString();
-          _selectedDoctorId = _doctors.any((doctor) => doctor['id'].toString() == requestedId)
-              ? requestedId
-              : _doctors[0]['id'].toString();
+          _selectedDoctorId =
+              _doctors.any((doctor) => doctor['id'].toString() == requestedId)
+                  ? requestedId
+                  : _doctors[0]['id'].toString();
           await _loadAvailableSlots();
         }
       }
@@ -907,31 +1703,60 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
-  String get _formattedDate => '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
+  String get _formattedDate =>
+      '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
 
   String get _availabilityMessage {
     switch (_availabilityReason) {
-      case 'DOCTOR_ON_LEAVE': return 'Doctor unavailable on this date';
-      case 'NO_SCHEDULE_CONFIGURED': return 'Appointment availability has not been configured for this doctor';
-      case 'ALL_SLOTS_BOOKED': return 'All appointment slots are booked for this date';
-      case 'NO_FUTURE_SLOTS': return 'No future appointment times remain today';
-      case 'INVALID_DATE': return 'Please choose a future appointment date';
-      case 'AVAILABILITY_ERROR': return 'Unable to load appointment availability. Please try again.';
-      default: return 'No appointments available for this date';
+      case 'DOCTOR_ON_LEAVE':
+        return 'Doctor unavailable on this date';
+      case 'NO_SCHEDULE_CONFIGURED':
+        return 'Appointment availability has not been configured for this doctor';
+      case 'ALL_SLOTS_BOOKED':
+        return 'All appointment slots are booked for this date';
+      case 'NO_FUTURE_SLOTS':
+        return 'No future appointment times remain today';
+      case 'INVALID_DATE':
+        return 'Please choose a future appointment date';
+      case 'AVAILABILITY_ERROR':
+        return 'Unable to load appointment availability. Please try again.';
+      default:
+        return 'No appointments available for this date';
     }
   }
 
   Future<void> _loadAvailableSlots() async {
     final doctorId = int.tryParse(_selectedDoctorId ?? '');
     if (doctorId == null) return;
-    setState(() { _isLoadingSlots = true; _selectedSlot = null; _availableSlots = []; _availabilityReason = null; });
+    setState(() {
+      _isLoadingSlots = true;
+      _selectedSlot = null;
+      _availableSlots = [];
+      _availabilityReason = null;
+    });
     final requestDate = _formattedDate;
-    final response = await ApiService.getDoctorAvailableSlots(widget.hospital.id, doctorId, requestDate);
+    final response = await ApiService.getDoctorAvailableSlots(
+        widget.hospital.id, doctorId, requestDate);
     if (!mounted) return;
     // Ignore an older response when a user changes doctor/date quickly.
-    if (requestDate != _formattedDate || doctorId != int.tryParse(_selectedDoctorId ?? '')) return;
-    final slots = response['slots'] is List ? (response['slots'] as List).whereType<Map>().where((slot) => slot['available'] == true).map((slot) => '${slot['time']}').toList() : <String>[];
-    setState(() { _availableSlots = slots; _availabilityReason = response['success'] == true ? response['reason'] as String? : 'AVAILABILITY_ERROR'; _isLoadingSlots = false; });
+    if (requestDate != _formattedDate ||
+        doctorId != int.tryParse(_selectedDoctorId ?? '')) {
+      return;
+    }
+    final slots = response['slots'] is List
+        ? (response['slots'] as List)
+            .whereType<Map>()
+            .where((slot) => slot['available'] == true)
+            .map((slot) => '${slot['time']}')
+            .toList()
+        : <String>[];
+    setState(() {
+      _availableSlots = slots;
+      _availabilityReason = response['success'] == true
+          ? response['reason'] as String?
+          : 'AVAILABILITY_ERROR';
+      _isLoadingSlots = false;
+    });
   }
 
   List<Map<String, dynamic>> get _filteredDoctors {
@@ -958,9 +1783,9 @@ class _BookingScreenState extends State<BookingScreen> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
-              primary: Color(0xFF0A4D68),
+              primary: Color(0xFF142D4E),
               onPrimary: Colors.white,
-              onSurface: Color(0xFF0A4D68),
+              onSurface: Color(0xFF142D4E),
             ),
           ),
           child: child!,
@@ -1001,16 +1826,16 @@ class _BookingScreenState extends State<BookingScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                     Text(widget.hospital.address),
+                    Text(widget.hospital.address),
                     if (widget.qrPayload != null) ...[
                       const SizedBox(height: 8),
                       const Text('Scan verified hospital QR',
-                          style: TextStyle(color: Colors.green)),
+                          style: TextStyle(color: AppColors.success)),
                     ],
-                    ],
-                  ),
+                  ],
                 ),
               ),
+            ),
             const SizedBox(height: 16),
 
             // Date Picker
@@ -1025,7 +1850,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_today, color: Color(0xFF0A4D68)),
+                    const Icon(Icons.calendar_today, color: Color(0xFF142D4E)),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
@@ -1060,7 +1885,7 @@ class _BookingScreenState extends State<BookingScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.access_time, color: Color(0xFF0A4D68)),
+                  const Icon(Icons.access_time, color: Color(0xFF142D4E)),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -1189,18 +2014,20 @@ class _BookingScreenState extends State<BookingScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: AppColors.warning.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.shade200),
+                  border: Border.all(
+                      color: AppColors.warning.withValues(alpha: 0.1)),
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.warning, color: Colors.orange),
+                    Icon(Icons.warning, color: AppColors.warning),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'No doctors available in this department. Please select a different department.',
-                        style: TextStyle(fontSize: 12, color: Colors.orange),
+                        style:
+                            TextStyle(fontSize: 12, color: AppColors.warning),
                       ),
                     ),
                   ],
@@ -1225,11 +2052,13 @@ class _BookingScreenState extends State<BookingScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _isBooking || _selectedDoctorId == null || _selectedSlot == null
+                onPressed: _isBooking ||
+                        _selectedDoctorId == null ||
+                        _selectedSlot == null
                     ? null
                     : _bookAppointment,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0A4D68),
+                  backgroundColor: const Color(0xFF142D4E),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 child: _isBooking
@@ -1266,13 +2095,10 @@ class _BookingScreenState extends State<BookingScreen> {
         if (widget.qrPayload != null) 'qr_payload': widget.qrPayload,
       };
 
-      debugPrint('Creating appointment with data: $appointmentData');
       debugPrint('Hospital ID: ${widget.hospital.id}');
       debugPrint('Hospital Name: ${widget.hospital.name}');
 
       final response = await ApiService.createAppointment(appointmentData);
-
-      debugPrint('Appointment response: $response');
 
       if (response['success'] == true && mounted) {
         final booking = response['data'] is Map
@@ -1299,13 +2125,14 @@ class _BookingScreenState extends State<BookingScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade50,
+                    color: AppColors.success.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.shade200),
+                    border: Border.all(
+                        color: AppColors.success.withValues(alpha: 0.1)),
                   ),
                   child: const Text(
                     'ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ You will receive a confirmation SMS/Email shortly.',
-                    style: TextStyle(fontSize: 12, color: Colors.green),
+                    style: TextStyle(fontSize: 12, color: AppColors.success),
                   ),
                 ),
               ],
@@ -1331,7 +2158,7 @@ class _BookingScreenState extends State<BookingScreen> {
             content: Text(response['code'] == 'SLOT_UNAVAILABLE'
                 ? 'This slot is no longer available. Please select another available time.'
                 : (response['message'] ?? 'Booking failed')),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -1341,7 +2168,7 @@ class _BookingScreenState extends State<BookingScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Network error. Please try again.'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }

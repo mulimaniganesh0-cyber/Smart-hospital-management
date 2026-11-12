@@ -1,5 +1,6 @@
 // lib/screens/admin/admin_profile.dart
 import 'package:flutter/material.dart';
+import 'package:hospital_resource_management/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../login_screen.dart';
@@ -42,7 +43,7 @@ class AdminProfile extends StatelessWidget {
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF0A4D68), Color(0xFF088395)],
+                  colors: [Color(0xFF142D4E), Color(0xFF0D9488)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -53,7 +54,8 @@ class AdminProfile extends StatelessWidget {
                   const CircleAvatar(
                     radius: 50,
                     backgroundColor: Colors.white,
-                    child: Icon(Icons.admin_panel_settings, size: 50, color: Color(0xFF0A4D68)),
+                    child: Icon(Icons.admin_panel_settings,
+                        size: 50, color: Color(0xFF142D4E)),
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -66,7 +68,8 @@ class AdminProfile extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.white24,
                       borderRadius: BorderRadius.circular(20),
@@ -80,7 +83,7 @@ class AdminProfile extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            
+
             // Profile Details Card
             Container(
               decoration: BoxDecoration(
@@ -104,14 +107,14 @@ class AdminProfile extends StatelessWidget {
                         Icons.email_outlined,
                         'Email Address',
                         user?.email ?? 'admin@system.com',
-                        Colors.blue,
+                        AppColors.primary,
                       ),
                       _buildDivider(),
                       _buildProfileRow(
                         Icons.phone_outlined,
                         'Phone Number',
                         user?.phone ?? '+1 234 567 8900',
-                        Colors.green,
+                        AppColors.success,
                       ),
                     ],
                   ),
@@ -124,14 +127,14 @@ class AdminProfile extends StatelessWidget {
                         Icons.business_center,
                         'Department',
                         'IT Administration',
-                        Colors.purple,
+                        AppColors.secondary,
                       ),
                       _buildDivider(),
                       _buildProfileRow(
                         Icons.verified_outlined,
                         'Role',
                         'Super Admin',
-                        Colors.orange,
+                        AppColors.warning,
                       ),
                     ],
                   ),
@@ -145,7 +148,7 @@ class AdminProfile extends StatelessWidget {
                         icon: Icons.assessment,
                         title: 'System Reports',
                         subtitle: 'View and download reports',
-                        color: Colors.blue,
+                        color: AppColors.primary,
                         onTap: () {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
@@ -160,7 +163,7 @@ class AdminProfile extends StatelessWidget {
                         icon: Icons.download_done,
                         title: 'Downloaded Reports',
                         subtitle: 'View your downloaded reports',
-                        color: Colors.green,
+                        color: AppColors.success,
                         onTap: () {
                           _showDownloadsDialog(context);
                         },
@@ -171,7 +174,7 @@ class AdminProfile extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 32),
-            
+
             // Logout Button
             SizedBox(
               width: double.infinity,
@@ -180,19 +183,22 @@ class AdminProfile extends StatelessWidget {
                   final shouldLogout = await showDialog<bool>(
                     context: context,
                     builder: (context) => AlertDialog(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
                       title: Row(
                         children: [
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.1),
+                              color: AppColors.error.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Icon(Icons.logout, color: Colors.red),
+                            child: const Icon(Icons.logout,
+                                color: AppColors.error),
                           ),
                           const SizedBox(width: 12),
-                          const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold)),
+                          const Text('Logout',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
                         ],
                       ),
                       content: const Text('Are you sure you want to logout?'),
@@ -201,17 +207,20 @@ class AdminProfile extends StatelessWidget {
                           onPressed: () => Navigator.pop(context, false),
                           style: TextButton.styleFrom(
                             foregroundColor: Colors.grey[600],
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 12),
                           ),
                           child: const Text('Cancel'),
                         ),
                         ElevatedButton(
                           onPressed: () => Navigator.pop(context, true),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
+                            backgroundColor: AppColors.error,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
                           ),
                           child: const Text('Logout'),
                         ),
@@ -224,7 +233,8 @@ class AdminProfile extends StatelessWidget {
                     if (context.mounted) {
                       Navigator.pushAndRemoveUntil(
                         context,
-                        MaterialPageRoute(builder: (context) => const LoginScreen()),
+                        MaterialPageRoute(
+                            builder: (context) => const LoginScreen()),
                         (route) => false,
                       );
                     }
@@ -233,11 +243,13 @@ class AdminProfile extends StatelessWidget {
                 icon: const Icon(Icons.logout),
                 label: const Text('Logout'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
+                  backgroundColor: AppColors.error,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  textStyle: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
@@ -262,10 +274,10 @@ class AdminProfile extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0A4D68).withValues(alpha: 0.1),
+                  color: const Color(0xFF142D4E).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(icon, size: 20, color: const Color(0xFF0A4D68)),
+                child: Icon(icon, size: 20, color: const Color(0xFF142D4E)),
               ),
               const SizedBox(width: 12),
               Text(
@@ -284,7 +296,8 @@ class AdminProfile extends StatelessWidget {
     );
   }
 
-  Widget _buildProfileRow(IconData icon, String label, String value, Color iconColor) {
+  Widget _buildProfileRow(
+      IconData icon, String label, String value, Color iconColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -309,7 +322,8 @@ class AdminProfile extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   value,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -373,7 +387,7 @@ class AdminProfile extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.download_done, color: Colors.blue),
+            Icon(Icons.download_done, color: AppColors.primary),
             SizedBox(width: 12),
             Text('Downloaded Reports'),
           ],
@@ -403,7 +417,7 @@ class AdminProfile extends StatelessWidget {
                 icon: const Icon(Icons.assessment),
                 label: const Text('Go to Reports'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0A4D68),
+                  backgroundColor: const Color(0xFF142D4E),
                 ),
               ),
             ],

@@ -1,6 +1,20 @@
 // src/controllers/resourceController.js
 const { pool } = require('../config/database');
 const { notifyHospital, createNotification } = require('../services/notificationService');
+const { normalizeBloodGroup } = require('../services/bloodInventoryService');
+
+async function emitHospitalResourceState(req, hospitalId) {
+  const io = req.app.get('io');
+  if (!io || !hospitalId) return;
+  try {
+    const result = await pool.query('SELECT * FROM hospital_resources WHERE hospital_id=$1', [hospitalId]);
+    if (!result.rowCount) return;
+    const payload = { hospitalId, resources: result.rows[0], updatedAt: result.rows[0].updated_at };
+    io.to(`hospital_${hospitalId}`).emit('resources-changed', payload);
+  } catch (error) {
+    console.error('Hospital resource realtime notification failed:', error.message);
+  }
+}
 
 async function notifyPatientRequest({ req, request, type, title, message }) {
   if (!request.user_id) return null;
@@ -50,6 +64,12 @@ exports.requestResource = async (req, res) => {
       hospital_address 
     } = req.body;
 
+    const hospitalId = Number(hospital_id);
+    const requestedQuantity = Number(quantity ?? 1);
+    if (!Number.isSafeInteger(hospitalId) || hospitalId < 1 || !Number.isSafeInteger(requestedQuantity) || requestedQuantity < 1 || requestedQuantity > 1000) {
+      return res.status(400).json({ success: false, message: 'Select a valid hospital and a quantity from 1 to 1000.' });
+    }
+
     console.log('Resource request received:', { userId, hospital_id, resource_type, quantity });
 
     // Map resource type to database field
@@ -69,6 +89,7 @@ exports.requestResource = async (req, res) => {
       resourceField = 'oxygen_supported_beds_available';
       normalizedResourceType = 'oxygen_bed';
     }
+    if (!resourceField) return res.status(400).json({ success: false, message: 'Select a supported resource type.' });
 
     // Get patient id
     const patientResult = await pool.query(
@@ -85,12 +106,11 @@ exports.requestResource = async (req, res) => {
     if (resourceField) {
       const resourceCheck = await pool.query(
         `SELECT ${resourceField} as available FROM hospital_resources WHERE hospital_id = $1`,
-        [hospital_id]
+        [hospitalId]
       );
       
       if (resourceCheck.rows.length > 0) {
         const available = resourceCheck.rows[0].available || 0;
-        const requestedQuantity = quantity || 1;
         if (available < requestedQuantity) {
           return res.status(400).json({
             success: false,
@@ -107,13 +127,12 @@ exports.requestResource = async (req, res) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', CURRENT_TIMESTAMP)
       RETURNING *`,
       [
-        patientId, userId, hospital_id, normalizedResourceType, quantity || 1,
+        patientId, userId, hospitalId, normalizedResourceType, requestedQuantity,
         description || '', patient_name || 'Patient', patient_phone || '',
         hospital_address || ''
       ]
     );
 
-    console.log('Resource request created:', result.rows[0]);
     await notifyHospital({ io: req.app.get('io'), hospitalId: result.rows[0].hospital_id, type: 'resource_request', priority: 'high', relatedType: 'resource_request', relatedId: result.rows[0].id, patientId: result.rows[0].patient_id, title: 'NEW RESOURCE REQUEST', message: `${normalizedResourceType.replace('_', ' ')} request requires review.` });
 
     res.status(201).json({
@@ -234,7 +253,7 @@ exports.fulfillResourceRequest = async (req, res) => {
 
     // Check if request exists and is pending
     const requestResult = await client.query(
-      'SELECT * FROM resource_requests WHERE id = $1 AND hospital_id = $2 AND status = $3',
+      'SELECT * FROM resource_requests WHERE id = $1 AND hospital_id = $2 AND status = $3 FOR UPDATE',
       [requestId, hospitalId, 'pending']
     );
 
@@ -260,10 +279,16 @@ exports.fulfillResourceRequest = async (req, res) => {
       resourceField = 'oxygen_supported_beds_available';
     }
 
+    const requestedQuantity = Number(request.quantity ?? 1);
+    if (!resourceField || !Number.isSafeInteger(requestedQuantity) || requestedQuantity < 1 || requestedQuantity > 1000) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: 'This request has an invalid resource type or quantity.' });
+    }
+
     // DECREASE the available resource count
     if (resourceField) {
       const checkResult = await client.query(
-        `SELECT ${resourceField} as available FROM hospital_resources WHERE hospital_id = $1`,
+        `SELECT ${resourceField} as available FROM hospital_resources WHERE hospital_id = $1 FOR UPDATE`,
         [hospitalId]
       );
 
@@ -276,8 +301,6 @@ exports.fulfillResourceRequest = async (req, res) => {
       }
 
       const currentAvailable = checkResult.rows[0].available || 0;
-      const requestedQuantity = request.quantity || 1;
-
       if (currentAvailable < requestedQuantity) {
         await client.query('ROLLBACK');
         return res.status(400).json({ 
@@ -287,13 +310,17 @@ exports.fulfillResourceRequest = async (req, res) => {
       }
 
       // Decrease the resource count
-      await client.query(
+      const decremented = await client.query(
         `UPDATE hospital_resources 
          SET ${resourceField} = ${resourceField} - $1,
              updated_at = CURRENT_TIMESTAMP
-         WHERE hospital_id = $2`,
+         WHERE hospital_id = $2 AND ${resourceField} >= $1`,
         [requestedQuantity, hospitalId]
       );
+      if (!decremented.rowCount) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ success: false, message: 'Resource availability changed. Review the request and try again.' });
+      }
       
       console.log(`Decreased ${resourceField} by ${requestedQuantity}`);
     }
@@ -308,6 +335,8 @@ exports.fulfillResourceRequest = async (req, res) => {
     );
 
     await client.query('COMMIT');
+
+    await emitHospitalResourceState(req, result.rows[0].hospital_id);
 
     await notifyPatientRequest({ req, request: result.rows[0], type: 'resource_accepted', title: 'Resource request accepted', message: `Your ${request.resource_type.replace('_', ' ')} request has been accepted.` });
 
@@ -394,81 +423,63 @@ exports.rejectResourceRequest = async (req, res) => {
 
 // ========== FREE RESOURCE (DISCHARGE PATIENT) ==========
 exports.freeResource = async (req, res) => {
+  const client = await pool.connect();
   try {
     const userId = req.user.id;
-    const { resource_type, quantity = 1 } = req.body;
-    
-    console.log(`Freeing ${quantity} ${resource_type} resource for user: ${userId}`);
+    const { resource_type, quantity = 1 } = req.body || {};
+    const count = Number(quantity);
+    if (!Number.isSafeInteger(count) || count < 1 || count > 1000) {
+      return res.status(400).json({ success: false, message: 'Quantity must be a whole number from 1 to 1000.' });
+    }
 
-    const hospitalResult = await pool.query(
+    const hospitalResult = await client.query(
       'SELECT id FROM hospitals WHERE user_id = $1',
       [userId]
     );
-
-    if (hospitalResult.rows.length === 0) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Hospital not found' 
-      });
-    }
+    if (!hospitalResult.rowCount) return res.status(404).json({ success: false, message: 'Hospital not found' });
 
     const hospitalId = hospitalResult.rows[0].id;
+    const fields = {
+      bed: ['general_beds_available', 'general_beds_total'],
+      general_bed: ['general_beds_available', 'general_beds_total'],
+      icu: ['icu_beds_available', 'icu_beds_total'],
+      icu_bed: ['icu_beds_available', 'icu_beds_total'],
+      ventilator: ['ventilators_available', 'ventilators_total'],
+      oxygen: ['oxygen_supported_beds_available', 'oxygen_supported_beds_total'],
+      oxygen_bed: ['oxygen_supported_beds_available', 'oxygen_supported_beds_total'],
+    };
+    const [availableField, totalField] = fields[resource_type] || [];
+    if (!availableField) return res.status(400).json({ success: false, message: 'Invalid resource type.' });
 
-    // Determine which resource to update
-    let field = '';
-    if (resource_type === 'bed' || resource_type === 'general_bed') {
-      field = 'general_beds_available';
-    } else if (resource_type === 'icu' || resource_type === 'icu_bed') {
-      field = 'icu_beds_available';
-    } else if (resource_type === 'ventilator') {
-      field = 'ventilators_available';
-    } else if (resource_type === 'oxygen') {
-      field = 'oxygen_supported_beds_available';
-    } else {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Invalid resource type. Use: bed, icu, ventilator, or oxygen' 
-      });
+    await client.query('BEGIN');
+    const current = await client.query(`SELECT ${availableField} AS available, ${totalField} AS total
+      FROM hospital_resources WHERE hospital_id=$1 FOR UPDATE`, [hospitalId]);
+    if (!current.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: 'Hospital resources not found.' });
     }
-
-    // Check current available count
-    const checkResult = await pool.query(
-      `SELECT ${field} as available FROM hospital_resources WHERE hospital_id = $1`,
-      [hospitalId]
-    );
-
-    if (checkResult.rows.length === 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Hospital resources not found' 
-      });
+    if (Number(current.rows[0].available || 0) + count > Number(current.rows[0].total || 0)) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: 'Freed quantity would exceed the configured resource total.' });
     }
-
-    // Add the freed resource back (increase availability)
-    const result = await pool.query(
-      `UPDATE hospital_resources 
-       SET ${field} = ${field} + $1,
-           updated_at = CURRENT_TIMESTAMP
-       WHERE hospital_id = $2
-       RETURNING *`,
-      [quantity, hospitalId]
-    );
-
-    console.log(`Freed ${quantity} ${resource_type}(s). New available count updated.`);
-
-    res.json({
+    const result = await client.query(`UPDATE hospital_resources SET ${availableField}=${availableField}+$1,
+      updated_at=CURRENT_TIMESTAMP WHERE hospital_id=$2 AND ${availableField}+$1 <= ${totalField} RETURNING *`, [count, hospitalId]);
+    if (!result.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: 'Resource availability changed. Refresh and try again.' });
+    }
+    await client.query('COMMIT');
+    await emitHospitalResourceState(req, hospitalId);
+    return res.json({
       success: true,
-      message: `${quantity} ${resource_type}(s) freed successfully. Resource is now available.`,
+      message: `${count} ${resource_type}(s) freed successfully. Resource is now available.`,
       data: result.rows[0],
     });
   } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('Free resource error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error', 
-      error: error.message 
-    });
-  }
+    return res.status(500).json({ success: false, message: 'Server error' });
+  } finally { client.release(); }
 };
 
 // ==================== BLOOD REQUESTS ====================
@@ -484,23 +495,15 @@ exports.requestBlood = async (req, res) => {
       hospital_address 
     } = req.body;
 
-    console.log('Blood request:', { userId, hospital_id, blood_group, units_required });
-
-    // Check if blood is available
-    const bloodCheck = await pool.query(
-      'SELECT units_available FROM blood_bank WHERE hospital_id = $1 AND blood_group = $2',
-      [hospital_id, blood_group]
-    );
-    
-    if (bloodCheck.rows.length > 0) {
-      const available = bloodCheck.rows[0].units_available || 0;
-      if (available < (units_required || 1)) {
-        return res.status(400).json({
-          success: false,
-          message: `Not enough ${blood_group} blood available. Available: ${available}, Requested: ${units_required || 1}`
-        });
-      }
+    const hospitalId = Number(hospital_id);
+    const bloodGroup = normalizeBloodGroup(blood_group);
+    const units = Number(units_required ?? 1);
+    if (!Number.isSafeInteger(hospitalId) || hospitalId < 1 || !bloodGroup ||
+        !Number.isSafeInteger(units) || units < 1 || units > 1000) {
+      return res.status(400).json({ success: false, message: 'Select a valid hospital and blood group, and request between 1 and 1000 units.' });
     }
+    const hospital = await pool.query('SELECT id FROM hospitals WHERE id=$1', [hospitalId]);
+    if (!hospital.rowCount) return res.status(404).json({ success: false, message: 'Hospital not found.' });
 
     const patientResult = await pool.query(
       'SELECT id FROM patients WHERE user_id = $1',
@@ -519,12 +522,11 @@ exports.requestBlood = async (req, res) => {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', CURRENT_TIMESTAMP)
       RETURNING *`,
       [
-        patientId, userId, hospital_id, blood_group, units_required || 1,
+        patientId, userId, hospitalId, bloodGroup, units,
         patient_name || 'Patient', hospital_address || ''
       ]
     );
 
-    console.log('Blood request created:', result.rows[0]);
     // The notification record is persisted before Socket.IO delivery. Failure
     // to notify must not invalidate the patient's already-created request.
     try {
@@ -647,9 +649,14 @@ exports.fulfillBloodRequest = async (req, res) => {
 
     const hospitalId = hospitalResult.rows[0].id;
 
+    const requestIdNumber = Number(requestId);
+    if (!Number.isSafeInteger(requestIdNumber) || requestIdNumber < 1) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, message: 'Invalid blood request ID.' });
+    }
     const requestResult = await client.query(
-      'SELECT * FROM blood_requests WHERE id = $1 AND hospital_id = $2 AND status = $3',
-      [requestId, hospitalId, 'pending']
+      'SELECT * FROM blood_requests WHERE id = $1 AND hospital_id = $2 AND status = $3 FOR UPDATE',
+      [requestIdNumber, hospitalId, 'pending']
     );
 
     if (requestResult.rows.length === 0) {
@@ -663,50 +670,60 @@ exports.fulfillBloodRequest = async (req, res) => {
     const request = requestResult.rows[0];
 
     // Check if enough blood is available
-    const checkResult = await client.query(
-      `SELECT units_available FROM blood_bank 
-       WHERE hospital_id = $1 AND blood_group = $2`,
-      [hospitalId, request.blood_group]
-    );
-
-    if (checkResult.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ 
-        success: false, 
-        message: `Blood group ${request.blood_group} not found in hospital inventory` 
-      });
-    }
-
-    const currentAvailable = checkResult.rows[0].units_available || 0;
-    if (currentAvailable < request.units_required) {
-      await client.query('ROLLBACK');
-      return res.status(400).json({ 
-        success: false, 
-        message: `Insufficient blood. Available: ${currentAvailable}, Requested: ${request.units_required}` 
-      });
-    }
-
-    // Decrease blood stock
-    await client.query(
+    // Conditional decrement protects against concurrent requests consuming the
+    // same stock after an earlier availability check.
+    const stockResult = await client.query(
       `UPDATE blood_bank 
        SET units_available = units_available - $1,
            last_updated = CURRENT_TIMESTAMP
-       WHERE hospital_id = $2 AND blood_group = $3`,
+       WHERE hospital_id = $2 AND blood_group = $3 AND units_available >= $1
+         AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)
+       RETURNING id, units_available`,
       [request.units_required, hospitalId, request.blood_group]
+    );
+    if (!stockResult.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: `Insufficient ${request.blood_group} blood inventory to fulfill this request.` });
+    }
+    await client.query(
+      `INSERT INTO blood_inventory_transactions
+         (hospital_id, blood_bank_id, blood_group, transaction_type, units, reference_type, reference_id, created_by)
+       VALUES ($1, $2, $3, 'ISSUED', $4, 'BLOOD_REQUEST', $5, $6)`,
+      [hospitalId, stockResult.rows[0].id, request.blood_group, request.units_required, request.id, userId]
     );
 
     // Update request status
     const result = await client.query(
       `UPDATE blood_requests 
        SET status = 'fulfilled', fulfilled_date = CURRENT_TIMESTAMP
-       WHERE id = $1
+       WHERE id = $1 AND hospital_id = $2 AND status = 'pending'
        RETURNING *`,
-      [requestId]
+      [requestIdNumber, hospitalId]
     );
+    if (!result.rowCount) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ success: false, message: 'This blood request has already been processed.' });
+    }
 
     await client.query('COMMIT');
 
-    await notifyPatientRequest({ req, request: result.rows[0], type: 'blood_accepted', title: 'Blood request accepted', message: `Your ${request.blood_group} blood request has been accepted.` });
+    const io = req.app?.get?.('io');
+    if (io) {
+      try {
+        const inventory = await pool.query(`SELECT blood_group,units_available FROM blood_bank
+          WHERE hospital_id=$1 AND (expiry_date IS NULL OR expiry_date >= CURRENT_DATE)`, [hospitalId]);
+        io.to(`hospital_${hospitalId}`).emit('blood-stock-changed', { hospitalId, inventory: inventory.rows });
+        io.emit('global-blood-stock-changed', { hospitalId, inventory: inventory.rows });
+      } catch (notificationError) {
+        console.error('Blood fulfillment inventory event failed:', notificationError.message);
+      }
+    }
+
+    try {
+      await notifyPatientRequest({ req, request: result.rows[0], type: 'blood_accepted', title: 'Blood request accepted', message: `Your ${request.blood_group} blood request has been accepted.` });
+    } catch (notificationError) {
+      console.error('Blood fulfillment notification failed:', notificationError.message);
+    }
 
     console.log(`Blood request ${requestId} fulfilled successfully`);
 
@@ -765,7 +782,11 @@ exports.rejectBloodRequest = async (req, res) => {
     }
 
     console.log(`Blood request ${requestId} rejected`);
-    await notifyPatientRequest({ req, request: result.rows[0], type: 'blood_rejected', title: 'Blood request rejected', message: `Your ${result.rows[0].blood_group} blood request was rejected.` });
+    try {
+      await notifyPatientRequest({ req, request: result.rows[0], type: 'blood_rejected', title: 'Blood request rejected', message: `Your ${result.rows[0].blood_group} blood request was rejected.` });
+    } catch (notificationError) {
+      console.error('Blood rejection notification failed:', notificationError.message);
+    }
 
     res.json({
       success: true,

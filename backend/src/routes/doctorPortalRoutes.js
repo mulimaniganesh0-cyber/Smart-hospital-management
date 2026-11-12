@@ -1,0 +1,16 @@
+const router=require('express').Router();
+const { protect, authorize }=require('../middleware/auth');
+const doctor=require('../controllers/doctorPortalController');
+router.use(protect,authorize('doctor'),doctor.requireDoctor);
+router.get('/profile',doctor.profile);
+router.get('/appointments',doctor.appointments);
+router.get('/patients',doctor.patients);
+router.get('/reports',doctor.reports);
+router.put('/availability',doctor.setAvailability);
+router.get('/appointment-schedule',doctor.appointmentSchedule);
+router.put('/appointments/:appointmentId/status',doctor.changeAppointment);
+router.post('/appointments/:appointmentId/consultation/start',doctor.startConsultation);
+router.get('/appointments/:appointmentId/consultation-context',doctor.consultationContext);
+router.put('/appointments/:appointmentId/report',doctor.saveReport);
+router.put('/appointments/:appointmentId/prescription',doctor.savePrescription);
+module.exports=router;

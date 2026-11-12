@@ -101,6 +101,7 @@ class HospitalRecommendation {
   final double longitude;
   final double? entranceLatitude;
   final double? entranceLongitude;
+  final bool entranceVerified;
   final String? openingHours;
   final List<DoctorRecommendation> doctors;
   final double? googleRating;
@@ -127,6 +128,7 @@ class HospitalRecommendation {
     this.longitude = 0,
     this.entranceLatitude,
     this.entranceLongitude,
+    this.entranceVerified = false,
     this.openingHours,
     this.doctors = const [],
     this.googleRating,
@@ -155,6 +157,7 @@ class HospitalRecommendation {
       'longitude': longitude,
       'entranceLatitude': entranceLatitude,
       'entranceLongitude': entranceLongitude,
+      'entranceVerified': entranceVerified,
       'openingHours': openingHours,
       'doctors': doctors.map((item) => item.toJson()).toList(),
       'googleRating': googleRating,
@@ -184,6 +187,7 @@ class HospitalRecommendation {
       longitude: (json['longitude'] as num?)?.toDouble() ?? 0,
       entranceLatitude: (json['entranceLatitude'] as num?)?.toDouble(),
       entranceLongitude: (json['entranceLongitude'] as num?)?.toDouble(),
+      entranceVerified: json['entranceVerified'] == true,
       openingHours: json['openingHours'],
       doctors: (json['doctors'] as List? ?? const [])
           .whereType<Map>()

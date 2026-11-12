@@ -14,9 +14,8 @@ class PatientLocationException implements Exception {
 
 class LocationService {
   static const _languages = ['English', 'Hindi', 'Kannada'];
-  // Session-only cache. A browser may have a perfectly usable Wi-Fi position
-  // indoors, then fail to produce a new fix on the following request.
-  static Position? _lastValidPosition;
+  static const Duration maxFixAge = Duration(seconds: 30);
+  static const double maxAcceptedAccuracyMeters = 1000;
 
   static List<String> getSupportedLanguages() => _languages;
 
@@ -33,6 +32,9 @@ class LocationService {
       return await getBestAvailableLocation();
     } on PatientLocationException {
       return null;
+    } catch (error) {
+      developer.log('Location acquisition failed: $error', name: 'Location');
+      return null;
     }
   }
 
@@ -42,21 +44,33 @@ class LocationService {
       position.latitude >= -90 &&
       position.latitude <= 90 &&
       position.longitude >= -180 &&
-      position.longitude <= 180;
+      position.longitude <= 180 &&
+      position.accuracy.isFinite &&
+      position.accuracy >= 0 &&
+      position.accuracy <= maxAcceptedAccuracyMeters &&
+      isRecent(position.timestamp);
 
-  static void _cache(Position position) {
-    _lastValidPosition = position;
-    developer.log(
-      'Cached valid location; latitude=${position.latitude}; '
-      'longitude=${position.longitude}; accuracy=${position.accuracy}m',
-      name: 'Location',
-    );
+  static bool isRecent(DateTime timestamp, {DateTime? now}) {
+    final age = (now ?? DateTime.now()).difference(timestamp);
+    return age >= const Duration(seconds: -5) && age <= maxFixAge;
   }
 
-  /// Gets one current browser position and falls back to the browser's last
-  /// known position or this CareGuide session's cached position. Accuracy is
-  /// informational: indoor Chrome positions remain useful for nearby search.
+  /// Gets one fresh device/browser position. Never substitutes an old fix or
+  /// a cached coordinate when the platform cannot provide a current reading.
   static Future<Position> getBestAvailableLocation() async {
+    try {
+      return await _acquireFreshLocation();
+    } on PatientLocationException {
+      rethrow;
+    } catch (error) {
+      developer.log('Location acquisition failed: $error', name: 'Location');
+      throw const PatientLocationException(
+        'Unable to determine your current location. Please check permissions and try again.',
+      );
+    }
+  }
+
+  static Future<Position> _acquireFreshLocation() async {
     developer.log('[Location] Checking service...', name: 'Location');
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     developer.log('Service enabled: $serviceEnabled', name: 'Location');
@@ -71,7 +85,8 @@ class LocationService {
     developer.log('Permission status: $permission', name: 'Location');
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      developer.log('Permission requested; status: $permission', name: 'Location');
+      developer.log('Permission requested; status: $permission',
+          name: 'Location');
     }
     if (permission == LocationPermission.deniedForever) {
       throw const PatientLocationException(
@@ -85,25 +100,22 @@ class LocationService {
     }
 
     try {
-      developer.log('[Location] Requesting current browser location...', name: 'Location');
+      developer.log('[Location] Requesting a fresh high-accuracy position...',
+          name: 'Location');
       final position = await Geolocator.getCurrentPosition(
-        // High accuracy can wait indefinitely indoors on Chrome. Medium uses
-        // the best promptly available browser fix; its accuracy is retained
-        // for the UI to communicate any uncertainty.
-        desiredAccuracy: LocationAccuracy.medium,
+        desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 20),
       );
       if (isUsablePosition(position)) {
         developer.log(
-          '[Location] Position received; latitude=${position.latitude}; '
-          'longitude=${position.longitude}; accuracy=${position.accuracy}m'
-          '${position.accuracy > 200 ? '; accuracy is low but position is usable' : ''}',
+          '[Location] Fresh position received; accuracy=${position.accuracy}m',
           name: 'Location',
         );
-        _cache(position);
         return position;
       }
-      developer.log('[Location] Browser returned invalid coordinates', name: 'Location');
+      throw const PatientLocationException(
+        'The location fix is invalid, stale, or too inaccurate. Please retry with location services enabled.',
+      );
     } on LocationServiceDisabledException {
       throw const PatientLocationException(
         'Please enable location services and try again.',
@@ -113,25 +125,12 @@ class LocationService {
         'Location permission is required to use your current location.',
       );
     } on TimeoutException catch (_) {
-      developer.log('[Location] Current location timed out; trying fallbacks', name: 'Location');
+      developer.log('[Location] Fresh location request timed out',
+          name: 'Location');
     } catch (error) {
-      developer.log('[Location] Current location failed; trying fallbacks: $error', name: 'Location');
-    }
-
-    try {
-      developer.log('[Location] Trying last known browser location...', name: 'Location');
-      final lastKnown = await Geolocator.getLastKnownPosition();
-      if (lastKnown != null && isUsablePosition(lastKnown)) {
-        _cache(lastKnown);
-        developer.log('[Location] Using last known browser location', name: 'Location');
-        return lastKnown;
-      }
-    } catch (error) {
-      developer.log('[Location] Last known location unavailable: $error', name: 'Location');
-    }
-    if (_lastValidPosition != null && isUsablePosition(_lastValidPosition!)) {
-      developer.log('[Location] Using cached CareGuide session location', name: 'Location');
-      return _lastValidPosition!;
+      if (error is PatientLocationException) rethrow;
+      developer.log('[Location] Fresh location request failed: $error',
+          name: 'Location');
     }
     developer.log('[Location] No usable location available', name: 'Location');
     throw const PatientLocationException(
@@ -139,7 +138,7 @@ class LocationService {
     );
   }
 
-  /// Compatibility entry point for existing screens. It now uses the same
-  /// controlled fallback strategy as CareGuide instead of creating retries.
-  static Future<Position> getFreshPatientLocation() => getBestAvailableLocation();
+  /// Compatibility entry point for existing screens; it requires a fresh fix.
+  static Future<Position> getFreshPatientLocation() =>
+      getBestAvailableLocation();
 }
